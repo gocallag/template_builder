@@ -1,0 +1,14 @@
+---
+# roles:
+#   - src: http://gitlab.thewarren.au/keo/patching.git
+#     version: main
+#     name: patching
+#     scm: git
+#   - src: http://github.com/gocallag/utils.git
+#     version: main
+#     name: utils
+#     scm: git
+#   - src: http://gitlab.thewarren.au/lab/hardening.git
+#     version: main
+#     name: hardening
+#     scm: git

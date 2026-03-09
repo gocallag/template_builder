@@ -1,0 +1,40 @@
+{
+  "build": {
+  "dockerfile": "Dockerfile"
+},
+
+  "containerUser": "root",
+  "overrideCommand": true,
+  "updateRemoteUserUID": false,
+
+  "runArgs": [
+    "--privileged",
+    "--add-host=host.docker.internal:host-gateway",
+    "--env-file", "/home/${localEnv:USER}/.template_builder/credentials.sh"
+  ],
+
+  "remoteEnv": {
+    "DOCKER_HOST": "unix:///var/run/docker.sock",
+    "DOCKER_SKIP": "true",
+    "REMOTE_CONTAINERS_NO_WSL": "true",
+    "SHELL": "/bin/bash"
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-azuretools.vscode-containers"
+      ],
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+
+  "mounts": [
+    "type=bind,source=/dev,target=/dev",
+    "type=bind,source=/home/${localEnv:USER}/.ssh,target=/root/.ssh,readonly",
+    "type=bind,source=/home/${localEnv:USER}/template_builder,target=/build",
+    "type=bind,source=/home/${localEnv:USER}/.template_builder/credentials.sh,target=/root/credentials.sh,readonly"
+  ]
+}
