@@ -70,7 +70,7 @@ RUN chmod -R 755 /usr/share/ansible/collections || true
 
 # Copy roles installed by the builder stage
 COPY --from=builder /tmp/ansible_roles/ /usr/share/ansible/roles/
-RUN chown -R 1000:0 /usr/share/ansible/roles || true && chmod -R 755 /usr/share/ansible/roles || true
+RUN chown -R 1001:0 /usr/share/ansible/roles || true && chmod -R 755 /usr/share/ansible/roles || true
 
 # ------------------------------------------------------------
 # 5. Create roles directory (AWX expects it)
