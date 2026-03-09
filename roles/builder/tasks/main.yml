@@ -2,15 +2,15 @@
 - name: (MAIN) Assert required build variables are defined
   ansible.builtin.assert:
     that:
-      - env_qemu_ip is defined and env_qemu_ip | trim | length > 0
-      - env_build_path is defined and env_build_path and (env_build_path | trim | length > 0)
-      - env_ansible_user is defined and env_ansible_user and (env_ansible_user | trim | length > 0)
-      - env_ansible_password is defined and env_ansible_password and (env_ansible_password | trim | length > 0)
-      - env_linux_admin_user is defined and env_linux_admin_user and (env_linux_admin_user | trim | length > 0)
-      - env_linux_admin_password is defined and env_linux_admin_password and (env_linux_admin_password | trim | length > 0)
-      - env_WIN_ADMIN_USER is defined and env_WIN_ADMIN_USER and (env_WIN_ADMIN_USER | trim | length > 0)
-      - env_WIN_ADMIN_PASSWORD is defined and env_WIN_ADMIN_PASSWORD and (env_WIN_ADMIN_PASSWORD | trim | length > 0)
-      - env_ansible_key is defined and env_ansible_key and (env_ansible_key | trim | length > 0)
+      - builder_env_qemu_ip is defined and builder_env_qemu_ip | trim | length > 0
+      - builder_env_build_path is defined and builder_env_build_path and (builder_env_build_path | trim | length > 0)
+      - builder_env_ansible_user is defined and builder_env_ansible_user and (builder_env_ansible_user | trim | length > 0)
+      - builder_env_ansible_password is defined and builder_env_ansible_password and (builder_env_ansible_password | trim | length > 0)
+      - builder_env_linux_admin_user is defined and builder_env_linux_admin_user and (builder_env_linux_admin_user | trim | length > 0)
+      - builder_env_linux_admin_password is defined and builder_env_linux_admin_password and (builder_env_linux_admin_password | trim | length > 0)
+      - builder_env_win_admin_user is defined and builder_env_win_admin_user and (builder_env_win_admin_user | trim | length > 0)
+      - builder_env_win_admin_password is defined and builder_env_win_admin_password and (builder_env_win_admin_password | trim | length > 0)
+      - builder_env_ansible_key is defined and builder_env_ansible_key and (builder_env_ansible_key | trim | length > 0)
     fail_msg: "(MAIN) One or more required variables are not defined correctly."
     success_msg: "(MAIN) All required variables are defined and appear valid."
   tags:                       # list all the tags used role wide so we can see them with a list-tags command
@@ -53,7 +53,7 @@
         loop_var: builder_buildtask
     - name: (MAIN) cleanup build path
       ansible.builtin.file:
-        path: "{{ build_basedir }}"
+        path: "{{ builder_env_build_path }}"
         state: absent
       become: true
       tags:
