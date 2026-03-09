@@ -14,6 +14,7 @@ RUN set -eux; \
 # Copy the EE directory from the build context into the builder stage.
 # When building from the repository root: docker build -f ee/Dockerfile .
 COPY . /tmp/ee/
+RUN mkdir -p /tmp/ansible_roles
 
 # Ensure ansible-galaxy is available; some runner images include it, but install ansible-core if missing
 RUN set -eux; \
