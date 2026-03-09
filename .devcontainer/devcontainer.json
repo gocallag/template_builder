@@ -23,7 +23,8 @@
   "customizations": {
     "vscode": {
       "extensions": [
-        "ms-azuretools.vscode-containers"
+        "ms-azuretools.vscode-containers",
+        "redhat.ansible"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
