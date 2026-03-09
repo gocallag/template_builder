@@ -7,3 +7,4 @@ ovirt-engine-sdk-python==4.6.3
 lxml==6.0.2
 python-dateutil==2.9.0.post0
 six==1.17.0
+ansible-lint==26.3.0
