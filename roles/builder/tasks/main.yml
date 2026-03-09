@@ -1,0 +1,84 @@
+---
+- name: (MAIN) Assert required build variables are defined
+  ansible.builtin.assert:
+    that:
+      - env_qemu_ip is defined and env_qemu_ip | trim | length > 0
+      - env_build_path is defined and env_build_path and (env_build_path | trim | length > 0)
+      - env_ansible_user is defined and env_ansible_user and (env_ansible_user | trim | length > 0)
+      - env_ansible_password is defined and env_ansible_password and (env_ansible_password | trim | length > 0)
+      - env_linux_admin_user is defined and env_linux_admin_user and (env_linux_admin_user | trim | length > 0)
+      - env_linux_admin_password is defined and env_linux_admin_password and (env_linux_admin_password | trim | length > 0)
+      - env_WIN_ADMIN_USER is defined and env_WIN_ADMIN_USER and (env_WIN_ADMIN_USER | trim | length > 0)
+      - env_WIN_ADMIN_PASSWORD is defined and env_WIN_ADMIN_PASSWORD and (env_WIN_ADMIN_PASSWORD | trim | length > 0)
+      - env_ansible_key is defined and env_ansible_key and (env_ansible_key | trim | length > 0)
+    fail_msg: "(MAIN) One or more required variables are not defined correctly."
+    success_msg: "(MAIN) All required variables are defined and appear valid."
+  tags:                       # list all the tags used role wide so we can see them with a list-tags command
+    - always
+    - build_targets
+    - build_target_proxmox
+    - build_target_ovirt
+    - build_fetch_iso
+    - build_base
+    - build_aux
+    - build_customise
+    - build_cleanup
+- name: (MAIN) Drive Setup
+  ansible.builtin.include_role:
+    name: builder
+    tasks_from: setup
+  tags:
+    - always
+
+
+- name: (MAIN) add default build steps if none are defined
+  ansible.builtin.set_fact:
+    builder_build: "{{ builder_build_default }}"
+  when: builder_build is not defined or builder_build | length == 0
+  tags:
+    - always
+- name: (MAIN) Perform the build
+  block:
+    - name: (MAIN) include build roles if any are defined
+      ansible.builtin.include_role:
+        name: builder
+        tasks_from: "glue/glue.yml"
+      tags:
+        - always
+      vars:
+        builder_stage: "{{ builder_buildtask.name }}"
+        builder_task_vars: "{{ builder_buildtask.task_vars | default({}) }}"
+      loop: "{{ builder_build | default([]) }}"
+      loop_control:
+        loop_var: builder_buildtask
+    - name: (MAIN) cleanup build path
+      ansible.builtin.file:
+        path: "{{ build_basedir }}"
+        state: absent
+      become: true
+      tags:
+        - build_cleanup
+  rescue:
+    - name: "(MAIN) Show error on failure"
+      ansible.builtin.debug:
+        msg: >-
+          (MAIN) Task '{{ ansible_failed_task }}' failed.
+          {{ ansible_failed_result.msg | default('no additional message') }}
+      tags:
+        - always
+  always:
+    - name: (MAIN) Display Webserver job_id
+      ansible.builtin.debug:
+        msg: "(MAIN) Webserver jobid is {{ webserver.ansible_job_id }} "
+      when: webserver is defined and webserver.ansible_job_id is defined
+      tags:
+        - always
+    - name: (MAIN) kill dangly web servers
+      ansible.builtin.shell: |
+        kill {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
+        sleep 5
+        kill -9 {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
+      when: webserver is defined and webserver.ansible_job_pid is defined
+      changed_when: false
+      tags:
+        - always
