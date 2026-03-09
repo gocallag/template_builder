@@ -1,4 +1,5 @@
-# roles:
+---
+roles:
 #   - src: http://gitlab.thewarren.au/keo/patching.git
 #     version: main
 #     name: patching
