@@ -1,0 +1,7 @@
+---
+- name: (GLUE) include the designated task
+  ansible.builtin.include_tasks: "glue/{{ builder_stage }}.yml"
+  tags:
+      - always
+  vars:
+      builder_glue_task_vars: "{{ builder_task_vars | default({}) }}"

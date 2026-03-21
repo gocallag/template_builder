@@ -1,0 +1,6 @@
+---
+- name: (GLUE) trigger buildaux
+  ansible.builtin.include_tasks:
+    file: buildaux.yml # straight pass through of buildaux as we dont have glue variables to set
+  tags:
+    - build_aux
