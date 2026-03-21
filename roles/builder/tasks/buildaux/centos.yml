@@ -1,0 +1,7 @@
+  # Centos-Based Systems, treat as RedHat
+- name: (BUILDAUX, Centos)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, Centos)
+        ansible.builtin.include_tasks: buildaux/rhel.yml
