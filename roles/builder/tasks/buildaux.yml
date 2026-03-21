@@ -1,0 +1,21 @@
+---
+- name: (BUILDAUX)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX) create build AUX directories
+        ansible.builtin.file:
+            path: "{{ file }}"
+            state: directory
+            mode: "755"
+        loop_control:
+            loop_var: file
+        loop:
+            - "{{ builder_build_basedir }}/build/iso_contents"
+            - "{{ builder_build_basedir }}/build/iso_contents/drivers"
+            - "{{ builder_build_basedir }}/build/iso_contents/tools"
+            - "{{ builder_build_basedir }}/build/iso_contents/patches"
+      - name: (BUILDAUX) include variant-specific tasks
+        ansible.builtin.include_tasks:
+            file: buildaux/{{ os.variant | lower }}.yml
+        when: os.variant is defined
