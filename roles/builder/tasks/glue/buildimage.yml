@@ -1,0 +1,5 @@
+---
+- name: (GLUE-BUILDIMAGE)
+  ansible.builtin.include_tasks: buildimage.yml
+  tags:
+      - always
