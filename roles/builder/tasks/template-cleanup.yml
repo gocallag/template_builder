@@ -1,0 +1,312 @@
+---
+- name: (TEMPLATE-CLEANUP) Initial Setup
+  tags:
+      - build_customise
+  block:
+      # Debug Information
+      - name: (TEMPLATE-CLEANUP) Debug OS Information
+        ansible.builtin.debug:
+            msg:
+                - "OS Family: {{ ansible_os_family }}"
+                - "OS Distribution: {{ ansible_distribution }}"
+                - "OS Variant: {{ os.variant | default('unknown') | lower }}"
+
+    # RedHat-Based Systems
+      - name: (TEMPLATE-CLEANUP, redhat) Setup
+        when: os.variant|lower in ["redhat","almalinux"]
+        block:
+            - name: (TEMPLATE-CLEANUP, redhat) Ensure dnf-utils is installed
+              ansible.builtin.shell: |
+                  dnf install -y dnf-utils
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, redhat, almalinux) Remove old kernels (if permitted)
+              ansible.builtin.shell: dnf remove -y $(dnf repoquery --installonly --latest-limit=-1 -q)
+              become: true
+              changed_when: true
+              when: ansible_distribution_major_version|int >= 8
+              delegate_to: bob_build
+              ignore_errors: true # noqa: ignore-errors
+
+            - name: (TEMPLATE-CLEANUP, redhat) Delete YUM cache
+              ansible.builtin.shell: |
+                  dnf clean all
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, redhat) Remove kickstart files
+              ansible.builtin.file:
+                  path: "{{ item }}"
+                  state: absent
+              loop:
+                  - /root/anaconda-ks.cfg
+                  - /root/original-ks.cfg
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, redhat) Cleanup NetworkManager
+              ansible.builtin.shell: rm -f /etc/NetworkManager/system-connections/*
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, redhat) Cleanup network-scripts
+              ansible.builtin.shell: rm -f /etc/sysconfig/network-scripts/ifcfg*
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+
+      # Common Linux Cleanup Tasks
+      - name: (TEMPLATE-CLEANUP, common Linux) Common Linux Cleanup
+        when: os.type | lower == "linux"
+        block:
+            - name: (TEMPLATE-CLEANUP, common Linux) Find temporary files
+              ansible.builtin.find:
+                  file_type: any
+                  paths:
+                      - /tmp
+                      - /var/tmp
+                  patterns: "*"
+              register: tmp_files # noqa: var-naming
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Remove temporary files
+              ansible.builtin.file:
+                  path: "{{ item.path }}"
+                  state: absent
+              loop: "{{ tmp_files.files }}"
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Truncate files
+              ansible.builtin.command: "truncate -s 0 {{ item }}"
+              loop:
+                  - /etc/machine-id
+                  - /etc/hostname
+                  - /etc/resolv.conf
+                  - /var/log/wtmp
+                  - /var/log/lastlog
+                  - /var/log/btmp
+                  - /var/log/cron
+                  - /var/log/maillog
+                  - /var/log/messages
+                  - /var/log/secure
+                  - /var/log/spooler
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Remove log folders
+              ansible.builtin.file:
+                  path: "{{ item }}"
+                  state: absent
+              loop:
+                  - /var/log/qemu-ga
+                  - /var/log/tuned
+                  - /var/lib/cloud
+                  - /etc/machine-info
+                  - /var/lib/systemd/credential.secret
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Find log files
+              ansible.builtin.find:
+                  paths:
+                      - /var/log
+                      - /var/log/sssd
+                  patterns: "*log,*.old,*.log.gz,*.[0-9],*.gz,*-????????"
+              register: log_files # noqa: var-naming
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Remove log files
+              ansible.builtin.file:
+                  path: "{{ item.path }}"
+                  state: absent
+              loop: "{{ log_files.files }}"
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Remove random-seed
+              ansible.builtin.file:
+                  path: /var/lib/systemd/random-seed
+                  state: absent
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Get mounted filesystems
+              ansible.builtin.command: df --output=target
+              register: mounted_filesystems # noqa: var-naming
+              changed_when: false
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Debug mounted filesystems
+              ansible.builtin.debug:
+                  var: builder_mounted_filesystems.stdout_lines
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Check if fstrim is available
+              ansible.builtin.command: which fstrim
+              register: fstrim_check # noqa: var-naming
+              ignore_errors: true
+              changed_when: false
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Use fstrim on all filesystems if available
+              ansible.builtin.command: fstrim -v {{ item }}
+              loop: "{{ mounted_filesystems.stdout_lines }}"
+              when:
+                  - fstrim_check.rc == 0
+                  - item not in ['/proc', '/sys', '/dev', '/run', '/snap']  # Exclude non-TRIM filesystems
+              changed_when: false
+              become: true
+              ignore_errors: true # noqa: ignore-errors
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Check if fallocate is available
+              ansible.builtin.command: which fallocate
+              register: fallocate_check # noqa: var-naming
+              ignore_errors: true # noqa: ignore-errors
+              changed_when: false
+              become: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Use fallocate to zero free space on all filesystems
+              ansible.builtin.shell: "set -o pipefail; fallocate --zero-range -o 0 -l $(df --output=avail {{ item }} | tail -1)K {{ item }}/zeroed_file || rm -f {{ item }}/zeroed_file"
+              loop: "{{ mounted_filesystems.stdout_lines }}"
+              when:
+                  - fstrim_check.rc != 0
+                  - fallocate_check.rc == 0
+                  - item not in ['/proc', '/sys', '/dev', '/run']  # Exclude non-TRIM filesystems
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Fallback to dd if fallocate is not available
+              ansible.builtin.shell: dd if=/dev/zero of={{ item }}/zeroed_file bs=1M oflag=direct || rm -f {{ item }}/zeroed_file
+              loop: "{{ mounted_filesystems.stdout_lines }}"
+              when:
+                  - fstrim_check.rc != 0
+                  - fallocate_check.rc != 0
+                  - item not in ['/proc', '/sys', '/dev', '/run']  # Exclude non-TRIM filesystems
+              become: true
+              changed_when: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, common Linux) Sync disk
+              ansible.builtin.command: sync
+              become: true
+              changed_when: false
+              delegate_to: bob_build
+
+      # Final Cleanup
+      - name: (TEMPLATE-CLEANUP, common Linux) Remove SSH host keys and shutdown
+        ansible.builtin.shell: rm -f /etc/ssh/*host*key* && shutdown -h -t now && sleep 120
+        become: true
+        ignore_errors: true # noqa: ignore-errors
+        ignore_unreachable: true
+        changed_when: true
+        delegate_to: bob_build
+        when: os.type == "linux"
+      # Windows Systems
+      - name: (TEMPLATE-CLEANUP, windows) Cleanup block
+        when: os.variant|lower == "windows"
+        block:
+            - name: (TEMPLATE-CLEANUP, windows) Check if SoftwareDistribution folder exists
+              ansible.windows.win_stat:
+                  path: c:\Windows\SoftwareDistribution\Download
+              register: software_distribution # noqa: var-naming
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, windows) Cleaning updates
+              ansible.windows.win_shell: |
+                Write-Host "Cleaning updates..."
+                Stop-Service -Name wuauserv -Force
+                Remove-Item c:\Windows\SoftwareDistribution\Download\* -Recurse -Force
+                Start-Service -Name wuauserv
+              when: software_distribution.stat.exists
+              register: oput # noqa: var-naming
+              ignore_errors: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, windows) Cleaning SxS
+              ansible.windows.win_shell: |
+                Write-Host "Cleaning SxS..."
+                Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase
+              register: oput # noqa: var-naming
+              ignore_errors: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, windows) Remove cruft
+              ansible.windows.win_shell: |
+                @(
+                  "$env:localappdata\Nuget",
+                  "$env:localappdata\temp\*",
+                  "$env:windir\logs",
+                  "$env:windir\panther",
+                  "$env:windir\temp\*",
+                  "$env:windir\winsxs\manifestcache"
+                ) | % {
+                  if(Test-Path $_) {
+                    Write-Host "Removing $_"
+                    try {
+                      Takeown /d Y /R /f $_
+                      Icacls $_ /GRANT:r administrators:F /T /c /q  2>&1 | Out-Null
+                      Remove-Item $_ -Recurse -Force | Out-Null
+                    } catch { $global:error.RemoveAt(0) }
+                  }
+                }
+              register: oput # noqa: var-naming
+              ignore_errors: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, windows) Defragging
+              ansible.windows.win_shell: |
+                Write-Host "Defragging..."
+                if (Get-Command Optimize-Volume -ErrorAction SilentlyContinue) {
+                  Optimize-Volume -DriveLetter C
+                } else {
+                  Defrag.exe c: /H
+                }
+              register: oput # noqa: var-naming
+              ignore_errors: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, windows) Zero empty space
+              ansible.windows.win_shell: |
+                    Write-Host "Zeroing out empty space using SDelete..."
+                    $SDeleteUrl = "https://download.sysinternals.com/files/SDelete.zip"
+                    $SDeleteZip = "$env:TEMP\SDelete.zip"
+                    $SDeletePath = "$env:TEMP\SDelete.exe"
+
+                    # Download SDelete
+                    Invoke-WebRequest -Uri $SDeleteUrl -OutFile $SDeleteZip -UseBasicParsing
+
+                    # Extract SDelete
+                    Add-Type -AssemblyName System.IO.Compression.FileSystem
+                    [System.IO.Compression.ZipFile]::ExtractToDirectory($SDeleteZip, $env:TEMP)
+
+                    # Run SDelete to zero out free space
+                    & $SDeletePath -z C:
+
+                    # Cleanup
+                    Remove-Item $SDeleteZip -Force
+                    Remove-Item $SDeletePath -Force
+              register: oput # noqa: var-naming
+              ignore_errors: true
+              delegate_to: bob_build
+
+            - name: (TEMPLATE-CLEANUP, windows) Shut down Windows system
+              ansible.windows.win_shell: shutdown /s /t 0
+              ignore_errors: true
+              ignore_unreachable: true
+              changed_when: true
+              delegate_to: bob_build
+              # noqa: ignore-errors
