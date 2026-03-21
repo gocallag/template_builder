@@ -1,0 +1,7 @@
+  # Almalinux-Based Systems, treat as RedHat
+- name: (BUILDAUX, almalinux)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, almalinux)
+        ansible.builtin.include_tasks: buildaux/rhel.yml
