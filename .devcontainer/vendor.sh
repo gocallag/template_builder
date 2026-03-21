@@ -50,7 +50,7 @@ vendor_collection "https://github.com/ansible-collections/ansible.utils/archive/
 vendor_collection "https://github.com/ansible-collections/ansible.posix/archive/refs/tags/2.1.0.tar.gz" "ansible/posix"
 vendor_collection "https://github.com/ansible-collections/community.general/archive/refs/tags/12.4.0.tar.gz" "community/general"
 vendor_collection "https://github.com/oVirt/ovirt-ansible-collection/releases/download/3.2.2-1/ovirt-ovirt-3.2.2.tar.gz" "ovirt/ovirt"
-vendor_collection "https://github.com/ansible-collections/ansible.windows/archive/refs/tags/3.4.0.tar.gz" "ansible/windows"
+vendor_collection "https://github.com/ansible-collections/ansible.windows/archive/refs/tags/3.5.0.tar.gz" "ansible/windows"
 
 
 find collections -type d
