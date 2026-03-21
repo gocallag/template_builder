@@ -33,8 +33,8 @@
 
 - name: (MAIN) add default build steps if none are defined
   ansible.builtin.set_fact:
-    builder_build: "{{ builder_build_default }}"
-  when: builder_build is not defined or builder_build | length == 0
+    build: "{{ builder_build_default }}" # noqa: var-naming[no-role-prefix]
+  when: build is not defined or build | length == 0
   tags:
     - always
 - name: (MAIN) Perform the build
@@ -48,12 +48,12 @@
       vars:
         builder_stage: "{{ builder_buildtask.name }}"
         builder_task_vars: "{{ builder_buildtask.task_vars | default({}) }}"
-      loop: "{{ builder_build | default([]) }}"
+      loop: "{{ build | default([]) }}"
       loop_control:
         loop_var: builder_buildtask
     - name: (MAIN) cleanup build path
       ansible.builtin.file:
-        path: "{{ builder_env_build_path }}"
+        path: "{{ builder_env_build_path }}/{{ builder_build_id }}"
         state: absent
       become: true
       tags:
