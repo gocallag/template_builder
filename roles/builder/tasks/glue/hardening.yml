@@ -1,0 +1,6 @@
+---
+# straight pass through of hardening as we dont have glue variables to set
+- name: (GLUE-HARDENING)
+  ansible.builtin.include_tasks: hardening.yml
+  tags:
+      - build_customise
