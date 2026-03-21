@@ -1,0 +1,7 @@
+  # OracleLinux-Based Systems, treat as RedHat
+- name: (BUILDAUX, OracleLinux)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, OracleLinux)
+        ansible.builtin.include_tasks: buildaux/rhel.yml
