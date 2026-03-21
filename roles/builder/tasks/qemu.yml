@@ -1,0 +1,255 @@
+- name: (QEMU) Set Template
+  tags:
+    - build_aux
+    - build_base
+    - build_customise
+  block:
+    - name: (QEMU) Template
+      ansible.builtin.debug:
+        msg:
+          - "Template_Builder: source_name: {{ id }}"
+    - name: (QEMU) create build directories
+      ansible.builtin.file:
+        path: "{{ file }}"
+        state: directory
+        mode: "0755"
+      loop_control:
+        loop_var: file
+      loop:
+        - "{{ builder_build_output | dirname }}"
+        - "{{ builder_build_output | dirname }}/mnt"
+      tags:
+        - build_aux
+        - build_base
+        - build_customise
+    - name: (QEMU) Set QEMU arguments
+      tags:
+        - build_base
+        - build_customise
+        - build_disk
+      ansible.builtin.set_fact:
+        qemu_args: # noqa: var-naming
+          - "-name {{ id }}"
+          - "-enable-kvm"
+          - "-cpu host"
+          - "-smp {{ builder_build_vcpus }}"
+          - "-m {{ builder_build_ram }}"
+          - "-netdev user,id=net0,hostfwd=tcp::{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}-:{{ (os.type | lower == 'windows') | ternary(5986, 22) }}"
+          - "-device {{ os.config.nicdriver | default('e1000') }},netdev=net0"
+          - "-device ich9-ahci,id=ahci"
+          - "-drive file={{ builder_build_imagedir }}/{{ id }}.x86_64.qcow2,media=disk,if=none,format=qcow2,id=disk0"
+          - "-device ide-hd,drive=disk0,bus=ahci.0"
+          - "-vnc localhost:{{ builder_port_offset }}"
+
+
+    - name: (QEMU) Set QEMU command
+      ansible.builtin.set_fact:
+        builder_qemu_command: "{{ builder_base_qemu_command }} {{ qemu_args | join(' ') }}"
+      tags:
+        - build_base
+        - build_customise
+        - build_disk
+    - name: (QEMU) Set QEMU command with aux ISO if needed
+      ansible.builtin.set_fact:
+        builder_qemu_command: "{{ builder_qemu_command }} -drive file={{ builder_build_imagedir }}/aux.iso,media=cdrom,if=ide,index=2"
+      when: useauxiso | default(false) | bool
+      tags:
+        - build_base
+        - build_customise
+        - build_disk
+    - name: (QEMU) Setup QEMU environment
+      block:
+        - name: (QEMU) delete any existing QEMU VM disk image
+          tags:
+            - build_disk
+            - build_base
+          block:
+            - name: (QEMU) create output directory
+              ansible.builtin.file:
+                path: "{{ qemudir }}"
+                state: directory
+                mode: "0755"
+              loop_control:
+                loop_var: qemudir
+              loop:
+                - "{{ builder_build_imagedir }}"
+            - name: (QEMU) delete any existing QEMU VM disk image
+              ansible.builtin.file:
+                path: "{{ qemufile }}"
+                state: absent
+              loop_control:
+                loop_var: qemufile
+              loop:
+                - "{{ builder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+
+            - name: (QEMU) Create VM disk image
+              ansible.builtin.command: qemu-img create -f qcow2 "{{ builder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ os.config.disks[0] }}G"
+              args:
+                creates: "{{ builder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+              register: qemu_disk # noqa: var-naming
+              failed_when: qemu_disk.rc != 0
+            - name: (QEMU) Show disk creation result
+              ansible.builtin.debug:
+                msg: "Checking for saved base image at {{ builder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+            - name: (QEMU) stat the saved base image
+              ansible.builtin.stat:
+                path: "{{ builder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+              register: qemu_disk_stat # noqa: var-naming
+
+            - name: (QEMU) restore base image if it exists
+              ansible.builtin.command: cp "{{ builder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2" "{{ builder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+              changed_when: true
+              when:
+                - qemu_disk_stat.stat.exists
+                - qemu_disk_stat.stat.size > 0
+              register: qemu_disk_restore # noqa: var-naming
+            - name: (QEMU) Show restore result
+              ansible.builtin.debug:
+                msg: "Restored base image from {{ builder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+              when: qemu_disk_restore is defined and qemu_disk_restore.changed
+
+    - name: (QEMU) Start temporary web server
+      ansible.builtin.shell: |
+        python3 -m http.server {{ builder_localport }} --directory {{ builder_build_httpdir }}
+      async: 3600        # max runtime in seconds
+      poll: 0            # run in background
+      register: webserver # noqa: var-naming
+      changed_when: true
+      tags:
+        - always
+        - build_base
+        - build_customise
+    - name: "(QEMU) Show web server info"
+      ansible.builtin.debug:
+        msg: "(QEMU) Temporary web server started with PID {{ webserver.ansible_job_pid | default('N/A') }} "
+      when: webserver is defined and webserver.ansible_job_id is defined
+      tags:
+        - always
+        - build_base
+        - build_customise
+
+    - name: (QEMU) Build based
+      when:
+        - not qemu_disk_stat.stat.exists or qemu_disk_stat.stat.size == 0
+      tags:
+        - build_base
+      block:
+        - name: (QEMU) Launch QEMU VM
+          ansible.builtin.command: >
+              {{ builder_qemu_command }} \
+              -chardev socket,id=mon0,host=localhost,port={{ builder_env_qemu_monport }},server=on,wait=off \
+              -mon chardev=mon0, \
+              -boot order=d \
+              -drive file="{{ builder_build_iso }}",media=cdrom,if=ide,index=1
+          async: 99999
+          changed_when: true
+          poll: 0
+          register: qemu_boot # noqa: var-naming
+
+        - name: "(QEMU) Show QEMU boot result"
+          ansible.builtin.debug:
+            msg: "{{ qemu_boot }}"
+
+        - name: "(QEMU) Wait for QEMU monitor"
+          ansible.builtin.wait_for:
+            port: "{{ builder_env_qemu_monport }}"
+            delay: 5
+            timeout: 120
+        - name: "(QEMU) Show console boot commands"
+          ansible.builtin.debug: msg="{{ os.console_boot | map('string') | join('') }}" # noqa: no-free-form
+          when:
+            - os.console_boot is defined
+        - name: "(QEMU) Run sendkeys script to send commands to QEMU monitor"
+          vars:
+            sendkeys_script: "{{ builder_build_basedir }}/sendkeys.py"
+            sendkeys_commands: "{{ os.console_boot }}"
+          ansible.builtin.command:
+            argv:
+              - python3
+              - "{{ builder_build_basedir }}/sendkeys.py"
+              - --host
+              - localhost
+              - --port
+              - "{{ builder_env_qemu_monport }}"
+              - --boot-command
+              - "{{ os.console_boot }}"
+          delegate_to: "{{ run_on | default('localhost') }}"
+          changed_when: true
+          register: sendkeys_result # noqa: var-naming
+          when:
+            - os.console_boot is defined
+        - name: "(QEMU) Show sendkeys result"
+          ansible.builtin.debug:
+            msg: "{{ sendkeys_result }}"
+          when:
+            - os.console_boot is defined
+
+        - name: "(QEMU) Wait for QEMU monitor"
+          ansible.builtin.wait_for:
+            port: "{{ builder_env_qemu_monport }}"
+            delay: 20
+            timeout: 120
+
+        # - shell: 'echo "{{ item }}" | nc -w 1 localhost {{ builder_env_qemu_monport }}'
+        #   loop: "{{ build_bootcmd}}"
+        #   when: build_bootcmd is defined
+
+        - name: "(QEMU) Wait for QEMU async job to finish (poll process)"
+          ansible.builtin.shell: |
+            max_retries=600
+            count=0
+            while pgrep -f "^qemu.*{{ id }}.x86_64.qcow2" >/dev/null 2>&1; do
+              sleep 10
+              count=$((count+1))
+              if [ "$count" -ge "$max_retries" ]; then
+                echo "timeout waiting for qemu process to exit"
+                exit 2
+              fi
+            done
+            exit 0
+          register: qemu_wait # noqa: var-naming
+          failed_when: qemu_wait.rc != 0
+          changed_when: false
+          delegate_to: "{{ run_on | default('localhost') }}"
+          tags:
+            - build_base
+
+        - name: (QEMU) save base image
+          ansible.builtin.command: cp "{{ builder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ builder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+          args:
+            creates: "{{ builder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+          tags:
+            - build_base
+
+  rescue:
+    - name: "(QEMU) Show error on failure"
+      ansible.builtin.debug:
+        msg: >-
+          (QEMU) Task '{{ ansible_failed_task }}' failed.
+          {{ ansible_failed_result.msg | default('no additional message') }}
+      tags:
+        - always
+  always:
+    - name: "(QEMU) Show webserver jobid"
+      ansible.builtin.debug:
+        msg: "(QEMU) Webserver jobid is {{ webserver.ansible_job_id }}"
+      when: webserver is defined and webserver.ansible_job_id is defined
+      tags:
+        - always
+    - name: "(QEMU) Kill webserver process"
+      ansible.builtin.shell: |
+        kill {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
+        sleep 5
+        kill -9 {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
+      become: true
+      changed_when: true
+      tags:
+        - always
+    - name: "(QEMU) Kill leftover QEMU processes"
+      ansible.builtin.shell: |
+        pgrep -f "{{ id }}.x86_64.qcow2" | xargs -r kill -9
+      ignore_errors: true # noqa: ignore-errors
+      changed_when: true
+      become: true
+      tags:
+        - always

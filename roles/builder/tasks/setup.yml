@@ -1,0 +1,183 @@
+- name: (SETUP) Initial setup and variable validation
+  tags:
+      - always
+  block:
+
+      - name: (SETUP) force setup so we can make sure the build system is configured OK
+        ansible.builtin.setup:
+      - name: (SETUP) get the id prefix
+        ansible.builtin.set_fact:
+            builder_id_prefix: "{{ id | regex_replace('^(.*?)-.*$', '\\1') }}"
+      - name: (SETUP) Fail if prefix is unknown
+        ansible.builtin.fail:
+            msg: "Unknown prefix '{{ builder_id_prefix }}'. Add it to builder_prefix_port_offset_map."
+        when: builder_id_prefix not in builder_prefix_port_offset_map
+
+      - name: (SETUP) Lookup offset
+        ansible.builtin.set_fact:
+            builder_port_offset: "{{ builder_prefix_port_offset_map[builder_id_prefix] }}"
+      - name: (SETUP) Debug port offset
+        ansible.builtin.debug:
+            msg: "(SETUP) Using port offset {{ builder_port_offset }} for prefix {{ builder_id_prefix }}"
+
+      - name: (SETUP) set local  ports based on offset
+        ansible.builtin.set_fact:
+            builder_localport: "{{ 8180 + (builder_port_offset | default(0) | int) }}"
+            builder_env_qemu_ssh_port: "{{ 10222 + (builder_port_offset | default(0) | int) }}"
+            builder_env_qemu_psrp_port: "{{ 5986 + (builder_port_offset | default(0) | int) }}"
+            builder_env_qemu_monport: "{{ 4445 + (builder_port_offset | default(0) | int) }}"
+      - name: (SETUP) Debug local ports
+        ansible.builtin.debug:
+            msg: "(SETUP) Using localport={{ builder_localport }}, env_qemu_ssh_port={{ builder_env_qemu_ssh_port }}, env_qemu_psrp_port={{ builder_env_qemu_psrp_port }}, env_qemu_monport={{ builder_env_qemu_monport }}"
+      - name: (SETUP) split the version into major and minor
+        ansible.builtin.set_fact:
+            version_major: "{{ version | regex_replace('^(\\d+)\\..*$', '\\1') | int }}" # noqa: var-naming
+            version_minor: "{{ version | regex_replace('^\\d+\\.(\\d+).*$', '\\1') | int }}" # noqa: var-naming
+
+      - name: (SETUP) save the builder_build_basedir
+        ansible.builtin.set_fact:
+            builder_build_basedir: "{{ builder_env_build_path }}/{{ id }}"
+            builder_build_savedir: "{{ builder_env_build_path }}/images"
+      - name: (SETUP) set all the build_ variables that we use for building
+        ansible.builtin.set_fact:
+            builder_build_id: "{{ id }}"
+            builder_port_offset: "{{ builder_port_offset | default(0) }}"
+            builder_build_iso: "{{ builder_env_build_path }}/{{ id }}/downloads/{{ os.iso | basename }}"
+            builder_build_aux: "{{ builder_env_build_path }}/{{ id }}/build/{{ id }}.img"
+            builder_build_disks: "{{ os.config.disks }}"
+            builder_build_kickstart: "{{ builder_env_build_path }}/{{ id }}/ks.cfg"
+            builder_build_ram: "{{ builder_env_build_memory | default(2048) }}"
+            builder_build_vcpus: "{{ builder_env_build_cpu | default(2) }}"
+            builder_build_output: "{{ builder_build_basedir }}/build/{{ id }}.qcow2"
+            builder_build_httpdir: "{{ builder_build_basedir }}/http"
+            builder_build_auxdir: "{{ builder_build_basedir }}/http/aux"
+            builder_build_format: qcow2
+            builder_build_imagedir: "{{ builder_build_basedir }}/build"
+            builder_build_downloadsdir: "{{ builder_build_basedir }}/downloads"
+            builder_aux_dir: "{{ builder_build_basedir }}/aux"
+            builder_iso_file: "{{ builder_build_basedir }}/build/{{ id }}.iso"
+
+      - name: (SETUP) Add new system to in-memory inventory
+        ansible.builtin.add_host:
+            name: 'bob_build'
+            ansible_host: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
+            ansible_user: "{{ builder_env_ansible_user }}"
+            ansible_password: "{{ builder_env_ansible_password }}"
+            ansible_port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
+            ansible_connection: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}"
+            ansible_psrp_auth: "negotiate"
+            ansible_winrm_server_cert_validation: ignore
+            ansible_psrp_cert_validation: ignore
+            ansible_winrm_read_timeout_sec: 1800
+            ansible_psrp_read_timeout_sec: 1800
+      - name: (SETUP) Update apt cache
+        ansible.builtin.apt:
+            update_cache: true
+        become: true
+        when: ansible_facts['os_family'] | lower == 'debian'
+      - name: (SETUP) Install required packages
+        ansible.builtin.package:
+            name: "{{ builder_package_lists[ansible_facts['os_family'] | lower] }}"
+            state: present
+        become: true
+      - name: (SETUP) Install required pip packages
+        ansible.builtin.pip:
+            name: "{{ builder_pip_packages[ansible_facts['os_family'] | lower] }}"
+            state: present
+            extra_args: "--break-system-packages"
+        become: true
+      - name: (SETUP) get current user info
+        ansible.builtin.command: whoami
+        register: current_user # noqa: var-naming
+        changed_when: false
+      - name: (SETUP) Create base build directory
+        ansible.builtin.file:
+            path: "{{ builder_env_build_path }}"
+            state: directory
+            owner: "{{ ansible_user | default(current_user.stdout) }}"
+            mode: "0755"
+        become: true
+
+      - name: (SETUP) cleanup build directories
+        ansible.builtin.file:
+            path: "{{ build_loop }}"
+            state: absent
+        loop_control:
+            loop_var: build_loop
+        loop:
+            - "{{ builder_build_httpdir }}"
+            - "{{ builder_build_downloadsdir }}"
+            - "{{ builder_build_imagedir }}"
+        tags:
+            - cleanup
+        when: "'cleanup' in ansible_run_tags"
+
+      - name: (SETUP) create build directories
+        ansible.builtin.file:
+            path: "{{ file }}"
+            state: directory
+            mode: "0755"
+        loop_control:
+            loop_var: file
+        loop:
+            - "{{ builder_build_httpdir }}"
+            - "{{ builder_build_httpdir }}/aux/drivers"
+            - "{{ builder_build_httpdir }}/aux/tools"
+            - "{{ builder_build_httpdir }}/aux/patches"
+            - "{{ builder_build_httpdir }}/aux/tools"
+            - "{{ builder_build_downloadsdir }}"
+            - "{{ builder_build_imagedir }}"
+            - "{{ builder_build_savedir }}"
+
+      - name: (SETUP) copy qemu monitor script
+        ansible.builtin.template:
+            src: "files/qemu/sendkeys.py"
+            dest: "{{ builder_env_build_path }}/{{ id }}/sendkeys.py"
+            mode: '0755'
+        delegate_to: "{{ run_on | default('localhost') }}"
+
+      - name: (SETUP) set the port connection details for qemu based on the OS type
+        ansible.builtin.set_fact:
+            wait_host: "{{ builder_env_qemu_ip }}" # noqa: var-naming
+            wait_port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}" # noqa: var-naming
+            wait_proto: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
+
+
+      - name: (SETUP) Find PIDs of temporary web server
+        ansible.builtin.command: pgrep -f "python3 -m http.server {{ builder_localport }}"
+        register: webserver_pids # noqa: var-naming
+        changed_when: true
+        failed_when: false
+
+      - name: (SETUP) Stop temporary web server
+        ansible.builtin.command: kill -15 {{ item }}
+        loop: "{{ webserver_pids.stdout_lines }}"
+        when: webserver_pids.stdout != ""
+        register: webserver_kill_results # noqa: var-naming
+        changed_when: true
+        failed_when: false
+      - name: (SETUP) Debug temporary web server stop results
+        ansible.builtin.debug:
+            msg: "(SETUP) Temporary web server stop attempt for PID {{ item.item }} result: {{ item }}"
+        loop: "{{ webserver_kill_results.results }}"
+
+
+      - name: (SETUP) Find PIDs of any dangling qemu
+        ansible.builtin.command: pgrep -f "^{{ builder_base_qemu_command }}.*{{ id }}"
+        register: qemu_pids # noqa: var-naming
+        changed_when: false
+        failed_when: false
+      - name: (SETUP) Stop dangling qemu instances
+        ansible.builtin.shell: |
+            kill -15 {{ item }} 2>/dev/null || true
+            sleep 1
+            kill -9 {{ item }} 2>/dev/null || true
+        loop: "{{ qemu_pids.stdout_lines }}"
+        when: qemu_pids.stdout != ""
+        changed_when: true
+        register: qemu_kill_results # noqa: var-naming
+        failed_when: false
+      - name: (SETUP) Debug dangling qemu stop results
+        ansible.builtin.debug:
+            msg: "(SETUP) Dangling QEMU stop attempt for PID {{ item.item }} result: {{ item }}"
+        loop: "{{ qemu_kill_results.results }}"

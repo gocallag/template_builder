@@ -1,0 +1,31 @@
+---
+- name: (BUILDIMAGE) Include build implementation
+  block:
+
+    - name: (BUILDIMAGE) Include QEMU tasks
+      ansible.builtin.include_tasks: qemu.yml
+      tags:
+        - build_base
+        - build_customise
+
+    - name: (BUILDIMAGE) Power on QEMU VM (customise)
+      tags:
+        - build_customise
+      block:
+        - name: (BUILDIMAGE) Power on QEMU VM (customise)
+          ansible.builtin.command: >
+            {{ builder_qemu_command }} \
+            -chardev socket,id=mon0,host=localhost,port={{ builder_env_qemu_monport }},server=on,wait=off \
+            -mon chardev=mon0, \
+            -boot order=c \
+            -drive file="{{ builder_build_iso }}",media=cdrom,index=1
+          async: 99999
+          poll: 0
+          register: qemu_boot # noqa: var-naming
+          changed_when: true
+        - name: (BUILDIMAGE) Wait for QEMU VM to be accessible
+          ansible.builtin.wait_for:
+            host: "{{ builder_env_qemu_ip }}"
+            port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
+            delay: 10
+            timeout: 900

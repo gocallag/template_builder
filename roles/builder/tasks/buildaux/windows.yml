@@ -1,0 +1,286 @@
+---
+
+# Windows Systems
+- name: (BUILDAUX, windows)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, windows) create build directories
+        ansible.builtin.file:
+            path: "{{ file }}"
+            state: directory
+            mode: "0755"
+        loop_control:
+            loop_var: file
+        loop:
+            - "{{ build_basedir }}/build"
+      - name: (BUILDAUX, windows) remove existing aux ISO (if it exists)
+        ansible.builtin.file:
+            path: "{{ build_basedir }}/build/aux.iso"
+            state: absent
+
+      - name: (BUILDAUX,windows) set the unattend file content if not already defined
+        ansible.builtin.set_fact:
+            unattend: # noqa: var-naming
+                |
+                  <?xml version="1.0" encoding="utf-8"?>
+                  <unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+                      <settings pass="windowsPE">
+                          <component name="Microsoft-Windows-PnpCustomizationsWinPE" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS" processorArchitecture="amd64">
+                          </component>
+                          <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                              <SetupUILanguage>
+                                  <UILanguage>en-US</UILanguage>
+                              </SetupUILanguage>
+                              <InputLocale>en-US</InputLocale>
+                              <SystemLocale>en-US</SystemLocale>
+                              <UILanguage>en-US</UILanguage>
+                              <UILanguageFallback>en-US</UILanguageFallback>
+                              <UserLocale>en-US</UserLocale>
+                          </component>
+                          <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                              <DiskConfiguration>
+                                  <Disk wcm:action="add">
+                                      <CreatePartitions>
+                                          <CreatePartition wcm:action="add">
+                                              <Type>Primary</Type>
+                                              <Order>1</Order>
+                                              <Size>100</Size>
+                                          </CreatePartition>
+                                          <CreatePartition wcm:action="add">
+                                              <Order>2</Order>
+                                              <Type>Primary</Type>
+                                              <Extend>true</Extend>
+                                          </CreatePartition>
+                                      </CreatePartitions>
+                                      <ModifyPartitions>
+                                          <ModifyPartition wcm:action="add">
+                                              <Active>true</Active>
+                                              <Format>NTFS</Format>
+                                              <Label>boot</Label>
+                                              <Order>1</Order>
+                                              <PartitionID>1</PartitionID>
+                                          </ModifyPartition>
+                                          <ModifyPartition wcm:action="add">
+                                              <Format>NTFS</Format>
+                                              <Label>Windows</Label>
+                                              <Letter>C</Letter>
+                                              <Order>2</Order>
+                                              <PartitionID>2</PartitionID>
+                                           </ModifyPartition>
+                                      </ModifyPartitions>
+                                      <DiskID>0</DiskID>
+                                      <WillWipeDisk>true</WillWipeDisk>
+                                  </Disk>
+                              </DiskConfiguration>
+                              <ImageInstall>
+                                  <OSImage>
+                                      <InstallFrom>
+                                          <MetaData wcm:action="add">
+                                              <Key>/IMAGE/INDEX</Key>
+                                              <Value>{{ imageselect }}</Value>
+                                          </MetaData>
+                                      </InstallFrom>
+                                      <InstallTo>
+                                          <DiskID>0</DiskID>
+                                          <PartitionID>2</PartitionID>
+                                      </InstallTo>
+                                  </OSImage>
+                              </ImageInstall>
+                              <UserData>
+                                  <ProductKey>
+                                        <Key>{{ key.id }}</Key>
+                                      <WillShowUI>OnError</WillShowUI>
+                                  </ProductKey>
+                                  <AcceptEula>true</AcceptEula>
+                                  <FullName>{{ env_ansible_user }}</FullName>
+                                  <Organization>{{ key.organization }}</Organization>
+                              </UserData>
+                               <DynamicUpdate>
+                                  <Enable>false</Enable>
+                              </DynamicUpdate>
+                           </component>
+                      </settings>
+                      <settings pass="generalize">
+                          <component name="Microsoft-Windows-Security-SPP" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                              <SkipRearm>1</SkipRearm>
+                         </component>
+                           <component name="Microsoft-Windows-PnpSysprep" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                              <PersistAllDeviceInstalls>false</PersistAllDeviceInstalls>
+                              <DoNotCleanUpNonPresentDevices>false</DoNotCleanUpNonPresentDevices>
+                          </component>
+                       </settings>
+                      <settings pass="oobeSystem">
+                           <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                              <InputLocale>en-US</InputLocale>
+                              <SystemLocale>en-US</SystemLocale>
+                              <UILanguage>en-US</UILanguage>
+                              <UserLocale>en-US</UserLocale>
+                          </component>
+                          <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <OOBE>
+                                    <HideEULAPage>true</HideEULAPage>
+                                    <HideLocalAccountScreen>true</HideLocalAccountScreen>
+                                    <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+                                    <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+                                    <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+                                    <NetworkLocation>Work</NetworkLocation>
+                                    <ProtectYourPC>3</ProtectYourPC>
+                                    <SkipMachineOOBE>true</SkipMachineOOBE>
+                                    <SkipUserOOBE>true</SkipUserOOBE>
+                                    <!-- <VMModeOptimizations>
+                                        <SkipAdministratorProfileRemoval>true</SkipAdministratorProfileRemoval>
+                                        <SkipNotifyUILanguageChange>true</SkipNotifyUILanguageChange>
+                                        <SkipWinREInitialization>true</SkipWinREInitialization>
+                                    </VMModeOptimizations> -->
+                                </OOBE>
+                                <TimeZone>UTC</TimeZone>
+                                <UserAccounts>
+                                    <AdministratorPassword>
+                                        <Value>{{ env_WIN_ADMIN_PASSWORD }}</Value>
+                                        <PlainText>true</PlainText>
+                                    </AdministratorPassword>
+                                    <LocalAccounts>
+                                        <LocalAccount wcm:action="add">
+                                            <Password>
+                                                <Value>{{ env_ansible_password }}</Value>
+                                                <PlainText>true</PlainText>
+                                            </Password>
+                                            <Description>{{ env_ansible_user }} User</Description>
+                                            <DisplayName>{{ env_ansible_user }}</DisplayName>
+                                            <Group>administrators</Group>
+                                            <Name>{{ env_ansible_user }}</Name>
+                                        </LocalAccount>
+                                    </LocalAccounts>
+                                </UserAccounts>
+                                <AutoLogon>
+                                    <Password>
+                                        <Value>{{ env_ansible_password }}</Value>
+                                        <PlainText>true</PlainText>
+                                    </Password>
+                                    <Username>{{ env_ansible_user }}</Username>
+                                    <Enabled>true</Enabled>
+                                </AutoLogon>
+                                            <FirstLogonCommands>
+                                            {% for command in first_logon_commands %}
+                                            <SynchronousCommand wcm:action="add">
+                                                <CommandLine>{{ command.cmd }}</CommandLine>
+                                                <Order>{{ command.order }}</Order>
+                                                <Description>{{ command.description | default('') }}</Description>
+                                            </SynchronousCommand>
+                                            {% endfor %}
+                                            </FirstLogonCommands>
+                            </component>
+                            <component name="Microsoft-Windows-WinRE-RecoveryAgent" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <UninstallWindowsRE>true</UninstallWindowsRE>
+                            </component>
+                        </settings>
+                        <settings pass="specialize">
+                            <!-- Disable Server Manager at logon -->
+                            <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-ServerManager-SvrMgrNc" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <DoNotOpenServerManagerAtLogon>true</DoNotOpenServerManagerAtLogon>
+                            </component>
+                            <!-- Disable IE ESC -->
+                            <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-IE-ESC" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <!--  Disable IE ESC.  -->
+                                <IEHardenAdmin>false</IEHardenAdmin>
+                                <IEHardenUser>false</IEHardenUser>
+                            </component>
+                            <!-- Turn off OOBE -->
+                            <component xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="Microsoft-Windows-OutOfBoxExperience" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <DoNotOpenInitialConfigurationTasksAtLogon>true</DoNotOpenInitialConfigurationTasksAtLogon>
+                            </component>
+                            <!-- Disable System Restore -->
+                            <component name="Microsoft-Windows-SystemRestore-Main" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <DisableSR>1</DisableSR>
+                            </component>
+                            <!-- Disable Network Location Selection Prompt -->
+                            <component name="Microsoft-Windows-SystemSettingsThreshold" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <DisplayNetworkSelection>false</DisplayNetworkSelection>
+                            </component>
+                            <!-- Enable WinRM and Remote Management Firewall Rules -->
+                            <component name="Networking-MPSSVC-Svc" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <FirewallGroups>
+                                    <FirewallGroup wcm:action="add" wcm:keyValue="WindowsRemoteManagement">
+                                        <Active>true</Active>
+                                        <Group>Windows Remote Management</Group>
+                                        <Profile>all</Profile>
+                                    </FirewallGroup>
+                                    <FirewallGroup wcm:action="add" wcm:keyValue="RemoteAdministration">
+                                        <Active>true</Active>
+                                        <Group>Remote Administration</Group>
+                                        <Profile>all</Profile>
+                                    </FirewallGroup>
+                                </FirewallGroups>
+                            </component>
+                            <!-- Disable CEIP -->
+                            <component name="Microsoft-Windows-SQMApi" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <CEIPEnabled>0</CEIPEnabled>
+                            </component>
+                            <!-- Disable automatic activation -->
+                            <component name="Microsoft-Windows-Security-SPP-UX" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <SkipAutoActivation>true</SkipAutoActivation>
+                            </component>
+                                <!--<component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="" versionScope="nonSxS">
+                                <RunSynchronous>
+                                <RunSynchronousCommand wcm:action="add">
+                                    <Order>1</Order>
+                                    <Path>DISM /online /Set-Edition:ServerStandard /ProductKey:{{ key.id }} /AcceptEula /accepteula</Path>
+                                </RunSynchronousCommand>
+                                </RunSynchronous>
+                            </component>-->
+
+                        </settings>
+                        <!-- Turn off UAC -->
+                        <settings pass="offlineServicing">
+                            <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+                                <EnableLUA>false</EnableLUA>
+                            </component>
+                        </settings>
+                    </unattend>
+        when: unattend is not defined
+
+      - name: (BUILDAUX, windows) Copy unattend/boot config (Windows)
+        ansible.builtin.copy:
+            content: "{{ unattend }}"
+            dest: "{{ build_basedir }}/build/iso_contents/Autounattend.xml"
+            mode: "0644"
+
+      - name: (BUILDAUX, windows) Copy support scripts (Windows)
+        ansible.builtin.template:
+            src: "files/{{ os.type }}/{{ item }}"
+            dest: "{{ build_basedir }}/build/iso_contents/{{ item }}"
+            mode: "0755"
+        loop:
+            - pre-ansible.ps1
+            - Install-patches.ps1
+            - windows-update.ps1
+            - ConfigureRemotingForAnsible.ps1
+
+      - name: (BUILDAUX, windows) Build aux ISO from contents (label OEMDRV)
+        ansible.builtin.command: >
+            genisoimage -output aux.iso -volid OEMDRV -joliet -rock .
+        args:
+            chdir: "{{ build_basedir }}/build/iso_contents"
+            creates: "{{ build_basedir }}/build/aux.iso"
+        register: mkiso # noqa: var-naming
+        failed_when: mkiso.rc != 0
+
+      - name: (BUILDAUX, windows) Move aux ISO to build directory
+        ansible.builtin.command: >
+            mv {{ build_basedir }}/build/iso_contents/aux.iso {{ build_basedir }}/build/aux.iso
+        args:
+            creates: "{{ build_basedir }}/build/aux.iso"
+      - name: (BUILDAUX, windows) create sha256 of build profile
+        ansible.builtin.set_fact:
+            build_profile: # noqa: var-naming
+                os_iso: "{{ os.iso }}" # noqa: var-naming
+                os_unattend: "{{ unattend }}" # noqa: var-naming
+      - name: (BUILDAUX, windows) create sha256 of build profile
+        ansible.builtin.set_fact:
+            build_profile: # noqa: var-naming
+                os_iso: "{{ os.iso }}" # noqa: var-naming
+                os_unattend: "{{ unattend }}" # noqa: var-naming
+      - name: (BUILDAUX, windows) create sha256 of build profile
+        ansible.builtin.set_fact:
+            profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming

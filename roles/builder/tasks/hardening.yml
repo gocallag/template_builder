@@ -1,0 +1,298 @@
+---
+- name: (HARDENING) Initial Setup
+  tags:
+      - build_customise
+  block:
+      - name: (HARDENING) Run setup
+        ansible.builtin.setup:
+        delegate_to: bob_build
+
+    # Red Hat Hardening Tasks
+      - name: (HARDENING) Ensure SELinux is enforcing
+        ansible.builtin.command: setenforce 1
+        become: true
+        changed_when: true
+        when: ansible_facts['os_family'] == 'RedHat' and ansible_facts['selinux']['status'] != 'enforcing'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Validate SELinux is enforcing
+        ansible.builtin.command: getenforce
+        become: true
+        register: selinux_status # noqa: var-naming
+        changed_when: false
+        failed_when: selinux_status.stdout != "Enforcing"
+        when: ansible_facts['os_family'] == 'RedHat'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure firewalld is enabled and running
+        ansible.builtin.service:
+            name: firewalld
+            state: started
+            enabled: true
+        become: true
+        when: ansible_facts['os_family'] == 'RedHat'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure permissions on /etc/passwd are configured
+        ansible.builtin.file:
+            path: /etc/passwd
+            owner: root
+            group: root
+            mode: '0644'
+        become: true
+        when: ansible_facts['os_family'] == 'RedHat'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure no unowned files or directories exist
+        ansible.builtin.command: find / -nouser
+        become: true
+        register: unowned_files # noqa: var-naming
+        changed_when: false
+        failed_when: unowned_files.stdout != ""
+        when: ansible_facts['os_family'] | lower == 'redhat'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure password expiration is 90 days or less
+        ansible.builtin.lineinfile:
+            path: /etc/login.defs
+            regexp: '^PASS_MAX_DAYS'
+            line: 'PASS_MAX_DAYS 90'
+        become: true
+        when: ansible_facts['os_family'] | lower in ['redhat', 'debian']
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure auditd service is enabled and running
+        ansible.builtin.service:
+            name: auditd
+            state: started
+            enabled: true
+        become: true
+        when: ansible_facts['os_family'] | lower in ['redhat']
+        delegate_to: bob_build
+
+      - name: (HARDENING) Disable root login via SSH
+        ansible.builtin.lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: '^PermitRootLogin'
+            line: 'PermitRootLogin no'
+        become: true
+        when: ansible_facts['os_family'] | lower in ['redhat', 'debian']
+        delegate_to: bob_build
+
+      - name: (HARDENING) Configure strong password policies
+        ansible.builtin.lineinfile:
+            path: /etc/security/pwquality.conf
+            regexp: '^minlen'
+            line: 'minlen = 14'
+        become: true
+        when: ansible_facts['os_family'] | lower in ['redhat']
+        delegate_to: bob_build
+
+      - name: (HARDENING) Harden kernel parameters
+        ansible.posix.sysctl:
+            name: "{{ item.name }}"
+            value: "{{ item.value }}"
+            state: present
+        become: true
+        loop:
+            - { name: 'net.ipv4.conf.all.rp_filter', value: '1' }
+            - { name: 'net.ipv4.conf.default.rp_filter', value: '1' }
+            - { name: 'net.ipv4.tcp_syncookies', value: '1' }
+        when: ansible_facts['os_family'] | lower in ['redhat', 'debian']
+        delegate_to: bob_build
+
+      - name: (HARDENING) Restrict access to cron
+        ansible.builtin.file:
+            path: /etc/cron.deny
+            state: absent
+        become: true
+        when: ansible_facts['os_family'] | lower in ['redhat', 'debian']
+        delegate_to: bob_build
+
+      - name: (HARDENING) Restrict access to at
+        ansible.builtin.file:
+            path: /etc/at.deny
+            state: absent
+        become: true
+        when: ansible_facts['os_family'] | lower in ['redhat', 'debian']
+        delegate_to: bob_build
+
+      # - name: (HARDENING) Ensure security updates are installed
+      #   package:
+      #     name: "{{ item }}"
+      #     state: latest
+      #   become: true
+      #   loop:
+      #     - unattended-upgrades
+      #   when: ansible_facts['os_family'] | lower in ['redhat', 'debian']
+      #   delegate_to: bob_build
+
+      # Ubuntu Hardening Tasks
+      - name: (HARDENING) Ensure AppArmor is enabled
+        ansible.builtin.command: aa-status
+        become: true
+        register: apparmor_status # noqa: var-naming
+        changed_when: false
+        failed_when: "'enforce' not in apparmor_status.stdout"
+        when: ansible_facts['os_family'] | lower == 'debian'
+        delegate_to: bob_build
+
+      # - name: (HARDENING) Ensure UFW is enabled and active
+      #   block:
+          # - name: Enable UFW
+          #   ufw:
+          #     state: enabled
+          #   become: true
+          #   when: ansible_facts['os_family'] | lower == 'debian'
+          #   delegate_to: bob_build
+
+          # - name: (HARDENING) Validate UFW is active
+          #   command: ufw status
+          #   become: true
+          #   register: ufw_status
+          #   failed_when: "'Status: active' not in ufw_status.stdout"
+          #   when: ansible_facts['os_family'] | lower == 'debian'
+          #   delegate_to: bob_build
+
+      - name: (HARDENING) Ensure permissions on /etc/passwd are configured
+        ansible.builtin.file:
+            path: /etc/passwd
+            owner: root
+            group: root
+            mode: '0644'
+        become: true
+        when: ansible_facts['os_family'] | lower == 'debian'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure no unowned files or directories exist
+        ansible.builtin.command: find / -nouser
+        become: true
+        register: unowned_files # noqa: var-naming
+        changed_when: false
+        failed_when: unowned_files.stdout != ""
+        when: ansible_facts['os_family'] | lower == 'debian'
+        delegate_to: bob_build
+
+
+      # Windows Hardening Tasks
+      - name: (HARDENING) Ensure Windows Firewall and Defender are enabled
+        when: ansible_facts['os_family'] | lower == 'windows'
+        block:
+            - name: (HARDENING) Enable Windows Firewall
+              ansible.windows.win_shell: Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
+              become: true
+              changed_when: true
+              become_user: SYSTEM
+              become_method: ansible.builtin.runas
+              delegate_to: bob_build
+
+            - name: (HARDENING) Validate Windows Firewall is enabled
+              ansible.windows.win_shell: Get-NetFirewallProfile -Profile Domain,Public,Private | Select-Object -Property Enabled
+              become: true
+              become_user: SYSTEM
+              become_method: ansible.builtin.runas
+              register: firewall_status # noqa: var-naming
+              changed_when: true
+              failed_when: "'True' not in firewall_status.stdout"
+              delegate_to: bob_build
+
+            - name: (HARDENING) Ensure Windows Defender is enabled and up-to-date
+              ansible.windows.win_shell: Set-MpPreference -DisableRealtimeMonitoring $false
+              become: true
+              become_user: SYSTEM
+              changed_when: true
+              become_method: ansible.builtin.runas
+              delegate_to: bob_build
+
+
+      - name: (HARDENING) Ensure audit logging is enabled
+        ansible.windows.win_shell: AuditPol /set /category:"Logon/Logoff" /success:enable /failure:enable
+        become: true
+        become_user: SYSTEM
+        become_method: ansible.builtin.runas
+        changed_when: true
+        when: ansible_facts['os_family'] | lower == 'windows'
+        delegate_to: bob_build
+
+      - name: (HARDENING) Ensure account lockout threshold is configured
+        ansible.windows.win_shell: net accounts /lockoutthreshold:5
+        become: true
+        become_user: SYSTEM
+        become_method: ansible.builtin.runas
+        changed_when: true
+        when: ansible_facts['os_family'] | lower == 'windows'
+        delegate_to: bob_build
+
+      # - name: (HARDENING) Ensure account lockout duration is configured to 15 minutes
+      #   ansible.windows.win_shell: net accounts /lockoutduration:15
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_facts['os_family'] | lower == 'windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Ensure audit policies for object access are enabled
+      #   ansible.windows.win_shell: AuditPol /set /subcategory:"Object Access" /success:enable /failure:enable
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_facts['os_family'] | lower == 'windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Ensure SMBv1 is disabled
+      #   ansible.windows.win_shell: |
+      #     if (Get-WindowsOptionalFeature -Online -FeatureName smb1protocol).State -ne 'Disabled' {
+      #       Disable-WindowsOptionalFeature -Online -FeatureName smb1protocol
+      #     }
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_os_family == 'Windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Enable BitLocker for all drives
+      #   ansible.windows.win_shell: |
+      #     Get-BitLockerVolume | Enable-BitLocker -UsedSpaceOnly -RecoveryPasswordProtector
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_os_family == 'Windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Restrict PowerShell to signed scripts
+      #   ansible.windows.win_shell: Set-ExecutionPolicy RemoteSigned -Scope LocalMachine
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_os_family == 'Windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Enable Windows Defender Application Control
+      #   ansible.windows.win_shell: New-CIPolicy -Level Publisher -FilePath "C:\Policy.xml" -UserPEs 0
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_os_family == 'Windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Disable unnecessary services
+      #   ansible.windows.win_service:
+      #     name: "{{ item }}"
+      #     start_mode: disabled
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   loop:
+      #     - Spooler
+      #     - WSearch
+      #     - RemoteRegistry
+      #   when: ansible_facts['os_family'] | lower == 'windows'
+      #   delegate_to: bob_build
+
+      # - name: (HARDENING) Enable advanced auditing policies
+      #   ansible.windows.win_shell: AuditPol /set /subcategory:"Process Creation" /success:enable /failure:enable
+      #   become: true
+      #   become_user: SYSTEM
+      #   become_method: ansible.builtin.runas
+      #   when: ansible_facts['os_family'] | lower == 'windows'
+      #   delegate_to: bob_build

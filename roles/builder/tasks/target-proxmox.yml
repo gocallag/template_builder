@@ -1,0 +1,155 @@
+---
+- name: (TARGET-PROXMOX) Upload template to Proxmox server
+  tags:
+    - build_targets
+    - build_target_proxmox
+  block:
+
+    - name: Add the host for the Proxmox server
+      ansible.builtin.add_host:
+        name: proxmox_server
+        ansible_host: "{{ env_proxmox_server }}"
+        ansible_port: 22
+        ansible_user: "{{ env_proxmox_user }}"
+        ansible_password: "{{ env_proxmox_password }}"
+        ansible_connection: ssh
+
+    - name: Ensure the destination directory exists on the Proxmox server
+      ansible.builtin.file:
+        path: "/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}"
+        state: directory
+        mode: "0755"
+      delegate_to: proxmox_server
+      become: true
+
+    - name: Build SCP command as array
+      ansible.builtin.set_fact:
+        scp_cmd: # noqa: var-naming
+          - sshpass
+          - "-p"
+          - "{{ env_proxmox_password }}"
+          - scp
+          - "-q"
+          - "-C"
+          - "-P"
+          - "22"
+          - "-o"
+          - "StrictHostKeyChecking=no"
+          - "-o"
+          - "UserKnownHostsFile=/dev/null"
+          - "-o"
+          - "ServerAliveInterval=30"
+          - "-o"
+          - "ServerAliveCountMax=120"
+          - "-o"
+          - "TCPKeepAlive=yes"
+          - "{{ build_imagedir }}/{{ build_id }}.x86_64.qcow2"
+          - "{{ env_proxmox_user }}@{{ env_proxmox_server }}:/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
+
+    - name: Copy large file in async
+      ansible.builtin.command: "{{ scp_cmd | join(' ') }}"
+      async: 3600
+      poll: 0
+      register: copy_sleeper # noqa: var-naming
+      changed_when: true
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Check if async task has finished
+      ansible.builtin.async_status:
+        jid: "{{ copy_sleeper.ansible_job_id }}"
+      register: job_result # noqa: var-naming
+      until: job_result.finished
+      retries: 720
+      delay: 5
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Delete template if it exists
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ env_proxmox_user }}@pam"
+        api_password: "{{ env_proxmox_password }}"
+        api_host: "{{ env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ env_proxmox_node }}"
+        state: absent
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+      ignore_errors: true # noqa: ignore-errors
+
+    - name: Create new VM
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ env_proxmox_user }}@pam"
+        api_password: "{{ env_proxmox_password }}"
+        api_host: "{{ env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ env_proxmox_node }}"
+        vcpus: "1"
+        cpu: "host"
+        memory: "{{ env_build_memory }}"
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+      register: nvm # noqa: var-naming
+
+    - name: Add existing disk
+      community.proxmox.proxmox_disk:
+        vmid: "{{ nvm.vmid }}"
+        api_user: "{{ env_proxmox_user }}@pam"
+        api_password: "{{ env_proxmox_password }}"
+        api_host: "{{ env_proxmox_server }}"
+        name: "{{ id }}"
+        disk: sata0
+        storage: "{{ env_proxmox_storage }}"
+        import_from: "/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
+        timeout: 6000
+        state: present
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Update VM boot order
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ env_proxmox_user }}@pam"
+        api_password: "{{ env_proxmox_password }}"
+        api_host: "{{ env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ env_proxmox_node }}"
+        boot: "order=sata0"
+        update: true
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Set VM notes
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ env_proxmox_user }}@pam"
+        api_password: "{{ env_proxmox_password }}"
+        api_host: "{{ env_proxmox_server }}"
+        node: "{{ env_proxmox_node }}"
+        name: "template-{{ id }}"
+        update: true
+        description: |
+          Template built on {{ ansible_date_time.iso8601 }}
+          Build ID: {{ id }}
+          Built by: {{ env_ansible_user }}
+          Source: Proxmox automation pipeline
+      delegate_to: "{{ run_on | default('localhost') }}"
+    - name: Update VM to template
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ env_proxmox_user }}@pam"
+        api_password: "{{ env_proxmox_password }}"
+        api_host: "{{ env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ env_proxmox_node }}"
+        update: true
+        state: template
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+  rescue:
+    - name: Rescue on failure
+      ansible.builtin.debug:
+        msg: "Rescue: error during Proxmox template upload"
+
+  always:
+    - name: Remove the directory on the Proxmox server
+      ansible.builtin.file:
+        path: "/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}"
+        state: absent
+      delegate_to: proxmox_server
+      become: true
