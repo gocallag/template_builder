@@ -1,0 +1,7 @@
+---
+# straight pass through of target-proxmox as we dont have glue variables to set
+- name: (GLUE-TARGET-PROXMOX)
+  ansible.builtin.include_tasks: target-proxmox.yml
+  tags:
+      - build_targets
+      - build_target_proxmox

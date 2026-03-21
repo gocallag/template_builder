@@ -1,0 +1,6 @@
+---
+# straight pass through of template-cleanup as we dont have glue variables to set
+- name: (GLUE-TEMPLATE-CLEANUP)
+  ansible.builtin.include_tasks: template-cleanup.yml
+  tags:
+      - build_customise

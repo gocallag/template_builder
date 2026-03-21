@@ -1,0 +1,7 @@
+---
+# straight pass through of target-ovirt as we dont have glue variables to set
+- name: (GLUE-TARGET-OVIRT)
+  ansible.builtin.include_tasks: target-ovirt.yml
+  tags:
+      - build_targets
+      - build_target_ovirt

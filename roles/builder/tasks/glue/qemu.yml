@@ -1,0 +1,5 @@
+---
+- name: (GLUE-QEMU)
+  ansible.builtin.include_tasks: qemu.yml
+  tags:
+      - always
