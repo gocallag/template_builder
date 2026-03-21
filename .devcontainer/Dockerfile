@@ -45,8 +45,11 @@ RUN apt-get update && \
     update-locale LANG=en_US.UTF-8 && \
     apt-get install -y --no-install-recommends \
         $(grep -vE '^\s*#' /tmp/bindep.txt | tr '\n' ' ') \
-        sudo python3 python3-dev python3-pip python3-setuptools gcc g++ ca-certificates build-essential software-properties-common \
-    && rm -rf /var/lib/apt/lists/*
+        curl sudo python3 python3-dev python3-pip python3-setuptools gcc g++ ca-certificates build-essential software-properties-common
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    rm -rf /var/lib/apt/lists/*
+
 
  # ------------------------------------------------------------
 # 2. Install ansible-core + ansible-runner
@@ -60,6 +63,11 @@ RUN pip3 install --break-system-packages --no-cache-dir \
 # ------------------------------------------------------------
 COPY requirements.txt /tmp/requirements.txt
 RUN pip3 install --break-system-packages --no-cache-dir -r /tmp/requirements.txt
+
+# ------------------------------------------------------------
+# Install the Ansible Language Server (Node-based)
+# ------------------------------------------------------------
+RUN npm install -g @ansible/ansible-language-server
 
 # ------------------------------------------------------------
 # 4. Install vendored Ansible collections (from builder)
