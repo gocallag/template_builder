@@ -29,3 +29,12 @@
             port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
             delay: 10
             timeout: 900
+        - name: (BUILDIMAGE) Wait for SSH/PSRP to be ready on QEMU VM
+          ansible.builtin.include_tasks: waitfor.yml
+          vars:
+            wait_host_ip: "{{ builder_env_qemu_ip }}"
+            wait_port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
+            wait_proto: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}"
+            ponder: true
+          tags:
+            - build_customise

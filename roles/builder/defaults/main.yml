@@ -88,5 +88,5 @@ builder_build_default:
               - "cleanup"
     - name: hardening
     - name: template-cleanup
-    - name: target-proxmox
-    - name: target-ovirt
+    # - name: target-proxmox
+    # - name: target-ovirt

@@ -1,0 +1,215 @@
+---
+- name: (UTILS-WAITFOR) assert
+  ansible.builtin.assert:
+    that:
+      - wait_host_ip is defined and wait_host_ip is not none
+      - wait_port is defined and wait_port | int > 0
+      - wait_proto is defined and wait_proto | lower in ['ssh','psrp']
+    fail_msg: "Need to specify wait_host_ip (ip address), wait_port (number > 0) and wait_proto (ssh, psrp), wait_host_name is optional"
+    success_msg: "{{ wait_host }} {{ wait_port }} {{ wait_proto }} {{ ponder | default(false) }} {{ wait_host_name | default('no wait_host_name') }}"
+  tags:
+    - always
+
+- name: (UTILS-WAITFOR) Wait until ready
+  tags:
+    - always
+  block:
+    - name: (UTILS-WAITFOR) Set the ponder fact
+      ansible.builtin.set_fact:
+        ponder: "{{ ponder | default(false) }}" # noqa: var-naming
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: (UTILS-WAITFOR) Set the retry count for connection
+      ansible.builtin.set_fact:
+        retry_count: "{{ 1 if retry_count is undefined else retry_count | int + 1 }}" # noqa: var-naming
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: (UTILS-WAITFOR) Wait for admin port to be available (after 60 seconds)
+      ansible.builtin.wait_for:
+        port: "{{ wait_port }}"
+        host: "{{ wait_host_ip }}"
+        delay: 60
+        timeout: 900
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: (UTILS-WAITFOR) do a setup on the target host
+      ansible.builtin.setup:
+      ignore_unreachable: true
+      register: mysetup # noqa: var-naming
+      when: ponder
+      delegate_to: "{{ wait_host_name | default(omit) }}"
+
+    - name: (UTILS-WAITFOR) force error if setup failed on the target host
+      ansible.builtin.command: /bin/false
+      changed_when: false
+      delegate_to: localhost
+      when:
+        - ponder
+        - mysetup.unreachable is defined
+
+    - name: (UTILS-WAITFOR, common Linux) Ponder
+      when:
+        - ponder
+        - wait_proto | lower == "ssh"
+      tags:
+        - always
+      block:
+        - name: (UTILS-WAITFOR, redhat) Check for lock files on Red Hat-based systems
+          ansible.builtin.find:
+            paths:
+              - /var/run/yum.pid
+              - /var/run/dnf.pid
+              - /var/lib/yum/yum.pid
+              - /var/lib/dnf/dnf.pid
+            file_type: file
+          delegate_to: "{{ wait_host_name | default(omit) }}"
+          when: ansible_os_family | lower == 'redhat'
+          register: redhat_lock_files # noqa: var-naming
+
+        - name: (UTILS-WAITFOR, ubuntu) Check for lock files on Ubuntu-based systems
+          ansible.builtin.find:
+            paths:
+              - /var/lib/dpkg/lock
+              - /var/lib/dpkg/lock-frontend
+              - /var/cache/apt/archives/lock
+              - /var/lib/apt/lists/lock
+            file_type: file
+          delegate_to: "{{ wait_host_name | default(omit) }}"
+          when: ansible_os_family | lower == 'debian'
+          register: ubuntu_lock_files   # noqa: var-naming
+
+        - name: (UTILS-WAITFOR, sles) Check for lock files on SLES-based systems
+          ansible.builtin.find:
+            paths:
+              - /var/run/zypp.pid
+              - /var/cache/zypp/zypp.lock
+            file_type: file
+          delegate_to: "{{ wait_host_name | default(omit) }}"
+          when: ansible_os_family | lower == 'suse'
+          register: sles_lock_files # noqa: var-naming
+
+        - name: (UTILS-WAITFOR, redhat) Report Red Hat lock files
+          ansible.builtin.debug:
+            msg: "Red Hat lock files found: {{ redhat_lock_files.files | map(attribute='path') | list }}"
+          when: ansible_os_family | lower == 'redhat'
+          failed_when: redhat_lock_files.files | map(attribute='path') | list | length  > 0
+
+        - name: (UTILS-WAITFOR, ubuntu) Report Ubuntu lock files
+          ansible.builtin.debug:
+            msg: "Ubuntu lock files found: {{ ubuntu_lock_files.files | map(attribute='path') | list }}"
+          when: ansible_os_family | lower == 'debian'
+          failed_when: ubuntu_lock_files.files | map(attribute='path') | list | length  > 0
+
+        - name: (UTILS-WAITFOR, sles) Report SLES lock files
+          ansible.builtin.debug:
+            msg: "SLES lock files found: {{ sles_lock_files.files | map(attribute='path') | list }}"
+          when: ansible_os_family | lower == 'suse'
+          failed_when: sles_lock_files.files | map(attribute='path') | list | length > 0
+
+    - name: (UTILS-WAITFOR, Windows) Ponder
+      when:
+        - ponder
+        - wait_proto == "psrp"
+      tags:
+        - always
+      block:
+        - name: (UTILS-WAITFOR, Windows) Ponder
+          ansible.windows.win_shell: |
+            function ExitWithCode($exitCode) {
+                $host.SetShouldExit($exitCode)
+                Exit
+            }
+            Add-Type @'
+              using System;
+              using System.Runtime.InteropServices;
+
+              public static class Windows
+              {
+                  [DllImport("kernel32", SetLastError=true)]
+                  public static extern UInt64 GetTickCount64();
+
+                  public static TimeSpan GetUptime()
+                  {
+                      return TimeSpan.FromMilliseconds(GetTickCount64());
+                  }
+              }
+            '@
+
+            function Wait-Condition {
+                param(
+                  [scriptblock]$Condition,
+                  [int]$DebounceSeconds=15
+                )
+                process {
+                    $begin = [Windows]::GetUptime()
+                    do {
+                        Start-Sleep -Seconds 1
+                        try {
+                          $result = &$Condition
+                        } catch {
+                          $result = $false
+                        }
+                        if (-not $result) {
+                            $begin = [Windows]::GetUptime()
+                            continue
+                        }
+                    } while ((([Windows]::GetUptime()) - $begin).TotalSeconds -lt $DebounceSeconds)
+                }
+            }
+            Write-Output 'Waiting for the Windows Modules Installer to exit...'
+            Wait-Condition {(Get-Process -ErrorAction SilentlyContinue TiWorker | Measure-Object).Count -eq 0}
+            ExitWithCode 0
+          ignore_unreachable: true
+          delegate_to: "{{ wait_host_name | default(omit) }}"
+          register: mysetup # noqa: var-naming
+
+        - name: (UTILS-WAITFOR) do a setup again after pondering
+          ansible.builtin.setup:
+          ignore_unreachable: true
+          register: mysetup # noqa: var-naming
+          delegate_to: "{{ wait_host_name | default(omit) }}"
+          when: ponder
+
+        - name: (UTILS-WAITFOR) force failure if setup failed
+          ansible.builtin.command: /bin/false
+          changed_when: false
+          delegate_to: localhost
+          when:
+            - ponder
+            - mysetup.unreachable is defined
+
+  rescue:
+
+    - name: (UTILS-WAITFOR) debug failure
+      ansible.builtin.debug:
+        msg: "fail count = {{ retry_count }}"
+      tags:
+        - always
+
+    - name: (UTILS-WAITFOR) fail
+      ansible.builtin.fail:
+        msg: Ended after 15 tries
+      when: retry_count|int >=  15
+      tags:
+        - always
+
+
+    - name: (UTILS-WAITFOR) hold on for 2 minutes to give the target system a chance to sort itself out.
+      ansible.builtin.wait_for:
+        timeout: 120
+      delegate_to: localhost
+      tags:
+        - always
+
+
+    - name: (UTILS-WAITFOR) debug failure
+      ansible.builtin.debug:
+        msg: "Failed to connect - Retrying..."
+      tags:
+        - always
+
+
+    - name: (UTILS-WAITFOR) include the task again
+      ansible.builtin.include_tasks: "waitfor.yml"
+      tags:
+        - always
