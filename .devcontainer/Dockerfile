@@ -112,6 +112,7 @@ RUN echo "runner:x:1001:0:Ansible Runner:/runner:/usr/sbin/nologin" >> /etc/pass
 RUN echo 'runner ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/runner && \
     chmod 0440 /etc/sudoers.d/runner
 RUN usermod -p '!' runner || true
+RUN usermod -aG 994 runner || true
 
 COPY ansible.cfg /etc/ansible/ansible.cfg
 
