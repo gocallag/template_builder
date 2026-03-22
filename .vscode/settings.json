@@ -24,8 +24,6 @@
   // Improve YAML experience
 "yaml.schemas": {
   "https://raw.githubusercontent.com/ansible/schemas/main/f/ansible.json": [
-    "playbook.yml",
-    "site.yml",
     "tasks/**/*.yml",
     "handlers/**/*.yml"
   ]
