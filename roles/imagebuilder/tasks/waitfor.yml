@@ -5,8 +5,7 @@
       - wait_host_ip is defined and wait_host_ip is not none
       - wait_port is defined and wait_port | int > 0
       - wait_proto is defined and wait_proto | lower in ['ssh','psrp']
-    fail_msg: "Need to specify wait_host_ip (ip address), wait_port (number > 0) and wait_proto (ssh, psrp), wait_host_name is optional"
-    success_msg: "{{ wait_host }} {{ wait_port }} {{ wait_proto }} {{ ponder | default(false) }} {{ wait_host_name | default('no wait_host_name') }}"
+    fail_msg: "Need to specify wait_host_ip (ip address), wait_port (number > 0) and wait_proto (ssh, psrp)"
   tags:
     - always
 
