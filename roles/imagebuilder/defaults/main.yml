@@ -1,0 +1,92 @@
+builder_useauxiso: false
+builder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
+builder_prefix_port_offset_map:
+    alma: 0
+    ol: 1
+    rocky: 2
+    debian: 3
+    ubuntu: 4
+    windows: 5
+    suse: 6
+    fedora: 7
+    centos: 8
+    rhel: 9
+    leap: 10
+
+builder_package_lists:
+    debian:
+        - software-properties-common
+        - ansible
+        - genisoimage
+        - ipxe-qemu
+        - qemu-system-x86
+        - qemu-system-common
+        - qemu-system-data
+        - qemu-utils
+        - netcat-openbsd
+        - sshpass
+        - unzip
+        - vim
+        - wget
+        - xorriso
+        - libxml2-dev
+        - libxslt-dev
+        - python3-dev
+        - libnbd-bin
+        - nbdkit
+        - guestfish
+        - python3-pip
+builder_pip_packages:
+    debian:
+        - pywinrm
+        - proxmoxer
+        - ovirt-engine-sdk-python
+builder_base_qemu_command: "qemu-system-x86_64"
+
+
+builder_env_qemu_ip: "localhost"
+builder_env_build_path: /build
+builder_env_build_memory: 8192
+builder_env_build_cpu: 4
+
+builder_env_ansible_user: "{{ lookup('env', 'BUILD_ANSIBLE_USER') }}"
+builder_env_ansible_password: "{{ lookup('env', 'BUILD_ANSIBLE_PASSWORD') }}"
+builder_env_linux_admin_user: "{{ lookup('env', 'BUILD_LINUX_ADMIN_USER') }}"
+builder_env_linux_admin_password: "{{ lookup('env', 'BUILD_LINUX_ADMIN_PASSWORD') }}"
+builder_env_win_admin_user: "{{ lookup('env', 'BUILD_WIN_ADMIN_USER') }}"
+builder_env_win_admin_password: "{{ lookup('env', 'BUILD_WIN_ADMIN_PASSWORD') }}"
+builder_env_ansible_key: "{{ lookup('env', 'BUILD_ANSIBLE_KEY') }}"
+builder_env_proxmox_server: "{{ lookup('env', 'PROXMOX_SERVER') }}"
+builder_env_proxmox_user: "{{ lookup('env', 'PROXMOX_ADMIN_USER') }}"
+builder_env_proxmox_password: "{{ lookup('env', 'PROXMOX_ADMIN_PASSWORD') }}"
+builder_env_proxmox_storage: "{{ lookup('env', 'PROXMOX_STORAGE') }}"
+builder_env_proxmox_node: "{{ lookup('env', 'PROXMOX_NODE') }}"
+builder_env_ovirt_ovirt_url: "{{ lookup('env', 'OVIRT_URL') }}"
+builder_env_ovirt_ovirt_username: "{{ lookup('env', 'OVIRT_USERNAME') }}"
+builder_env_ovirt_ovirt_password: "{{ lookup('env', 'OVIRT_PASSWORD') }}"
+builder_env_ovirt_ovirt_storage_domain: "{{ lookup('env', 'OVIRT_STORAGE_DOMAIN') }}"
+builder_env_ovirt_ovirt_cluster: "{{ lookup('env', 'OVIRT_CLUSTER') }}"
+builder_env_rhsm_username: "{{ lookup('env', 'BUILD_RHSM_USER') }}"
+builder_env_rhsm_password: "{{ lookup('env', 'BUILD_RHSM_PASSWORD') }}"
+
+# default build steps
+
+builder_build_default:
+    - name: download
+      task_vars:
+          download_url: "{{ os.iso }}"
+          download_checksum: "{{ os.checksum }}"
+          download_dest: "{{ builder_build_basedir }}/downloads/{{ os.iso | basename }}"
+    - name: buildaux
+    - name: buildimage
+    - name: patching
+      task_vars:
+          location: internet
+          sub_tasks:
+              - "prepare"
+              - "patch"
+              - "cleanup"
+    - name: hardening
+    - name: template-cleanup
+    # - name: target-proxmox
+    # - name: target-ovirt
