@@ -44,14 +44,14 @@
 
     - name: (QEMU) Set QEMU command
       ansible.builtin.set_fact:
-        builder_qemu_command: "{{ builder_base_qemu_command }} {{ qemu_args | join(' ') }}"
+        builder_qemu_command: "{{ builder_base_qemu_command }} {{ qemu_args | join(' ') }}" # noqa: var-naming
       tags:
         - build_base
         - build_customise
         - build_disk
     - name: (QEMU) Set QEMU command with aux ISO if needed
       ansible.builtin.set_fact:
-        builder_qemu_command: "{{ builder_qemu_command }} -drive file={{ builder_build_imagedir }}/aux.iso,media=cdrom,if=ide,index=2"
+        builder_qemu_command: "{{ builder_qemu_command }} -drive file={{ builder_build_imagedir }}/aux.iso,media=cdrom,if=ide,index=2" # noqa: var-naming
       when: useauxiso | default(false) | bool
       tags:
         - build_base
