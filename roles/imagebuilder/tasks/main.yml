@@ -25,7 +25,7 @@
     - build_cleanup
 - name: (MAIN) Drive Setup
   ansible.builtin.include_role:
-    name: builder
+    name: imagebuilder
     tasks_from: setup
   tags:
     - always
@@ -41,7 +41,7 @@
   block:
     - name: (MAIN) include build roles if any are defined
       ansible.builtin.include_role:
-        name: builder
+        name: imagebuilder
         tasks_from: "glue/glue.yml"
       tags:
         - always
