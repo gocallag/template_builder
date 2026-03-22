@@ -1,0 +1,38 @@
+{
+  // Force the language server to activate even for collections
+  "ansible.activationMode": "always",
+
+  // Tell the extension where your collection lives
+  "ansible.collectionPaths": [
+    "${workspaceFolder}"
+  ],
+
+  // Enable linting and diagnostics
+  "ansible.validation.enabled": true,
+  "ansible.validation.lint.enabled": true,
+  "ansible.validation.lint.path": "ansible-lint",
+  "ansible.validation.lint.lintTaskFiles": true,
+"yaml.customTags": [
+  "!vault scalar",
+  "!vault mapping"
+],
+"yaml.validate": true,
+"yaml.files.associations": {
+  "roles/*/defaults/*.yml": "yaml-no-schema",
+  "roles/*/vars/*.yml": "yaml-no-schema"
+},
+  // Improve YAML experience
+"yaml.schemas": {
+  "https://raw.githubusercontent.com/ansible/schemas/main/f/ansible.json": [
+    "playbook.yml",
+    "site.yml",
+    "tasks/**/*.yml",
+    "handlers/**/*.yml"
+  ]
+},
+
+
+
+  // Optional: make the extension treat this like a full project
+  "ansible.workspaceRoot": "${workspaceFolder}"
+}
