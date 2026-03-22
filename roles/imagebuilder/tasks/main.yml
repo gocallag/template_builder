@@ -1,16 +1,50 @@
 ---
+- name: (MAIN)Expand standard credentials file path
+  ansible.builtin.set_fact:
+    envfile_path: "{{ '~/.template_builder/credentials.sh' | expanduser }}" # noqa: var-naming
+
+- name: (MAIN) Check if credentials file exists in the standard location
+  ansible.builtin.stat:
+    path: "{{ envfile_path }}"
+  register: envfile_stat # noqa: var-naming
+
+- name: (MAIN) Load env file (a=b format)
+  ansible.builtin.slurp:
+    src: "{{ envfile_path }}"
+  register: raw_env # noqa: var-naming
+  when: envfile_stat.stat.exists
+
+- name: (MAIN) Convert env file to dict
+  ansible.builtin.set_fact:
+    builder_env: # noqa: var-naming
+     >-
+      {{
+        raw_env.content
+        | b64decode
+        | regex_replace('^\\s*#.*$', '', multiline=True)
+        | regex_replace('^\\s*$', '', multiline=True)
+        | regex_replace('=', ': ', multiline=True)
+        | from_yaml
+      }}
+  when: envfile_stat.stat.exists
+
+- name: (MAIN) Display loaded environment variables
+  ansible.builtin.debug:
+    var: builder_env
+  when: builder_env is defined
+
 - name: (MAIN) Assert required build variables are defined
   ansible.builtin.assert:
     that:
-      - builder_env_qemu_ip is defined and builder_env_qemu_ip | trim | length > 0
-      - builder_env_build_path is defined and builder_env_build_path and (builder_env_build_path | trim | length > 0)
-      - builder_env_ansible_user is defined and builder_env_ansible_user and (builder_env_ansible_user | trim | length > 0)
-      - builder_env_ansible_password is defined and builder_env_ansible_password and (builder_env_ansible_password | trim | length > 0)
-      - builder_env_linux_admin_user is defined and builder_env_linux_admin_user and (builder_env_linux_admin_user | trim | length > 0)
-      - builder_env_linux_admin_password is defined and builder_env_linux_admin_password and (builder_env_linux_admin_password | trim | length > 0)
-      - builder_env_win_admin_user is defined and builder_env_win_admin_user and (builder_env_win_admin_user | trim | length > 0)
-      - builder_env_win_admin_password is defined and builder_env_win_admin_password and (builder_env_win_admin_password | trim | length > 0)
-      - builder_env_ansible_key is defined and builder_env_ansible_key and (builder_env_ansible_key | trim | length > 0)
+      - builder_env.qemu_ip is defined and builder_env.qemu_ip | trim | length > 0
+      - builder_env.build_path is defined and builder_env.build_path and (builder_env.build_path | trim | length > 0)
+      - builder_env.ansible_user is defined and builder_env.ansible_user and (builder_env.ansible_user | trim | length > 0)
+      - builder_env.ansible_password is defined and builder_env.ansible_password and (builder_env.ansible_password | trim | length > 0)
+      - builder_env.linux_admin_user is defined and builder_env.linux_admin_user and (builder_env.linux_admin_user | trim | length > 0)
+      - builder_env.linux_admin_password is defined and builder_env.linux_admin_password and (builder_env.linux_admin_password | trim | length > 0)
+      - builder_env.win_admin_user is defined and builder_env.win_admin_user and (builder_env.win_admin_user | trim | length > 0)
+      - builder_env.win_admin_password is defined and builder_env.win_admin_password and (builder_env.win_admin_password | trim | length > 0)
+      - builder_env.ansible_key is defined and builder_env.ansible_key and (builder_env.ansible_key | trim | length > 0)
     fail_msg: "(MAIN) One or more required variables are not defined correctly."
     success_msg: "(MAIN) All required variables are defined and appear valid."
   tags:                       # list all the tags used role wide so we can see them with a list-tags command

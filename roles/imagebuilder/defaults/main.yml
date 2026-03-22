@@ -43,32 +43,6 @@ builder_pip_packages:
         - ovirt-engine-sdk-python
 builder_base_qemu_command: "qemu-system-x86_64"
 
-
-builder_env_qemu_ip: "localhost"
-builder_env_build_path: /build
-builder_env_build_memory: 8192
-builder_env_build_cpu: 4
-
-builder_env_ansible_user: "{{ lookup('env', 'BUILD_ANSIBLE_USER') }}"
-builder_env_ansible_password: "{{ lookup('env', 'BUILD_ANSIBLE_PASSWORD') }}"
-builder_env_linux_admin_user: "{{ lookup('env', 'BUILD_LINUX_ADMIN_USER') }}"
-builder_env_linux_admin_password: "{{ lookup('env', 'BUILD_LINUX_ADMIN_PASSWORD') }}"
-builder_env_win_admin_user: "{{ lookup('env', 'BUILD_WIN_ADMIN_USER') }}"
-builder_env_win_admin_password: "{{ lookup('env', 'BUILD_WIN_ADMIN_PASSWORD') }}"
-builder_env_ansible_key: "{{ lookup('env', 'BUILD_ANSIBLE_KEY') }}"
-builder_env_proxmox_server: "{{ lookup('env', 'PROXMOX_SERVER') }}"
-builder_env_proxmox_user: "{{ lookup('env', 'PROXMOX_ADMIN_USER') }}"
-builder_env_proxmox_password: "{{ lookup('env', 'PROXMOX_ADMIN_PASSWORD') }}"
-builder_env_proxmox_storage: "{{ lookup('env', 'PROXMOX_STORAGE') }}"
-builder_env_proxmox_node: "{{ lookup('env', 'PROXMOX_NODE') }}"
-builder_env_ovirt_ovirt_url: "{{ lookup('env', 'OVIRT_URL') }}"
-builder_env_ovirt_ovirt_username: "{{ lookup('env', 'OVIRT_USERNAME') }}"
-builder_env_ovirt_ovirt_password: "{{ lookup('env', 'OVIRT_PASSWORD') }}"
-builder_env_ovirt_ovirt_storage_domain: "{{ lookup('env', 'OVIRT_STORAGE_DOMAIN') }}"
-builder_env_ovirt_ovirt_cluster: "{{ lookup('env', 'OVIRT_CLUSTER') }}"
-builder_env_rhsm_username: "{{ lookup('env', 'BUILD_RHSM_USER') }}"
-builder_env_rhsm_password: "{{ lookup('env', 'BUILD_RHSM_PASSWORD') }}"
-
 # default build steps
 
 builder_build_default:
