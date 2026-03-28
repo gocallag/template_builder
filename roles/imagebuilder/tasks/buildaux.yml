@@ -11,10 +11,10 @@
         loop_control:
             loop_var: file
         loop:
-            - "{{ builder_build_basedir }}/build/iso_contents"
-            - "{{ builder_build_basedir }}/build/iso_contents/drivers"
-            - "{{ builder_build_basedir }}/build/iso_contents/tools"
-            - "{{ builder_build_basedir }}/build/iso_contents/patches"
+            - "{{ imagebuilder_build_basedir }}/build/iso_contents"
+            - "{{ imagebuilder_build_basedir }}/build/iso_contents/drivers"
+            - "{{ imagebuilder_build_basedir }}/build/iso_contents/tools"
+            - "{{ imagebuilder_build_basedir }}/build/iso_contents/patches"
       - name: (BUILDAUX) include variant-specific tasks
         ansible.builtin.include_tasks:
             file: buildaux/{{ os.variant | lower }}.yml

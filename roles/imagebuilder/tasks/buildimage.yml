@@ -14,26 +14,26 @@
       block:
         - name: (BUILDIMAGE) Power on QEMU VM (customise)
           ansible.builtin.command: >
-            {{ builder_qemu_command }} \
-            -chardev socket,id=mon0,host=localhost,port={{ builder_env_qemu_monport }},server=on,wait=off \
+            {{ imagebuilder_qemu_command }} \
+            -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off \
             -mon chardev=mon0, \
             -boot order=c \
-            -drive file="{{ builder_build_iso }}",media=cdrom,index=1
+            -drive file="{{ imagebuilder_build_iso }}",media=cdrom,index=1
           async: 99999
           poll: 0
           register: qemu_boot # noqa: var-naming
           changed_when: true
         - name: (BUILDIMAGE) Wait for QEMU VM to be accessible
           ansible.builtin.wait_for:
-            host: "{{ builder_env_qemu_ip }}"
-            port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
+            host: "{{ imagebuilder_env_qemu_ip }}"
+            port: "{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
             delay: 10
             timeout: 900
         - name: (BUILDIMAGE) Wait for SSH/PSRP to be ready on QEMU VM
           ansible.builtin.include_tasks: waitfor.yml
           vars:
-            wait_host_ip: "{{ builder_env_qemu_ip }}"
-            wait_port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
+            wait_host_ip: "{{ imagebuilder_env_qemu_ip }}"
+            wait_port: "{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
             wait_proto: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}"
             ponder: true
           tags:

@@ -13,16 +13,16 @@
         loop_control:
             loop_var: file
         loop:
-            - "{{ builder_build_basedir }}/build"
-            - "{{ builder_build_basedir }}/build/mnt"
+            - "{{ imagebuilder_build_basedir }}/build"
+            - "{{ imagebuilder_build_basedir }}/build/mnt"
       - name: (BUILDAUX, redhat) remove existing aux ISO (if it exists)
         ansible.builtin.file:
-            path: "{{ builder_build_basedir }}/build/aux.iso"
+            path: "{{ imagebuilder_build_basedir }}/build/aux.iso"
             state: absent
 
       - name: (BUILDAUX, redhat) create temporary iso contents dir
         ansible.builtin.file:
-            path: "{{ builder_build_basedir }}/build/iso_contents"
+            path: "{{ imagebuilder_build_basedir }}/build/iso_contents"
             state: directory
             mode: "0755"
 
@@ -39,7 +39,7 @@
                   eula --agreed
                   lang en_US.UTF-8
                   keyboard us
-                  rootpw {{ builder_env_linux_admin_password }}
+                  rootpw {{ imagebuilder_env_linux_admin_password }}
                   selinux --enforcing
                   firstboot --disable
                   firewall --enabled --ssh --port=22/tcp
@@ -69,7 +69,7 @@
                   logvol /var/log/audit --fstype xfs --name lvvarlogaud --vgname {{ os.variant | lower }} --size 512
                   logvol swap --fstype swap --recommended --name swap --vgname {{ os.variant | lower }}
 
-                  user --name={{ builder_env_ansible_user }} --groups=wheel --plaintext --password={{ builder_env_ansible_password }}
+                  user --name={{ imagebuilder_env_ansible_user }} --groups=wheel --plaintext --password={{ imagebuilder_env_ansible_password }}
 
                   %packages --ignoremissing --excludedocs {{ ('--instLangs') if (version_major | default('') | int) == 8 else ('--inst-langs') if (version_major | default('') | int) >= 9 else '' }}=en_US.utf8
                   {% if os.variant is defined and (os.variant | lower) == 'fedora' %}
@@ -179,19 +179,19 @@
                     alternatives --set python $(command -v python3)
 
                     #---- Install our SSH key ----
-                    id -u {{ builder_env_ansible_user }} &>/dev/null || useradd -m -s /bin/bash {{ builder_env_ansible_user }}
-                    mkdir -m0700 /home/{{ builder_env_ansible_user }}/.ssh/
-                    echo "{{ builder_env_ansible_key }}" > /home/{{ builder_env_ansible_user }}/.ssh/authorized_keys
-                    chown -R {{ builder_env_ansible_user }}:wheel /home/{{ builder_env_ansible_user }}/.ssh
-                    chmod 0600 /home/{{ builder_env_ansible_user }}/.ssh/authorized_keys
+                    id -u {{ imagebuilder_env_ansible_user }} &>/dev/null || useradd -m -s /bin/bash {{ imagebuilder_env_ansible_user }}
+                    mkdir -m0700 /home/{{ imagebuilder_env_ansible_user }}/.ssh/
+                    echo "{{ imagebuilder_env_ansible_key }}" > /home/{{ imagebuilder_env_ansible_user }}/.ssh/authorized_keys
+                    chown -R {{ imagebuilder_env_ansible_user }}:wheel /home/{{ imagebuilder_env_ansible_user }}/.ssh
+                    chmod 0600 /home/{{ imagebuilder_env_ansible_user }}/.ssh/authorized_keys
                     # Ensure ansible user is in the wheel group
-                    usermod -aG wheel {{ builder_env_ansible_user }}
-                    echo "{{ builder_env_ansible_user }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
+                    usermod -aG wheel {{ imagebuilder_env_ansible_user }}
+                    echo "{{ imagebuilder_env_ansible_user }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
                     chmod 0440 /etc/sudoers.d/ansible
 
                     # Check if SELinux is enabled before running restorecon to avoid unnecessary errors
                     if [ "$(getenforce)" != "Disabled" ]; then
-                      restorecon -R /home/{{ builder_env_ansible_user }}/.ssh/
+                      restorecon -R /home/{{ imagebuilder_env_ansible_user }}/.ssh/
                     fi
 
                     # Configure password quality settings
@@ -211,13 +211,13 @@
       - name: (BUILDAUX, redhat) Copy kickstart file (RedHat) to ISO contents
         ansible.builtin.copy:
             content: "{{ ks }}"
-            dest: "{{ builder_build_basedir }}/build/iso_contents/ks.cfg"
+            dest: "{{ imagebuilder_build_basedir }}/build/iso_contents/ks.cfg"
             mode: "0644"
         become: true
       - name: (BUILDAUX, redhat) Copy kickstart file (RedHat) to http directory
         ansible.builtin.copy:
             content: "{{ ks }}"
-            dest: "{{ builder_build_httpdir }}/ks.cfg"
+            dest: "{{ imagebuilder_build_httpdir }}/ks.cfg"
             mode: "0644"
         become: true
 
@@ -225,20 +225,20 @@
         ansible.builtin.command: >
           genisoimage -output aux.iso -volid OEMDRV -joliet -rock .
         args:
-            chdir: "{{ builder_build_basedir }}/build/iso_contents"
-            creates: "{{ builder_build_basedir }}/build/aux.iso"
+            chdir: "{{ imagebuilder_build_basedir }}/build/iso_contents"
+            creates: "{{ imagebuilder_build_basedir }}/build/aux.iso"
         register: mkiso # noqa: var-naming
         failed_when: mkiso.rc != 0
 
       - name: (BUILDAUX, redhat) Move aux ISO to build directory
         ansible.builtin.command: >
-          mv {{ builder_build_basedir }}/build/iso_contents/aux.iso {{ builder_build_basedir }}/build/aux.iso
+          mv {{ imagebuilder_build_basedir }}/build/iso_contents/aux.iso {{ imagebuilder_build_basedir }}/build/aux.iso
         args:
-            creates: "{{ builder_build_basedir }}/build/aux.iso"
+            creates: "{{ imagebuilder_build_basedir }}/build/aux.iso"
 
       - name: (BUILDAUX, redhat) Remove temporary ISO contents directory
         ansible.builtin.file:
-            path: "{{ builder_build_basedir }}/build/iso_contents"
+            path: "{{ imagebuilder_build_basedir }}/build/iso_contents"
             state: absent
         become: true
       - name: (BUILDAUX, redhat) create sha256 of build profile

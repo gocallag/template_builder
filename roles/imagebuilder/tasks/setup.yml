@@ -7,63 +7,59 @@
         ansible.builtin.setup:
       - name: (SETUP) get the id prefix
         ansible.builtin.set_fact:
-            builder_id_prefix: "{{ id | regex_replace('^(.*?)-.*$', '\\1') }}" # noqa: var-naming
+            imagebuilder_id_prefix: "{{ id | regex_replace('^(.*?)-.*$', '\\1') }}"
       - name: (SETUP) Fail if prefix is unknown
         ansible.builtin.fail:
-            msg: "Unknown prefix '{{ builder_id_prefix }}'. Add it to builder_prefix_port_offset_map."
-        when: builder_id_prefix not in builder_prefix_port_offset_map
+            msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. Add it to imagebuilder_prefix_port_offset_map."
+        when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
 
-      - name: (SETUP) Lookup offset
-        ansible.builtin.set_fact:
-            builder_port_offset: "{{ builder_prefix_port_offset_map[builder_id_prefix] }}" # noqa: var-naming
       - name: (SETUP) Debug port offset
         ansible.builtin.debug:
-            msg: "(SETUP) Using port offset {{ builder_port_offset }} for prefix {{ builder_id_prefix }}"
+            msg: "(SETUP) Using port offset {{ imagebuilder_port_offset }} for prefix {{ imagebuilder_id_prefix }}"
 
       - name: (SETUP) set local  ports based on offset
         ansible.builtin.set_fact:
-            builder_localport: "{{ 8180 + (builder_port_offset | default(0) | int) }}" # noqa: var-naming
-            builder_env_qemu_ssh_port: "{{ 10222 + (builder_port_offset | default(0) | int) }}" # noqa: var-naming
-            builder_env_qemu_psrp_port: "{{ 5986 + (builder_port_offset | default(0) | int) }}" # noqa: var-naming
-            builder_env_qemu_monport: "{{ 4445 + (builder_port_offset | default(0) | int) }}" # noqa: var-naming
+            imagebuilder_env_qemu_ssh_port: "{{ 10222 + (imagebuilder_port_offset | default(0) | int) }}" # noqa: var-naming
+            imagebuilder_env_qemu_psrp_port: "{{ 5986 + (imagebuilder_port_offset | default(0) | int) }}" # noqa: var-naming
+            imagebuilder_env_qemu_monport: "{{ 4445 + (imagebuilder_port_offset | default(0) | int) }}" # noqa: var-naming
       - name: (SETUP) Debug local ports
         ansible.builtin.debug:
-            msg: "(SETUP) Using localport={{ builder_localport }}, env_qemu_ssh_port={{ builder_env_qemu_ssh_port }}, env_qemu_psrp_port={{ builder_env_qemu_psrp_port }}, env_qemu_monport={{ builder_env_qemu_monport }}"
+            msg: "(SETUP) Using localport={{ imagebuilder_localport }}, env_qemu_ssh_port={{ imagebuilder_env_qemu_ssh_port }}, env_qemu_psrp_port={{ imagebuilder_env_qemu_psrp_port }}, env_qemu_monport={{ imagebuilder_env_qemu_monport }}"
       - name: (SETUP) split the version into major and minor
         ansible.builtin.set_fact:
             version_major: "{{ version | regex_replace('^(\\d+)\\..*$', '\\1') | int }}" # noqa: var-naming
             version_minor: "{{ version | regex_replace('^\\d+\\.(\\d+).*$', '\\1') | int }}" # noqa: var-naming
 
-      - name: (SETUP) save the builder_build_basedir
+      - name: (SETUP) save the imagebuilder_build_basedir
         ansible.builtin.set_fact:
-            builder_build_basedir: "{{ builder_env_build_path }}/{{ id }}" # noqa: var-naming
-            builder_build_savedir: "{{ builder_env_build_path }}/images" # noqa: var-naming
-      - name: (SETUP) set all the build_ variables that we use for building
+            imagebuilder_build_basedir: "{{ imagebuilder_env_build_path }}/{{ id }}" # noqa: var-naming
+            imagebuilder_build_savedir: "{{ imagebuilder_env_build_path }}/images" # noqa: var-naming
+      - name: (SETUP) set all the imagebuilder_build_ variables that we use for building
         ansible.builtin.set_fact:
-            builder_build_id: "{{ id }}"
-            builder_port_offset: "{{ builder_port_offset | default(0) }}" # noqa: var-naming
-            builder_build_iso: "{{ builder_env_build_path }}/{{ id }}/downloads/{{ os.iso | basename }}" # noqa: var-naming
-            builder_build_aux: "{{ builder_env_build_path }}/{{ id }}/build/{{ id }}.img" # noqa: var-naming
-            builder_build_disks: "{{ os.config.disks }}" # noqa: var-naming
-            builder_build_kickstart: "{{ builder_env_build_path }}/{{ id }}/ks.cfg" # noqa: var-naming
-            builder_build_ram: "{{ builder_env_build_memory | default(2048) }}" # noqa: var-naming
-            builder_build_vcpus: "{{ builder_env_build_cpu | default(2) }}" # noqa: var-naming
-            builder_build_output: "{{ builder_build_basedir }}/build/{{ id }}.qcow2" # noqa: var-naming
-            builder_build_httpdir: "{{ builder_build_basedir }}/http" # noqa: var-naming
-            builder_build_auxdir: "{{ builder_build_basedir }}/http/aux" # noqa: var-naming
-            builder_build_format: qcow2 # noqa: var-naming
-            builder_build_imagedir: "{{ builder_build_basedir }}/build" # noqa: var-naming
-            builder_build_downloadsdir: "{{ builder_build_basedir }}/downloads" # noqa: var-naming
-            builder_aux_dir: "{{ builder_build_basedir }}/aux" # noqa: var-naming
-            builder_iso_file: "{{ builder_build_basedir }}/build/{{ id }}.iso" # noqa: var-naming
+            imagebuilder_build_id: "{{ id }}"
+            imagebuilder_port_offset: "{{ imagebuilder_port_offset | default(0) }}"
+            imagebuilder_build_iso: "{{ imagebuilder_env_build_path }}/{{ id }}/downloads/{{ os.iso | basename }}"
+            imagebuilder_build_aux: "{{ imagebuilder_env_build_path }}/{{ id }}/build/{{ id }}.img"
+            imagebuilder_build_disks: "{{ os.config.disks }}"
+            imagebuilder_build_kickstart: "{{ imagebuilder_env_build_path }}/{{ id }}/ks.cfg"
+            imagebuilder_build_ram: "{{ imagebuilder_env_build_memory | default(2048) }}"
+            imagebuilder_build_vcpus: "{{ imagebuilder_env_build_cpu | default(2) }}"
+            imagebuilder_build_output: "{{ imagebuilder_build_basedir }}/build/{{ id }}.qcow2"
+            imagebuilder_build_httpdir: "{{ imagebuilder_build_basedir }}/http"
+            imagebuilder_build_auxdir: "{{ imagebuilder_build_basedir }}/http/aux"
+            imagebuilder_build_format: qcow2
+            imagebuilder_build_imagedir: "{{ imagebuilder_build_basedir }}/build"
+            imagebuilder_build_downloadsdir: "{{ imagebuilder_build_basedir }}/downloads"
+            imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
+            imagebuilder_iso_file: "{{ imagebuilder_build_basedir }}/build/{{ id }}.iso"
 
       - name: (SETUP) Add new system to in-memory inventory
         ansible.builtin.add_host:
             name: 'bob_build'
             ansible_host: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
-            ansible_user: "{{ builder_env_ansible_user }}"
-            ansible_password: "{{ builder_env_ansible_password }}"
-            ansible_port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}"
+            ansible_user: "{{ imagebuilder_env_ansible_user }}"
+            ansible_password: "{{ imagebuilder_env_ansible_password }}"
+            ansible_port: "{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
             ansible_connection: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}"
             ansible_psrp_auth: "negotiate"
             ansible_winrm_server_cert_validation: ignore
@@ -77,12 +73,12 @@
         when: ansible_facts['os_family'] | lower == 'debian'
       - name: (SETUP) Install required packages
         ansible.builtin.package:
-            name: "{{ builder_package_lists[ansible_facts['os_family'] | lower] }}"
+            name: "{{ imagebuilder_package_lists[ansible_facts['os_family'] | lower] }}"
             state: present
         become: true
       - name: (SETUP) Install required pip packages
         ansible.builtin.pip:
-            name: "{{ builder_pip_packages[ansible_facts['os_family'] | lower] }}"
+            name: "{{ imagebuilder_pip_packages[ansible_facts['os_family'] | lower] }}"
             state: present
             extra_args: "--break-system-packages"
         become: true
@@ -92,7 +88,7 @@
         changed_when: false
       - name: (SETUP) Create base build directory
         ansible.builtin.file:
-            path: "{{ builder_env_build_path }}"
+            path: "{{ imagebuilder_env_build_path }}"
             state: directory
             owner: "{{ ansible_user | default(current_user.stdout) }}"
             mode: "0755"
@@ -105,9 +101,9 @@
         loop_control:
             loop_var: build_loop
         loop:
-            - "{{ builder_build_httpdir }}"
-            - "{{ builder_build_downloadsdir }}"
-            - "{{ builder_build_imagedir }}"
+            - "{{ imagebuilder_build_httpdir }}"
+            - "{{ imagebuilder_build_downloadsdir }}"
+            - "{{ imagebuilder_build_imagedir }}"
         tags:
             - cleanup
         when: "'cleanup' in ansible_run_tags"
@@ -120,31 +116,31 @@
         loop_control:
             loop_var: file
         loop:
-            - "{{ builder_build_httpdir }}"
-            - "{{ builder_build_httpdir }}/aux/drivers"
-            - "{{ builder_build_httpdir }}/aux/tools"
-            - "{{ builder_build_httpdir }}/aux/patches"
-            - "{{ builder_build_httpdir }}/aux/tools"
-            - "{{ builder_build_downloadsdir }}"
-            - "{{ builder_build_imagedir }}"
-            - "{{ builder_build_savedir }}"
+            - "{{ imagebuilder_build_httpdir }}"
+            - "{{ imagebuilder_build_httpdir }}/aux/drivers"
+            - "{{ imagebuilder_build_httpdir }}/aux/tools"
+            - "{{ imagebuilder_build_httpdir }}/aux/patches"
+            - "{{ imagebuilder_build_httpdir }}/aux/tools"
+            - "{{ imagebuilder_build_downloadsdir }}"
+            - "{{ imagebuilder_build_imagedir }}"
+            - "{{ imagebuilder_build_savedir }}"
 
       - name: (SETUP) copy qemu monitor script
         ansible.builtin.template:
             src: "files/qemu/sendkeys.py"
-            dest: "{{ builder_env_build_path }}/{{ id }}/sendkeys.py"
+            dest: "{{ imagebuilder_env_build_path }}/{{ id }}/sendkeys.py"
             mode: '0755'
         delegate_to: "{{ run_on | default('localhost') }}"
 
       - name: (SETUP) set the port connection details for qemu based on the OS type
         ansible.builtin.set_fact:
-            wait_host: "{{ builder_env_qemu_ip }}" # noqa: var-naming
-            wait_port: "{{ (os.type | lower == 'linux') | ternary(builder_env_qemu_ssh_port, builder_env_qemu_psrp_port) }}" # noqa: var-naming
+            wait_host: "{{ imagebuilder_env_qemu_ip }}" # noqa: var-naming
+            wait_port: "{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
             wait_proto: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
 
 
       - name: (SETUP) Find PIDs of temporary web server
-        ansible.builtin.command: pgrep -f "python3 -m http.server {{ builder_localport }}"
+        ansible.builtin.command: pgrep -f "python3 -m http.server {{ imagebuilder_localport }}"
         register: webserver_pids # noqa: var-naming
         changed_when: true
         failed_when: false
@@ -163,7 +159,7 @@
 
 
       - name: (SETUP) Find PIDs of any dangling qemu
-        ansible.builtin.command: pgrep -f "^{{ builder_base_qemu_command }}.*{{ id }}"
+        ansible.builtin.command: pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ id }}"
         register: qemu_pids # noqa: var-naming
         changed_when: false
         failed_when: false
