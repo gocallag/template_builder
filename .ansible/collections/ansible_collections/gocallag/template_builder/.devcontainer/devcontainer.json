@@ -8,6 +8,7 @@
 
   "runArgs": [
     "--privileged",
+    "--device=/dev/kvm",
     "--add-host=host.docker.internal:host-gateway",
     "--env-file", "/home/${localEnv:USER}/.template_builder/credentials.sh"
   ],
