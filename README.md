@@ -13,6 +13,8 @@ docker build -t imagebuilder .
 2. Run the container
 ```
 docker run -it --privileged --device=/dev/kvm --rm -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) -v /home/gocallag/.template_builder/env.sh:/home/runner/.template_builder/env.sh -v /home/gocallag/build:/tmp/build -v ./samples:/home/runner/samples -p 5900:5900  imagebuilder:latest /bin/bash
+cd samples
+ansible-playbook alma8.yml
 ```
 
 Note: The env.sh file has a bunch of configuration settings, some examples below
