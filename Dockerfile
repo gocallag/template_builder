@@ -48,3 +48,4 @@ ENTRYPOINT ["/entrypoint.sh"]
 WORKDIR /home/runner
 CMD ["/bin/bash"]
 
+EXPOSE 5900-5910

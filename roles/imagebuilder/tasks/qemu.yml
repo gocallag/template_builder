@@ -39,7 +39,7 @@
           - "-device ich9-ahci,id=ahci"
           - "-drive file={{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2,media=disk,if=none,format=qcow2,id=disk0"
           - "-device ide-hd,drive=disk0,bus=ahci.0"
-          - "-vnc localhost:{{ imagebuilder_port_offset }}"
+          - "-vnc 0.0.0.0:{{ imagebuilder_port_offset }}"
 
 
     - name: (QEMU) Set QEMU command
