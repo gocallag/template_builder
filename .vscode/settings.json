@@ -32,5 +32,6 @@
 
 
   // Optional: make the extension treat this like a full project
-  "ansible.workspaceRoot": "${workspaceFolder}"
+  "ansible.workspaceRoot": "${workspaceFolder}",
+  "ansible.executionEnvironment.volumeMounts": []
 }
