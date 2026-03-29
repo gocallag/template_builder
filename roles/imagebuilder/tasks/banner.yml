@@ -1,0 +1,12 @@
+- name: (BANNER) Display banner
+  ansible.builtin.debug:
+    msg:
+      - "{{ top }}"
+      - "{{ side }} {{ message }} {{ side }}"
+      - "{{ bottom }}"
+  vars:
+    message: "{{ imagebuilder_banner_message | default('') }}"
+    width: "{{ message | length + 2 }}"
+    top: "{{ '┌' ~ ('─' * width | int) ~ '┐' }}"
+    bottom: "{{ '└' ~ ('─' * width | int) ~ '┘' }}"
+    side: "│"

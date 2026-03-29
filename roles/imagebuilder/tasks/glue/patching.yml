@@ -1,11 +1,10 @@
 ---
 
 - name: (GLUE-PATCHING) Include patching role
-  ansible.builtin.include_role:
-    name: patching
+  ansible.builtin.include_tasks: "patching/main.yml"
   vars:
-    sub_tasks: "{{ glue_task_vars.sub_tasks | default(omit) }}" # noqa: var-naming
-    location: "{{ glue_task_vars.glue_location | default(omit) }}" # noqa: var-naming
+    sub_tasks: "{{ imagebuilder_glue_task_vars.sub_tasks | default(omit) }}" # noqa: var-naming
+    location: "{{ imagebuilder_glue_task_vars.location | default(omit) }}" # noqa: var-naming
     delegate: bob_build
   tags:
     - build_customise

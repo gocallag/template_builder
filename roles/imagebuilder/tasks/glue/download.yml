@@ -1,17 +1,17 @@
 ---
 - name: (GLUE-DOWNLOAD) Elevate download variables safely
   ansible.builtin.set_fact:
-    glue_download_url: "{{ builder_glue_task_vars.download_url | default(omit) }}" # noqa: var-naming
-    glue_download_dest: "{{ builder_glue_task_vars.download_dest | default(omit) }}" # noqa: var-naming
-    glue_download_checksum: "{{ builder_glue_task_vars.download_checksum | default(omit) }}" # noqa: var-naming
-  when: builder_glue_task_vars is defined
+    glue_download_url: "{{ imagebuilder_glue_task_vars.download_url | default(omit) }}" # noqa: var-naming
+    glue_download_dest: "{{ imagebuilder_glue_task_vars.download_dest | default(omit) }}" # noqa: var-naming
+    glue_download_checksum: "{{ imagebuilder_glue_task_vars.download_checksum | default(omit) }}" # noqa: var-naming
+  when: imagebuilder_glue_task_vars is defined
   tags:
     - build_fetch_iso
 - name: (GLUE-DOWNLOAD) Download file with checksum validation
   ansible.builtin.get_url:
-    url: "{{ builder_glue_task_vars.download_url | default(omit) }}"
-    dest: "{{ builder_glue_task_vars.download_dest | default(omit) }}"
-    checksum: "sha256:{{ builder_glue_task_vars.download_checksum | default(omit) }}"
+    url: "{{ imagebuilder_glue_task_vars.download_url | default(omit) }}"
+    dest: "{{ imagebuilder_glue_task_vars.download_dest | default(omit) }}"
+    checksum: "sha256:{{ imagebuilder_glue_task_vars.download_checksum | default(omit) }}"
     mode: "0644"
   tags:
     - build_fetch_iso

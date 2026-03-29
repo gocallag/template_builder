@@ -1,66 +1,57 @@
 ---
-- name: (MAIN)Expand standard credentials file path
-  ansible.builtin.set_fact:
-    envfile_path: "{{ '~/.template_builder/credentials.sh' | expanduser }}" # noqa: var-naming
+- name: (MAIN) Display build banner
+  ansible.builtin.include_tasks: banner.yml
+  tags:
+    - always
+  vars:
+    imagebuilder_banner_message: "Starting build: {{ id }}"
 
-- name: (MAIN) Check if credentials file exists in the standard location
+- name: (MAIN) Check if environmental variables file exists in the standard location
   ansible.builtin.stat:
-    path: "{{ envfile_path }}"
-  register: envfile_stat # noqa: var-naming
+    path: "{{ imagebuilder_envfile_path }}"
+  register: imagebuilder_envfile_stat
+
+- name: (MAIN) fail if env file doesn't exist
+  ansible.builtin.fail:
+    msg: "(MAIN) Environment file not found at {{ imagebuilder_envfile_path }}. This file is required to provide necessary build variables. Please create the file with the required variables before running the build."
+  when: not imagebuilder_envfile_stat.stat.exists
+  tags:
+    - always
 
 - name: (MAIN) Load env file (a=b format)
   ansible.builtin.slurp:
-    src: "{{ envfile_path }}"
-  register: raw_env # noqa: var-naming
-  when: envfile_stat.stat.exists
+    src: "{{ imagebuilder_envfile_path }}"
+  register: imagebuilder_raw_env
+  when: imagebuilder_envfile_stat.stat.exists
 
 - name: (MAIN) Convert env file to dict
   ansible.builtin.set_fact:
-    builder_env: # noqa: var-naming
+    imagebuilder_env:
       >-
         {{
-          raw_env.content
+          imagebuilder_raw_env.content
           | b64decode
           | regex_replace('^\\s*#.*$', '', multiline=True)
           | regex_replace('^\\s*$', '', multiline=True)
           | regex_replace('=', ': ', multiline=True)
           | from_yaml
         }}
-  when: envfile_stat.stat.exists
+  when: imagebuilder_envfile_stat.stat.exists
 
-- name: (MAIN) Display loaded environment variables
-  ansible.builtin.debug:
-    var: builder_env
-  when: builder_env is defined
-
-- name: (MAIN) Map builder_env.* into individual vars
+- name: (MAIN) Map imagebuilder_env.* into individual vars
   ansible.builtin.set_fact:
-    builder_env_qemu_ip: "{{ builder_env.BUILDER_ENV_QEMU_IP }}" # noqa: var-naming
-    builder_env_build_path: "{{ builder_env.BUILDER_ENV_BUILD_PATH }}" # noqa: var-naming
-    builder_env_ansible_user: "{{ builder_env.BUILDER_ENV_ANSIBLE_USER }}" # noqa: var-naming
-    builder_env_ansible_password: "{{ builder_env.BUILDER_ENV_ANSIBLE_PASSWORD }}" # noqa: var-naming
-    builder_env_linux_admin_user: "{{ builder_env.BUILDER_ENV_LINUX_ADMIN_USER }}" # noqa: var-naming
-    builder_env_linux_admin_password: "{{ builder_env.BUILDER_ENV_LINUX_ADMIN_PASSWORD }}" # noqa: var-naming
-    builder_env_win_admin_user: "{{ builder_env.BUILDER_ENV_WIN_ADMIN_USER }}" # noqa: var-naming
-    builder_env_win_admin_password: "{{ builder_env.BUILDER_ENV_WIN_ADMIN_PASSWORD }}" # noqa: var-naming
-    builder_env_ansible_key: "{{ builder_env.BUILDER_ENV_ANSIBLE_KEY }}" # noqa: var-naming
-  when: envfile_stat.stat.exists
-
+    imagebuilder_env_qemu_ip: "{{ imagebuilder_env.IMAGEBUILDER_ENV_QEMU_IP }}"
+    imagebuilder_env_build_path: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_PATH }}"
+    imagebuilder_env_ansible_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_USER }}"
+    imagebuilder_env_ansible_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_PASSWORD }}"
+    imagebuilder_env_linux_admin_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_LINUX_ADMIN_USER }}"
+    imagebuilder_env_linux_admin_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_LINUX_ADMIN_PASSWORD }}"
+    imagebuilder_env_win_admin_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_WIN_ADMIN_USER }}"
+    imagebuilder_env_win_admin_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_WIN_ADMIN_PASSWORD }}"
+    imagebuilder_env_ansible_key: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_KEY }}"
+  when: imagebuilder_envfile_stat.stat.exists
 
 - name: (MAIN) Assert required build variables are defined
-  ansible.builtin.assert:
-    that:
-      - builder_env_qemu_ip is defined and builder_env_qemu_ip | trim | length > 0
-      - builder_env_build_path is defined and builder_env_build_path and (builder_env_build_path | trim | length > 0)
-      - builder_env_ansible_user is defined and builder_env_ansible_user and (builder_env_ansible_user | trim | length > 0)
-      - builder_env_ansible_password is defined and builder_env_ansible_password and (builder_env_ansible_password | trim | length > 0)
-      - builder_env_linux_admin_user is defined and builder_env_linux_admin_user and (builder_env_linux_admin_user | trim | length > 0)
-      - builder_env_linux_admin_password is defined and builder_env_linux_admin_password and (builder_env_linux_admin_password | trim | length > 0)
-      - builder_env_win_admin_user is defined and builder_env_win_admin_user and (builder_env_win_admin_user | trim | length > 0)
-      - builder_env_win_admin_password is defined and builder_env_win_admin_password and (builder_env_win_admin_password | trim | length > 0)
-      - builder_env_ansible_key is defined and builder_env_ansible_key and (builder_env_ansible_key | trim | length > 0)
-    fail_msg: "(MAIN) One or more required variables are not defined correctly."
-    success_msg: "(MAIN) All required variables are defined and appear valid."
   tags:                       # list all the tags used role wide so we can see them with a list-tags command
     - always
     - build_targets
@@ -71,21 +62,34 @@
     - build_aux
     - build_customise
     - build_cleanup
-- name: (MAIN) Drive Setup
-  ansible.builtin.include_role:
-    name: imagebuilder
-    tasks_from: setup
+  ansible.builtin.assert:
+    that:
+      - os is defined and os.iso is defined and os.iso | trim | length > 0
+      - imagebuilder_env_qemu_ip is defined and imagebuilder_env_qemu_ip | trim | length > 0
+      - imagebuilder_env_build_path is defined and imagebuilder_env_build_path | trim | length > 0
+      - imagebuilder_env_ansible_user is defined and imagebuilder_env_ansible_user | trim | length > 0
+      - imagebuilder_env_ansible_password is defined and imagebuilder_env_ansible_password | trim | length > 0
+      - imagebuilder_env_linux_admin_user is defined and imagebuilder_env_linux_admin_user | trim | length > 0
+      - imagebuilder_env_linux_admin_password is defined and imagebuilder_env_linux_admin_password | trim | length > 0
+      - imagebuilder_env_win_admin_user is defined and imagebuilder_env_win_admin_user | trim | length > 0
+      - imagebuilder_env_win_admin_password is defined and imagebuilder_env_win_admin_password | trim | length > 0
+      - imagebuilder_env_ansible_key is defined and imagebuilder_env_ansible_key | trim | length > 0
+    fail_msg: "(MAIN) One or more required variables are not defined correctly."
+    success_msg: "(MAIN) All required variables are defined. Proceeding with build."
+
+- name: (MAIN) Get the system ready for the build
+  ansible.builtin.include_tasks: setup.yml
   tags:
     - always
 
-
-- name: (MAIN) add default build steps if none are defined
+- name: (MAIN) add default build steps if none are defined defined by the build task
   ansible.builtin.set_fact:
-    build: "{{ builder_build_default }}" # noqa: var-naming[no-role-prefix]
-  when: build is not defined or build | length == 0
+    imagebuilder_build: "{{ imagebuilder_build_default }}" # noqa: var-naming
+  when: build is not defined or build | length == 0   # build is the list of build steps defined in the playbook, if it's not defined or empty then we use the default list of build steps defined in the role defaults
   tags:
     - always
-- name: (MAIN) Perform the build
+
+- name: (MAIN) Perform the defined build
   block:
     - name: (MAIN) include build roles if any are defined
       ansible.builtin.include_role:
@@ -94,19 +98,29 @@
       tags:
         - always
       vars:
-        builder_stage: "{{ builder_buildtask.name }}" # noqa: var-naming
-        builder_task_vars: "{{ builder_buildtask.task_vars | default({}) }}" # noqa: var-naming
-      loop: "{{ build | default([]) }}"
+        imagebuilder_stage: "{{ imagebuilder_buildtask.name }}"
+        imagebuilder_task_vars: "{{ imagebuilder_buildtask.task_vars | default({}) }}"
+      loop: "{{ imagebuilder_build | default([]) }}"
       loop_control:
-        loop_var: builder_buildtask
+        loop_var: imagebuilder_buildtask
+
+    - name: (MAIN) save base image
+      ansible.builtin.command: cp "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+      args:
+        creates: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+      tags:
+        - build_customise
+
     - name: (MAIN) cleanup build path
       ansible.builtin.file:
-        path: "{{ builder_env_build_path }}/{{ builder_build_id }}"
+        path: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_build_id }}"
         state: absent
       become: true
       tags:
         - build_cleanup
+
   rescue:
+
     - name: "(MAIN) Show error on failure"
       ansible.builtin.debug:
         msg: >-
@@ -114,13 +128,16 @@
           {{ ansible_failed_result.msg | default('no additional message') }}
       tags:
         - always
+
   always:
+
     - name: (MAIN) Display Webserver job_id
       ansible.builtin.debug:
         msg: "(MAIN) Webserver jobid is {{ webserver.ansible_job_id }} "
       when: webserver is defined and webserver.ansible_job_id is defined
       tags:
         - always
+
     - name: (MAIN) kill dangly web servers
       ansible.builtin.shell: |
         kill {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true

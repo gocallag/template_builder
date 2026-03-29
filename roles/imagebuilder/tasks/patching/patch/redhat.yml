@@ -1,0 +1,66 @@
+---
+
+  # RedHat-Based Systems
+  - block:
+    - name: (PATCHING-PATCH, RedHat) Check if reboot is required
+      shell: "/usr/bin/needs-restarting -r"
+      register: nr
+      failed_when: nr.rc not in [0,1,2]
+      delegate_to: "{{ delegate | default(omit)}}"
+
+
+    - name: (PATCHING-PATCH, RedHat) Reboot if required
+      block:
+      - reboot:
+          reboot_timeout: 1200
+        become: true
+        delegate_to: "{{ delegate | default(omit)}}"
+
+
+      - set_fact:
+          ponder: false
+
+      - name: (PATCHING-PATCH) Wait for admin port (22) to be available
+        wait_for:
+          host: "{{ waitfor_host }}"
+          port: "{{ waitfor_port }}"
+          delay: 10
+          timeout: 1200
+          state: started
+        delegate_to: "{{ run_on | default('localhost') }}"
+      when:
+      - nr is defined
+      - nr.rc == 1
+
+    - name: (PATCHING-PATCH, RedHat, AlmaLinux) Update the system
+      ansible.builtin.shell: |
+          dnf upgrade -y 
+      delegate_to: "{{ delegate | default(omit)}}"
+      register: yum
+      become: true
+      changed_when: yum.rc == 0 and 'Nothing to do' not in yum.stdout
+      ignore_errors: true
+
+    - name: (PATCHING-PATCH, RedHat, AlmaLinux ) Debug yum output
+      debug: var=yum
+
+    - name: Fallback to --nobest if depsolve fails
+      ansible.builtin.command: >
+        dnf upgrade --nobest -y
+      when: yum is failed
+      become: true
+      delegate_to: "{{ delegate | default(omit)}}"
+
+
+    - name: (PATCHING-PATCH, RedHat) Check if reboot is required post patching
+      shell: "/usr/bin/needs-restarting -r"
+      register: nr
+      failed_when: nr.rc not in [0,1,2]
+      delegate_to: "{{ delegate | default(omit)}}"
+
+    - name: (PATCHING-PATCH) retry patching if we need to reboot post yum update
+      include_tasks: patching/patch.yml
+      when:
+      - nr is defined
+      - nr.rc == 1
+    when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower in ["redhat", "centos", "rocky", "almalinux","oraclelinux"]

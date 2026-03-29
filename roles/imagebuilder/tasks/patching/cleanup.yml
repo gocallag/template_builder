@@ -1,0 +1,47 @@
+---
+- name: (PATCHING) Setup variables and facts
+  tags:
+    - always
+  block:
+
+    - name: (PATCHING-CLEANUP) Clean up ALMA Linux Systems
+      ansible.builtin.include_tasks: cleanup/alma.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat"
+        - ansible_facts['distribution'] | lower == "almalinux"
+
+    - name: (PATCHING-CLEANUP) Clean up Oracle Linux Systems
+      ansible.builtin.include_tasks: cleanup/oracle.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat"
+        - ansible_facts['distribution'] | lower == "oraclelinux"
+
+    - name: (PATCHING-CLEANUP) Clean up Red Hat Systems
+      ansible.builtin.include_tasks: cleanup/redhat.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "redhat"
+
+    - name: (PATCHING-CLEANUP) Clean up Fedora Systems
+      ansible.builtin.include_tasks: cleanup/fedora.yml
+      when:
+        - ansible_facts['os_family'] | lower == "fedora"
+
+    - name: (PATCHING-CLEANUP) Clean up Rocky Linux Systems
+      ansible.builtin.include_tasks: cleanup/rocky.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "rockylinux"
+
+    - name: (PATCHING-CLEANUP) Clean up Debian Systems
+      ansible.builtin.include_tasks: cleanup/debian.yml
+      when:
+        - ansible_facts['os_family'] | lower == "debian"
+
+    - name: (PATCHING-CLEANUP) Clean up Ubuntu Systems
+      ansible.builtin.include_tasks: cleanup/ubuntu.yml
+      when:
+        - ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower == "ubuntu"
+
+    - name: (PATCHING-CLEANUP) Clean up SUSE Systems
+      ansible.builtin.include_tasks: cleanup/suse.yml
+      when:
+        - ansible_facts['os_family'] | lower == "suse"

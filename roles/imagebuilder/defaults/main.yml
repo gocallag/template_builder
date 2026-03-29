@@ -1,6 +1,8 @@
-builder_useauxiso: false
-builder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
-builder_prefix_port_offset_map:
+ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" # noqa: var-naming
+imagebuilder_envfile_path: "{{ '~/.template_builder/env.sh' | expanduser }}"
+imagebuilder_useauxiso: false
+imagebuilder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
+imagebuilder_prefix_port_offset_map:
     alma: 0
     ol: 1
     rocky: 2
@@ -12,8 +14,9 @@ builder_prefix_port_offset_map:
     centos: 8
     rhel: 9
     leap: 10
-
-builder_package_lists:
+imagebuilder_port_offset: "{{ imagebuilder_prefix_port_offset_map[imagebuilder_id_prefix] }}"
+imagebuilder_localport: "{{ 8180 + (imagebuilder_port_offset | default(0) | int) }}"
+imagebuilder_package_lists:
     debian:
         - software-properties-common
         - ansible
@@ -36,21 +39,21 @@ builder_package_lists:
         - nbdkit
         - guestfish
         - python3-pip
-builder_pip_packages:
+imagebuilder_pip_packages:
     debian:
         - pywinrm
         - proxmoxer
         - ovirt-engine-sdk-python
-builder_base_qemu_command: "qemu-system-x86_64"
+imagebuilder_base_qemu_command: "qemu-system-x86_64"
 
 # default build steps
 
-builder_build_default:
+imagebuilder_build_default:
     - name: download
       task_vars:
           download_url: "{{ os.iso }}"
           download_checksum: "{{ os.checksum }}"
-          download_dest: "{{ builder_build_basedir }}/downloads/{{ os.iso | basename }}"
+          download_dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}"
     - name: buildaux
     - name: buildimage
     - name: patching

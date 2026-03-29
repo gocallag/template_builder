@@ -108,6 +108,23 @@
                 msg: "Restored base image from {{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
               when: qemu_disk_restore is defined and qemu_disk_restore.changed
 
+            - name: (QEMU) stat the saved custom image
+              ansible.builtin.stat:
+                path: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+              register: imagebuilder_custom_qemu_disk_stat # noqa: var-naming
+
+            - name: (QEMU) restore custom image if it exists
+              ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+              changed_when: true
+              when:
+                - imagebuilder_custom_qemu_disk_stat.stat.exists
+                - imagebuilder_custom_qemu_disk_stat.stat.size > 0
+              register: imagebuilder_custom_qemu_disk_restore # noqa: var-naming
+            - name: (QEMU) Show restore result
+              ansible.builtin.debug:
+                msg: "Restored custom image from {{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+              when: imagebuilder_custom_qemu_disk_restore is defined and imagebuilder_custom_qemu_disk_restore.changed
+
     - name: (QEMU) Start temporary web server
       ansible.builtin.shell: |
         python3 -m http.server {{ imagebuilder_localport }} --directory {{ imagebuilder_build_httpdir }}

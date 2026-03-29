@@ -1,0 +1,47 @@
+---
+- name: (PATCHING) Setup variables and facts
+  tags:
+    - always
+  block:
+    # Debug Information
+    - name: (PATCHING-PREPARE) Debug OS Information
+      ansible.builtin.debug:
+        msg:
+          - "OS Family: {{ ansible_facts['os_family'] }}"
+          - "OS Distribution: {{ ansible_facts['distribution'] }}"
+
+    - ansible.builtin.include_tasks: patching/prepare/windows.yml
+      when:
+        - ansible_facts['os_family'] | lower == "windows"
+
+    - ansible.builtin.include_tasks: patching/prepare/redhat.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "redhat"
+
+    - ansible.builtin.include_tasks: patching/prepare/debian.yml
+      when:
+        - ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower == "debian" 
+
+    - ansible.builtin.include_tasks: patching/prepare/ubuntu.yml
+      when:
+        - ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower == "ubuntu"
+
+    - ansible.builtin.include_tasks: patching/prepare/suse.yml
+      when:
+        - ansible_facts['os_family'] | lower == "suse"
+
+    - ansible.builtin.include_tasks: patching/prepare/fedora.yml
+      when:
+        - ansible_facts['os_family'] | lower == "fedora"
+
+    - ansible.builtin.include_tasks: patching/prepare/alma.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "almalinux"
+
+    - ansible.builtin.include_tasks: patching/prepare/rocky.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "rockylinux"
+
+    - ansible.builtin.include_tasks: patching/prepare/oracle.yml
+      when:
+        - ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "oraclelinux"

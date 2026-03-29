@@ -1,0 +1,7 @@
+# Alma Linux Systems
+- name: (PATCHING-PREPARE, alma) Alma Linux-specific preparation tasks
+  when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "almalinux"
+  block:
+    - name: (PATCHING-PREPARE, alma) Placeholder for Alma Linux-specific preparation tasks
+      ansible.builtin.debug:
+        msg: "No preparation tasks defined for Alma Linux systems yet."

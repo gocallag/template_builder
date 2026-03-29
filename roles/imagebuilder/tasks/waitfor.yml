@@ -9,6 +9,10 @@
   tags:
     - always
 
+- debug:
+    msg: "Waiting for {{ wait_proto }} to be available on {{ wait_host_ip }}:{{ wait_port }}"
+  tags:
+    - always
 - name: (UTILS-WAITFOR) Wait until ready
   tags:
     - always
@@ -16,12 +20,12 @@
     - name: (UTILS-WAITFOR) Set the ponder fact
       ansible.builtin.set_fact:
         ponder: "{{ ponder | default(false) }}" # noqa: var-naming
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: localhost
 
     - name: (UTILS-WAITFOR) Set the retry count for connection
       ansible.builtin.set_fact:
         retry_count: "{{ 1 if retry_count is undefined else retry_count | int + 1 }}" # noqa: var-naming
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: localhost
 
     - name: (UTILS-WAITFOR) Wait for admin port to be available (after 60 seconds)
       ansible.builtin.wait_for:
@@ -29,14 +33,14 @@
         host: "{{ wait_host_ip }}"
         delay: 60
         timeout: 900
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: localhost
 
     - name: (UTILS-WAITFOR) do a setup on the target host
       ansible.builtin.setup:
       ignore_unreachable: true
       register: mysetup # noqa: var-naming
       when: ponder
-      delegate_to: "{{ wait_host_name | default(omit) }}"
+      delegate_to: bob_build
 
     - name: (UTILS-WAITFOR) force error if setup failed on the target host
       ansible.builtin.command: /bin/false
@@ -61,7 +65,7 @@
               - /var/lib/yum/yum.pid
               - /var/lib/dnf/dnf.pid
             file_type: file
-          delegate_to: "{{ wait_host_name | default(omit) }}"
+          delegate_to: bob_build
           when: ansible_os_family | lower == 'redhat'
           register: redhat_lock_files # noqa: var-naming
 
@@ -73,7 +77,7 @@
               - /var/cache/apt/archives/lock
               - /var/lib/apt/lists/lock
             file_type: file
-          delegate_to: "{{ wait_host_name | default(omit) }}"
+          delegate_to: bob_build
           when: ansible_os_family | lower == 'debian'
           register: ubuntu_lock_files   # noqa: var-naming
 
@@ -83,7 +87,7 @@
               - /var/run/zypp.pid
               - /var/cache/zypp/zypp.lock
             file_type: file
-          delegate_to: "{{ wait_host_name | default(omit) }}"
+          delegate_to: bob_build
           when: ansible_os_family | lower == 'suse'
           register: sles_lock_files # noqa: var-naming
 
@@ -159,14 +163,14 @@
             Wait-Condition {(Get-Process -ErrorAction SilentlyContinue TiWorker | Measure-Object).Count -eq 0}
             ExitWithCode 0
           ignore_unreachable: true
-          delegate_to: "{{ wait_host_name | default(omit) }}"
+          delegate_to: bob_build
           register: mysetup # noqa: var-naming
 
         - name: (UTILS-WAITFOR) do a setup again after pondering
           ansible.builtin.setup:
           ignore_unreachable: true
           register: mysetup # noqa: var-naming
-          delegate_to: "{{ wait_host_name | default(omit) }}"
+          delegate_to: bob_build
           when: ponder
 
         - name: (UTILS-WAITFOR) force failure if setup failed

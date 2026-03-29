@@ -27,12 +27,12 @@
             mode: "0755"
       - name: (BUILDAUX, debian) Generate hashed password (Debian)
         ansible.builtin.shell: "set -o pipefail; printf '{{ env_ansible_password }}' | openssl passwd -6 -stdin"
-        register: builder_hashed_password
+        register: builder_hashed_password # noqa: var-naming
         changed_when: false
 
       - name: (BUILDAUX, debian) Set hashed password fact (Debian)
         ansible.builtin.set_fact:
-            builder_hashed_password: "{{ builder_hashed_password.stdout }}"
+            builder_hashed_password: "{{ builder_hashed_password.stdout }}" # noqa: var-naming
       - name: (BUILDAUX, debian) use default preseed if none provided
         ansible.builtin.set_fact:
             preseed: # noqa: var-naming
