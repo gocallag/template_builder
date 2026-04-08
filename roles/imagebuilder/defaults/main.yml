@@ -54,6 +54,7 @@ imagebuilder_build_default:
           download_url: "{{ os.iso }}"
           download_checksum: "{{ os.checksum }}"
           download_dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}"
+    - name: buildprofile
     - name: buildaux
     - name: buildimage
     - name: patching
@@ -65,5 +66,5 @@ imagebuilder_build_default:
               - "cleanup"
     - name: hardening
     - name: template-cleanup
-    # - name: target-proxmox
+    - name: target-proxmox
     # - name: target-ovirt

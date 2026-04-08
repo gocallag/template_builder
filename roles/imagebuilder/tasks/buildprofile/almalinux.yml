@@ -1,0 +1,7 @@
+  # Almalinux-Based Systems, treat as RedHat
+- name: (BUILDPROFILE, almalinux)
+  tags:
+      - always
+  block:
+        - name: (BUILDPROFILE, almalinux)
+          ansible.builtin.include_tasks: buildprofile/rhel.yml

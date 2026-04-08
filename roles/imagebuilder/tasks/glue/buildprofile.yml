@@ -1,0 +1,6 @@
+---
+- name: (GLUE) trigger buildprofile
+  ansible.builtin.include_tasks:
+    file: buildprofile.yml # straight pass through of buildprofile as we dont have glue variables to set
+  tags:
+    - always

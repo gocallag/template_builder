@@ -1,0 +1,7 @@
+  # Fedora-Based Systems, treat as RedHat
+- name: (BUILDAUX, Fedora)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, Fedora)
+        ansible.builtin.include_tasks: buildaux/rhel.yml

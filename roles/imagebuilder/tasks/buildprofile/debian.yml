@@ -1,0 +1,155 @@
+---
+# Debian-Based Systems
+- name: (BUILDAUX, debian)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, debian) create build directories
+        ansible.builtin.file:
+            path: "{{ file }}"
+            state: directory
+            mode: "0755"
+        loop_control:
+            loop_var: file
+        loop:
+            - "{{ build_basedir }}/build"
+            - "{{ build_basedir }}/build/mnt"
+
+      - name: (BUILDAUX, debian) remove existing aux ISO (if it exists)
+        ansible.builtin.file:
+            path: "{{ build_basedir }}/build/aux.iso"
+            state: absent
+
+      - name: (BUILDAUX, debian) create temporary iso contents dir
+        ansible.builtin.file:
+            path: "{{ build_basedir }}/build/iso_contents"
+            state: directory
+            mode: "0755"
+      - name: (BUILDAUX, debian) Generate hashed password (Debian)
+        ansible.builtin.shell: "set -o pipefail; printf '{{ env_ansible_password }}' | openssl passwd -6 -stdin"
+        register: builder_hashed_password # noqa: var-naming
+        changed_when: false
+
+      - name: (BUILDAUX, debian) Set hashed password fact (Debian)
+        ansible.builtin.set_fact:
+            builder_hashed_password: "{{ builder_hashed_password.stdout }}" # noqa: var-naming
+      - name: (BUILDAUX, debian) use default preseed if none provided
+        ansible.builtin.set_fact:
+            preseed: # noqa: var-naming
+                |
+                  ### Localization
+                  d-i debian-installer/locale string en_US.UTF-8
+                  d-i keyboard-configuration/xkb-keymap select us
+
+                  ### Network configuration
+                  d-i netcfg/choose_interface select auto
+                  d-i netcfg/get_hostname string ansible
+                  d-i netcfg/disable_autoconfig boolean false
+                  d-i netcfg/wireless_wep string
+
+                  # Force HTTP mirror and suppress CDROM completely
+                  d-i apt-setup/disable-cdrom-entries boolean true
+                  d-i apt-setup/cdrom/set-first boolean false
+                  d-i apt-setup/use_mirror boolean true
+                  d-i apt-setup/no_mirror boolean false
+                  d-i apt-setup/local0/repository string http://deb.debian.org/debian
+                  d-i apt-setup/local0/comment string HTTP mirror
+                  d-i apt-setup/local0/source boolean false
+
+                  # Mirror configuration
+                  d-i mirror/country string manual
+                  d-i mirror/http/hostname string deb.debian.org
+                  d-i mirror/http/directory string /debian
+                  d-i mirror/http/proxy string
+                  d-i mirror/suite string trixie
+
+
+                  ### Account setup
+                  d-i passwd/root-login boolean false
+                  d-i passwd/user-fullname string Ansible User
+                  d-i passwd/username string {{ env_ansible_user }}
+                  d-i passwd/user-password password {{ env_ansible_password }}
+                  d-i passwd/user-password-again password {{ env_ansible_password }}
+                  d-i passwd/user-default-groups string audio cdrom video sudo
+
+                  ### Clock and time zone setup
+                  d-i clock-setup/utc boolean true
+                  d-i time/zone string Australia/Melbourne
+                  d-i clock-setup/ntp boolean true
+
+                  ### Partitioning
+                  d-i partman-auto/method string lvm
+                  d-i partman-auto-lvm/guided_size string max
+                  d-i partman-lvm/device_remove_lvm boolean true
+                  d-i partman-md/device_remove_md boolean true
+                  d-i partman-lvm/confirm boolean true
+                  d-i partman-lvm/confirm_nooverwrite boolean true
+                  d-i partman-auto/choose_recipe select atomic
+                  d-i partman-partitioning/confirm_write_new_label boolean true
+                  d-i partman/choose_partition select finish
+                  d-i partman/confirm boolean true
+                  d-i partman/confirm_nooverwrite boolean true
+                  d-i partman-efi/non_efi_system boolean true
+                  d-i partman-md/confirm boolean true
+                  d-i partman-partitioning/confirm_write_new_label boolean true
+                  d-i partman/choose_partition select finish
+                  d-i partman/confirm boolean true
+                  d-i partman/confirm_nooverwrite boolean true
+
+                  ### Apt setup
+                  d-i apt-setup/cdrom/set-first boolean false
+
+                  ### Package selection
+                  tasksel tasksel/first multiselect standard, ssh-server
+                  d-i pkgsel/upgrade select safe-upgrade
+
+                  ### Boot loader installation
+                  d-i grub-installer/only_debian boolean true
+                  d-i grub-installer/with_other_os boolean true
+                  d-i grub-installer/bootdev string default
+
+                  ### Finishing up the installation
+                  d-i finish-install/reboot_in_progress note
+
+                  ### Running custom commands during the installation
+                  d-i preseed/late_command string \
+                  sed -i '/^deb cdrom:/d' /target/etc/apt/sources.list && \
+                  echo "deb http://deb.debian.org/debian trixie main contrib non-free-firmware" > /target/etc/apt/sources.list && \
+                  echo "deb http://deb.debian.org/debian-security trixie-security main contrib non-free-firmware" >> /target/etc/apt/sources.list && \
+                  echo "{{ env_ansible_user }} ALL=(ALL:ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/{{ env_ansible_user }} ; \
+                  chmod 0440 /target/etc/sudoers.d/{{ env_ansible_user }}
+
+
+                  ### Exit
+                  d-i debian-installer/exit/poweroff boolean true
+            when: preseed is not defined or preseed | length == 0
+      - name: (BUILDAUX, debian) Copy preseed to ISO contents
+        ansible.builtin.copy:
+            content: "{{ preseed }}"
+            dest: "{{ build_httpdir }}/preseed.cfg"
+            mode: "0644"
+        become: true
+
+      - name: (BUILDAUX, debian) Build aux ISO from contents (label PRESEED)
+        ansible.builtin.command: >
+          genisoimage -output aux.iso -volid PRESEED -joliet -rock .
+        args:
+            chdir: "{{ build_basedir }}/build/iso_contents"
+            creates: "{{ build_basedir }}/build/aux.iso"
+        register: mkiso # noqa: var-naming
+        failed_when: mkiso.rc != 0
+
+      - name: (BUILDAUX, debian) Move aux ISO to build directory
+        ansible.builtin.command: >
+          mv {{ build_basedir }}/build/iso_contents/aux.iso {{ build_basedir }}/build/aux.iso
+        args:
+            creates: "{{ build_basedir }}/build/aux.iso"
+
+      - name: (BUILDAUX, debian) create sha256 of build profile
+        ansible.builtin.set_fact:
+            build_profile: # noqa: var-naming
+                os_iso: "{{ os.iso }}" # noqa: var-naming
+                os_preseed: "{{ preseed }}" # noqa: var-naming
+      - name: (BUILDAUX, debian) create sha256 of build profile
+        ansible.builtin.set_fact:
+            profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming

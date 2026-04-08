@@ -10,6 +10,8 @@
   ansible.builtin.stat:
     path: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_envfile_stat
+  tags:
+    - always
 
 - name: (MAIN) fail if env file doesn't exist
   ansible.builtin.fail:
@@ -23,6 +25,8 @@
     src: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_raw_env
   when: imagebuilder_envfile_stat.stat.exists
+  tags:
+    - always
 
 - name: (MAIN) Convert env file to dict
   ansible.builtin.set_fact:
@@ -37,6 +41,8 @@
           | from_yaml
         }}
   when: imagebuilder_envfile_stat.stat.exists
+  tags:
+    - always
 
 - name: (MAIN) Map imagebuilder_env.* into individual vars
   ansible.builtin.set_fact:
@@ -49,7 +55,17 @@
     imagebuilder_env_win_admin_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_WIN_ADMIN_USER }}"
     imagebuilder_env_win_admin_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_WIN_ADMIN_PASSWORD }}"
     imagebuilder_env_ansible_key: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_KEY }}"
+    imagebuilder_env_proxmox_server: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_SERVER }}"
+    imagebuilder_env_proxmox_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_USER }}"
+    imagebuilder_env_proxmox_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_PASSWORD }}"
+    imagebuilder_env_proxmox_storage: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_STORAGE }}"
+    imagebuilder_env_proxmox_node: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_NODE }}"
+    imagebuilder_env_build_memory: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_MEMORY | default(8192) }}"
+    imagebuilder_env_build_cpu: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_CPU | default(4) }}"
+
   when: imagebuilder_envfile_stat.stat.exists
+  tags:
+    - always
 
 - name: (MAIN) Assert required build variables are defined
   tags:                       # list all the tags used role wide so we can see them with a list-tags command

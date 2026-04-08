@@ -1,0 +1,7 @@
+  # RockyLinux-Based Systems, treat as RedHat
+- name: (BUILDAUX, RockyLinux)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, RockyLinux)
+        ansible.builtin.include_tasks: buildaux/rhel.yml
