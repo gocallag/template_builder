@@ -8,15 +8,119 @@
     - name: Add the host for the Proxmox server
       ansible.builtin.add_host:
         name: proxmox_server
-        ansible_host: "{{ env_proxmox_server }}"
+        ansible_host: "{{ imagebuilder_env_proxmox_server }}"
         ansible_port: 22
-        ansible_user: "{{ env_proxmox_user }}"
-        ansible_password: "{{ env_proxmox_password }}"
+        ansible_user: "{{ imagebuilder_env_proxmox_user }}"
+        ansible_password: "{{ imagebuilder_env_proxmox_password }}"
         ansible_connection: ssh
+
+    - name: Validate OS family
+      ansible.builtin.fail:
+        msg: "os.type must be 'linux' or 'windows'"
+      when: os.type not in ["linux", "windows"]
+
+    ###########################################################################
+    # LINUX PATH
+    ###########################################################################
+    - name: Linux | Install QGA + prepare VirtIO
+      when: os.type == "linux"
+      block:
+
+        - name: Linux | Install QEMU Guest Agent
+          ansible.builtin.command: >
+            virt-customize
+            -a "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+            --install qemu-guest-agent
+            --run-command 'systemctl enable qemu-guest-agent || true'
+            --selinux-relabel
+          register: linux_customize
+          changed_when: true
+
+        - name: Linux | Show virt-customize output
+          ansible.builtin.debug:
+            var: linux_customize.stdout
+
+        - name: Linux | Convert QCOW2 to VirtIO-ready QCOW2
+          ansible.builtin.command: >
+            qemu-img convert -O qcow2 "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.virtio.{{ profile_hash }}.qcow2"
+          register: linux_convert
+          changed_when: true
+
+        - name: Linux | Show conversion output
+          ansible.builtin.debug:
+            var: linux_convert.stdout
+
+    ###########################################################################
+    # WINDOWS PATH
+    ###########################################################################
+    - name: Windows | Prepare VirtIO + QGA
+      when: os.type == "windows"
+      block:
+
+        - name: Windows | Ensure QGA download directory exists
+          ansible.builtin.file:
+            path: "/tmp/qga"
+            state: directory
+            mode: "0755"
+
+        - name: Windows | Download QEMU Guest Agent MSI
+          ansible.builtin.get_url:
+            url: "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest/qemu-ga-x86_64.msi"
+            dest: "/tmp/qga/qemu-ga-x86_64.msi"
+            mode: "0644"
+          register: qga_download
+
+        - name: Windows | Set QGA MSI path
+          ansible.builtin.set_fact:
+            windows_qga_msi: "/tmp/qga/qemu-ga-x86_64.msi"
+
+        - name: Windows | Render unattend.xml
+          ansible.builtin.template:
+            src: "{{ windows_unattend_template }}"
+            dest: "/tmp/unattend.xml"
+
+        - name: Windows | Build guestfish script
+          ansible.builtin.copy:
+            dest: "/tmp/win-virtio-qga.script"
+            mode: "0644"
+            content: |
+              run
+              inspect-os
+              mount /dev/sda2 /
+
+              # Upload QGA MSI
+              upload {{ windows_qga_msi }} /Windows/Temp/qemu-ga.msi
+
+              # Upload VirtIO driver tree
+              mkdir-p /Drivers/VirtIO
+              upload {{ windows_virtio_dir }} /Drivers/VirtIO
+
+              # Upload unattend.xml
+              upload /tmp/unattend.xml /Windows/Panther/Unattend.xml
+
+        - name: Windows | Inject QGA + VirtIO drivers + unattend.xml
+          ansible.builtin.command: >
+            guestfish --rw -a {{ image_path }} -f /tmp/win-virtio-qga.script
+          register: win_inject
+          changed_when: true
+
+        - name: Windows | Show guestfish output
+          ansible.builtin.debug:
+            var: win_inject.stdout
+
+        - name: Windows | Convert QCOW2 to VirtIO-ready QCOW2
+          ansible.builtin.command: >
+            qemu-img convert -O qcow2 {{ image_path }} {{ output_path }}
+          register: win_convert
+          changed_when: true
+
+        - name: Windows | Show conversion output
+          ansible.builtin.debug:
+            var: win_convert.stdout
 
     - name: Ensure the destination directory exists on the Proxmox server
       ansible.builtin.file:
-        path: "/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}"
+        path: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}"
         state: directory
         mode: "0755"
       delegate_to: proxmox_server
@@ -27,7 +131,7 @@
         scp_cmd: # noqa: var-naming
           - sshpass
           - "-p"
-          - "{{ env_proxmox_password }}"
+          - "{{ imagebuilder_env_proxmox_password }}"
           - scp
           - "-q"
           - "-C"
@@ -43,8 +147,8 @@
           - "ServerAliveCountMax=120"
           - "-o"
           - "TCPKeepAlive=yes"
-          - "{{ build_imagedir }}/{{ build_id }}.x86_64.qcow2"
-          - "{{ env_proxmox_user }}@{{ env_proxmox_server }}:/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
+          - "{{ imagebuilder_build_savedir }}/{{ id }}.virtio.{{ profile_hash }}.qcow2"
+          - "{{ imagebuilder_env_proxmox_user }}@{{ imagebuilder_env_proxmox_server }}:/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
 
     - name: Copy large file in async
       ansible.builtin.command: "{{ scp_cmd | join(' ') }}"
@@ -65,11 +169,11 @@
 
     - name: Delete template if it exists
       community.proxmox.proxmox_kvm:
-        api_user: "{{ env_proxmox_user }}@pam"
-        api_password: "{{ env_proxmox_password }}"
-        api_host: "{{ env_proxmox_server }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "template-{{ id }}"
-        node: "{{ env_proxmox_node }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
         state: absent
         timeout: 600
       delegate_to: "{{ run_on | default('localhost') }}"
@@ -77,14 +181,14 @@
 
     - name: Create new VM
       community.proxmox.proxmox_kvm:
-        api_user: "{{ env_proxmox_user }}@pam"
-        api_password: "{{ env_proxmox_password }}"
-        api_host: "{{ env_proxmox_server }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "template-{{ id }}"
-        node: "{{ env_proxmox_node }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
         vcpus: "1"
         cpu: "host"
-        memory: "{{ env_build_memory }}"
+        memory: "{{ imagebuilder_env_build_memory }}"
         timeout: 600
       delegate_to: "{{ run_on | default('localhost') }}"
       register: nvm # noqa: var-naming
@@ -92,24 +196,24 @@
     - name: Add existing disk
       community.proxmox.proxmox_disk:
         vmid: "{{ nvm.vmid }}"
-        api_user: "{{ env_proxmox_user }}@pam"
-        api_password: "{{ env_proxmox_password }}"
-        api_host: "{{ env_proxmox_server }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "{{ id }}"
         disk: sata0
-        storage: "{{ env_proxmox_storage }}"
-        import_from: "/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
+        storage: "{{ imagebuilder_env_proxmox_storage }}"
+        import_from: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
         timeout: 6000
         state: present
       delegate_to: "{{ run_on | default('localhost') }}"
 
     - name: Update VM boot order
       community.proxmox.proxmox_kvm:
-        api_user: "{{ env_proxmox_user }}@pam"
-        api_password: "{{ env_proxmox_password }}"
-        api_host: "{{ env_proxmox_server }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "template-{{ id }}"
-        node: "{{ env_proxmox_node }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
         boot: "order=sata0"
         update: true
         timeout: 600
@@ -117,25 +221,25 @@
 
     - name: Set VM notes
       community.proxmox.proxmox_kvm:
-        api_user: "{{ env_proxmox_user }}@pam"
-        api_password: "{{ env_proxmox_password }}"
-        api_host: "{{ env_proxmox_server }}"
-        node: "{{ env_proxmox_node }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
         name: "template-{{ id }}"
         update: true
         description: |
           Template built on {{ ansible_date_time.iso8601 }}
           Build ID: {{ id }}
-          Built by: {{ env_ansible_user }}
+          Built by: {{ imagebuilder_env_ansible_user }}
           Source: Proxmox automation pipeline
       delegate_to: "{{ run_on | default('localhost') }}"
     - name: Update VM to template
       community.proxmox.proxmox_kvm:
-        api_user: "{{ env_proxmox_user }}@pam"
-        api_password: "{{ env_proxmox_password }}"
-        api_host: "{{ env_proxmox_server }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "template-{{ id }}"
-        node: "{{ env_proxmox_node }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
         update: true
         state: template
         timeout: 600
@@ -149,7 +253,7 @@
   always:
     - name: Remove the directory on the Proxmox server
       ansible.builtin.file:
-        path: "/mnt/pve/{{ env_proxmox_storage }}/tmp/{{ id }}"
+        path: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}"
         state: absent
       delegate_to: proxmox_server
       become: true
