@@ -35,7 +35,7 @@ RUN apt-get update && apt-get install -y \
     nbdkit \
     guestfish \
     curl \
-    python3-dev  python3-setuptools gcc g++  build-essential software-properties-common gosu
+    python3-dev  python3-setuptools gcc g++  build-essential software-properties-common gosu vim
 
 # Install ansible-core + ansible-runner
 RUN pip3 install --break-system-packages --no-cache-dir \
