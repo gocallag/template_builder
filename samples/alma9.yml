@@ -1,0 +1,25 @@
+---
+- name: ALMA_9    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: alma-9
+    version: 9.7
+    os:
+      config:
+        disks:
+          - 20
+        timezone: Australia/Melbourne
+        nicdriver: e1000
+      type: linux
+      variant: almalinux
+      iso: http://192.168.1.161:8180/almalinux/9/AlmaLinux-9.7-x86_64-dvd.iso
+      checksum: 56f8bf5e44d293a040203b73b70f08bb7dc52f27654b047c20be8598f63ec1f8
+      console_boot: |
+       <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
