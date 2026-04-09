@@ -3,7 +3,7 @@
   tags:
       - always
   block:
-  - name: (BUILDPROFILE) include variant-specific tasks
-    ansible.builtin.include_tasks:
-        file: buildprofile/{{ os.variant | lower }}.yml
-    when: os.variant is defined
+      - name: (BUILDPROFILE) include variant-specific tasks
+        ansible.builtin.include_tasks:
+            file: buildprofile/{{ os.variant | lower }}.yml
+        when: os.variant is defined
