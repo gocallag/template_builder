@@ -1,0 +1,26 @@
+---
+- name: ALMA_10    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: alma-10
+    version: 10.1
+    os:
+      config:
+        disks:
+          - 20
+        timezone: Australia/Melbourne
+        nicdriver: e1000
+      type: linux
+      variant: almalinux
+      iso: http://192.168.1.161:8180/almalinux/10/AlmaLinux-10.1-x86_64-dvd.iso
+      checksum: 4597a7483fd7b49bbb7a46958fe2574b7c575531e5ee64ad4d6c1d2779494400
+      console_boot: |
+       <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
