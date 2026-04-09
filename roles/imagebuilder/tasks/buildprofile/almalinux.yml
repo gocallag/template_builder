@@ -3,5 +3,5 @@
   tags:
       - always
   block:
-        - name: (BUILDPROFILE, almalinux)
-          ansible.builtin.include_tasks: buildprofile/rhel.yml
+      - name: (BUILDPROFILE, almalinux) defer to RHEL build profile
+        ansible.builtin.include_tasks: buildprofile/rhel.yml

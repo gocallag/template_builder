@@ -5,8 +5,8 @@
   tags:
       - always
   block:
-        - name: (BUILDAUX, redhat) use default ks if none provided
-          ansible.builtin.set_fact:
+      - name: (BUILDAUX, redhat) use default ks if none provided
+        ansible.builtin.set_fact:
             ks: # noqa: var-naming
                 |
                   #default kickstart for redhat based systems
@@ -185,13 +185,13 @@
                     echo "ocredit = -1" >> /etc/security/pwquality.conf
                     echo "lcredit = -1" >> /etc/security/pwquality.conf
                   %end
-          when: ks is not defined or ks | length == 0
+        when: ks is not defined or ks | length == 0
 
-        - name: (BUILDPROFILE, redhat) create sha256 of build profile
-          ansible.builtin.set_fact:
-              build_profile: # noqa: var-naming
-                  os_iso: "{{ os.iso }}" # noqa: var-naming
-                  os_ks: "{{ ks }}" # noqa: var-naming
-        - name: (BUILDPROFILE, redhat) create sha256 of build profile
-          ansible.builtin.set_fact:
-              profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming
+      - name: (BUILDPROFILE, redhat) build profile fact
+        ansible.builtin.set_fact:
+            imagebuilder_build_profile:
+                os: "{{ os | to_json }}"  # noqa: var-naming
+                ks: "{{ ks }}"            # noqa: var-naming
+      - name: (BUILDPROFILE, redhat) create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"
