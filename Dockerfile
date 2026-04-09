@@ -62,7 +62,6 @@ COPY . /tmp/build/
 RUN cd /tmp/build && ansible-galaxy collection build -f .
 RUN cd /tmp/build && ansible-galaxy collection install gocallag-template_builder*.tar.gz
 RUN rm -rf /tmp/build
-COPY proxmox.yml /home/runner/proxmox.yml
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
