@@ -10,13 +10,7 @@
   ansible.builtin.stat:
     path: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_envfile_stat
-  tags:
-    - always
-
-- name: (MAIN) fail if env file doesn't exist
-  ansible.builtin.fail:
-    msg: "(MAIN) Environment file not found at {{ imagebuilder_envfile_path }}. This file is required to provide necessary build variables. Please create the file with the required variables before running the build."
-  when: not imagebuilder_envfile_stat.stat.exists
+  failed_when: not imagebuilder_envfile_stat.stat.exists
   tags:
     - always
 
@@ -24,7 +18,6 @@
   ansible.builtin.slurp:
     src: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_raw_env
-  when: imagebuilder_envfile_stat.stat.exists
   tags:
     - always
 
@@ -40,7 +33,6 @@
           | regex_replace('=', ': ', multiline=True)
           | from_yaml
         }}
-  when: imagebuilder_envfile_stat.stat.exists
   tags:
     - always
 
@@ -62,17 +54,12 @@
     imagebuilder_env_proxmox_node: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_NODE }}"
     imagebuilder_env_build_memory: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_MEMORY | default(8192) }}"
     imagebuilder_env_build_cpu: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_CPU | default(4) }}"
-
-  when: imagebuilder_envfile_stat.stat.exists
   tags:
     - always
 
 - name: (MAIN) Assert required build variables are defined
   tags:                       # list all the tags used role wide so we can see them with a list-tags command
     - always
-    - build_targets
-    - build_target_proxmox
-    - build_target_ovirt
     - build_fetch_iso
     - build_base
     - build_aux
@@ -100,8 +87,22 @@
 
 - name: (MAIN) add default build steps if none are defined defined by the build task
   ansible.builtin.set_fact:
-    imagebuilder_build: "{{ imagebuilder_build_default }}" # noqa: var-naming
-  when: build is not defined or build | length == 0   # build is the list of build steps defined in the playbook, if it's not defined or empty then we use the default list of build steps defined in the role defaults
+    imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
+  tags:
+    - always
+
+- name: (MAIN) Build the image profile based on our configuration
+  ansible.builtin.include_tasks: buildprofile.yml
+  tags:
+    - always
+
+- name: (MAIN) Perform any downloads needed for the build)
+  ansible.builtin.include_role:
+    name: "{{ rolename }}"
+    tasks_from: download.yml
+  loop: "{{ ansible_play_role_names }}"
+  loop_control:
+    loop_var: rolename
   tags:
     - always
 
@@ -121,19 +122,19 @@
         loop_var: imagebuilder_buildtask
 
     - name: (MAIN) save base image
-      ansible.builtin.command: cp "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+      ansible.builtin.command: cp "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
       args:
-        creates: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+        creates: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
       tags:
         - build_customise
 
-    - name: (MAIN) cleanup build path
-      ansible.builtin.file:
-        path: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_build_id }}"
-        state: absent
-      become: true
-      tags:
-        - build_cleanup
+    # - name: (MAIN) cleanup build path
+    #   ansible.builtin.file:
+    #     path: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_build_id }}"
+    #     state: absent
+    #   become: true
+    #   tags:
+    #     - build_cleanup
 
   rescue:
 
