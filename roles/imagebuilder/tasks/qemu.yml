@@ -90,14 +90,14 @@
               failed_when: qemu_disk.rc != 0
             - name: (QEMU) Show disk creation result
               ansible.builtin.debug:
-                msg: "Checking for saved base image at {{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+                msg: "Checking for saved base image at {{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
             - name: (QEMU) stat the saved base image
               ansible.builtin.stat:
-                path: "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+                path: "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
               register: qemu_disk_stat # noqa: var-naming
 
             - name: (QEMU) restore base image if it exists
-              ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+              ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
               changed_when: true
               when:
                 - qemu_disk_stat.stat.exists
@@ -105,16 +105,16 @@
               register: qemu_disk_restore # noqa: var-naming
             - name: (QEMU) Show restore result
               ansible.builtin.debug:
-                msg: "Restored base image from {{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+                msg: "Restored base image from {{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
               when: qemu_disk_restore is defined and qemu_disk_restore.changed
 
             - name: (QEMU) stat the saved custom image
               ansible.builtin.stat:
-                path: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+                path: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
               register: imagebuilder_custom_qemu_disk_stat # noqa: var-naming
 
             - name: (QEMU) restore custom image if it exists
-              ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+              ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
               changed_when: true
               when:
                 - imagebuilder_custom_qemu_disk_stat.stat.exists
@@ -122,7 +122,7 @@
               register: imagebuilder_custom_qemu_disk_restore # noqa: var-naming
             - name: (QEMU) Show restore result
               ansible.builtin.debug:
-                msg: "Restored custom image from {{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ profile_hash }}.qcow2"
+                msg: "Restored custom image from {{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
               when: imagebuilder_custom_qemu_disk_restore is defined and imagebuilder_custom_qemu_disk_restore.changed
 
     - name: (QEMU) Start temporary web server
@@ -232,9 +232,9 @@
             - build_base
 
         - name: (QEMU) save base image
-          ansible.builtin.command: cp "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+          ansible.builtin.command: cp "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
           args:
-            creates: "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ profile_hash }}.qcow2"
+            creates: "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
           tags:
             - build_base
 
