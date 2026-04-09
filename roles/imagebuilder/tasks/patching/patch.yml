@@ -3,49 +3,42 @@
   tags:
     - always
   block:
-  # Common Tasks
-  - name: (PATCHING-PATCH, Common) Set the retry count
-    set_fact:
-     retry_count: "{{ 0 if retry_count is undefined else retry_count|int + 1 }}"
-  - set_fact:
-      waitfor_host: "{{ hostvars.get(delegate, {}).get('ansible_host')  }}"
-      waitfor_port: "{{ hostvars.get(delegate, {}).get('ansible_port')  }}"
-    when: delegate is defined
-  - set_fact:
-      waitfor_host: "{{ ansible_host }}"
-      waitfor_port: "{{ ansible_port }}"
-    when: delegate is not defined
-  - debug: msg="{{ waitfor_host }} {{ waitfor_port }}"
-    delegate_to: localhost
-  - name: (PATCHING-PATCH, Common) Wait for admin port to be available
-    wait_for:
-      host: "{{ waitfor_host }}"
-      port: "{{ waitfor_port }}"
-      delay: 10
-      timeout: 1200
-      state: started
-    delegate_to: "{{ run_on | default('localhost') }}"
-  # RedHat-Based Systems
-  - block:
-    - include_tasks: patching/patch/redhat.yml
-    when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower in ["redhat", "centos", "rocky", "almalinux","oraclelinux"]
+    # Common Tasks
+    - name: (PATCHING-PATCH, Common) Set the retry count
+      ansible.builtin.set_fact:
+        retry_count: "{{ 0 if retry_count is undefined else retry_count | int + 1 }}"
+        waitfor_host: "{{ hostvars.get(delegate, {}).get('ansible_host') | default(ansible_host) }}"
+        waitfor_port: "{{ hostvars.get(delegate, {}).get('ansible_port') | default(ansible_port) }}"
 
-  # Debian-Based Systems
-  - block:
-    - include_tasks: patching/patch/debian.yml
-    when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower in ["debian"]
+    - name: (PATCHING-PATCH, Common) Wait for admin port to be available
+      ansible.builtin.wait_for:
+        host: "{{ waitfor_host }}"
+        port: "{{ waitfor_port }}"
+        delay: 10
+        timeout: 1200
+        state: started
+      delegate_to: "{{ run_on | default('localhost') }}"
+    # RedHat-Based Systems
+    - name: (PATCHING-PATCH, RedHat) Apply patches and updates
+      ansible.builtin.include_tasks: patching/patch/redhat.yml
+      when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower in ["redhat", "centos", "rocky", "almalinux","oraclelinux"]
 
-  # Ubuntu-based Systems
-  - block:
-    - include_tasks: patching/patch/ubuntu.yml
-    when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower in ["ubuntu"]
+    # Debian-Based Systems
+    - name: (PATCHING-PATCH, Debian) Apply patches and updates
+      ansible.builtin.include_tasks: patching/patch/debian.yml
+      when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower in ["debian"]
 
-  # Windows Systems
-  - block:
-    - include_tasks: patching/patch/windows.yml
-    when: ansible_facts['os_family'] | lower == "windows"
+    # Ubuntu-based Systems
+    - name: (PATCHING-PATCH, Ubuntu) Apply patches and updates
+      ansible.builtin.include_tasks: patching/patch/ubuntu.yml
+      when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower in ["ubuntu"]
 
-  # SUSE Systems
-  - block:
-    - include_tasks: patching/patch/suse.yml
-    when: ansible_facts['os_family'] | lower == "suse"
+    # Windows Systems
+    - name: (PATCHING-PATCH, Windows) Apply patches and updates
+      ansible.builtin.include_tasks: patching/patch/windows.yml
+      when: ansible_facts['os_family'] | lower == "windows"
+
+    # SUSE Systems
+    - name: (PATCHING-PATCH, SUSE) Apply patches and updates
+      ansible.builtin.include_tasks: patching/patch/suse.yml
+      when: ansible_facts['os_family'] | lower == "suse"
