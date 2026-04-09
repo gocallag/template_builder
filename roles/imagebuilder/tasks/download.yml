@@ -1,0 +1,38 @@
+---
+- name: (DOWNLOAD) check if the status file exists for the ISO download
+  ansible.builtin.stat:
+     path: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}.status"
+  register: imagebuilder_download_status_file
+  tags:
+     - always
+- name: (DOWNLOAD) load download status file
+  ansible.builtin.include_vars:
+     file: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}.status"
+     name: imagebuilder_download_status
+  when: imagebuilder_download_status_file.stat.exists
+  tags:
+     - always
+- name: (DOWNLOAD) Download ISO file with checksum validation
+  ansible.builtin.get_url:
+     url: "{{ os.iso }}"
+     dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}"
+     checksum: "sha256:{{ os.checksum }}"
+     mode: "0644"
+  retries: 3
+  delay: 5
+  register: imagebuilder_download_result
+  until: imagebuilder_download_result is succeeded
+  when: imagebuilder_download_status.downloaded is not defined or not imagebuilder_download_status.downloaded
+  tags:
+     - always
+- name: (DOWNLOAD) Save download status
+  ansible.builtin.copy:
+     dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}.status"
+     content: |
+      downloaded: true
+      url: "{{ os.iso }}"
+      checksum: "{{ os.checksum }}"
+      dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}"
+     mode: "0644"
+  tags:
+     - always
