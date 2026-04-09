@@ -1,0 +1,268 @@
+---
+- name: (TARGET-PROXMOX) Upload template to Proxmox server
+  tags:
+    - build_targets
+    - build_target_proxmox
+  block:
+
+    - name: Add the host for the Proxmox server
+      ansible.builtin.add_host:
+        name: proxmox_server
+        ansible_host: "{{ imagebuilder_env_proxmox_server }}"
+        ansible_port: 22
+        ansible_user: "{{ imagebuilder_env_proxmox_user }}"
+        ansible_password: "{{ imagebuilder_env_proxmox_password }}"
+        ansible_connection: ssh
+
+    - name: Validate OS family
+      ansible.builtin.fail:
+        msg: "os.type must be 'linux' or 'windows'"
+      when: os.type not in ["linux", "windows"]
+
+    ###########################################################################
+    # LINUX PATH
+    ###########################################################################
+    - name: Linux | Install QGA + prepare VirtIO
+      when: os.type == "linux"
+      block:
+
+        - name: Linux | Install QEMU Guest Agent
+          ansible.builtin.command: >
+            virt-customize
+            -a "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            --install qemu-guest-agent
+            --run-command 'systemctl enable qemu-guest-agent || true'
+            --selinux-relabel
+          register: linux_customize
+          changed_when: true
+
+        - name: Linux | Show virt-customize output
+          ansible.builtin.debug:
+            var: linux_customize.stdout
+
+        - name: Linux | Convert QCOW2 to VirtIO-ready QCOW2
+          ansible.builtin.command: >
+            qemu-img convert -O qcow2 "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.virtio.{{ imagebuilder_profile_hash }}.qcow2"
+          register: linux_convert
+          changed_when: true
+
+        - name: Linux | Show conversion output
+          ansible.builtin.debug:
+            var: linux_convert.stdout
+
+    ###########################################################################
+    # WINDOWS PATH
+    ###########################################################################
+    - name: Windows | Prepare VirtIO + QGA
+      when: os.type == "windows"
+      block:
+
+        - name: Windows | Ensure QGA download directory exists
+          ansible.builtin.file:
+            path: "/tmp/qga"
+            state: directory
+            mode: "0755"
+
+        - name: Windows | Download QEMU Guest Agent MSI
+          ansible.builtin.get_url:
+            url: "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest/qemu-ga-x86_64.msi"
+            dest: "/tmp/qga/qemu-ga-x86_64.msi"
+            mode: "0644"
+          register: qga_download
+
+        - name: Windows | Set QGA MSI path
+          ansible.builtin.set_fact:
+            windows_qga_msi: "/tmp/qga/qemu-ga-x86_64.msi"
+
+        - name: Windows | Render unattend.xml
+          ansible.builtin.template:
+            src: "{{ windows_unattend_template }}"
+            dest: "/tmp/unattend.xml"
+
+        - name: Windows | Build guestfish script
+          ansible.builtin.copy:
+            dest: "/tmp/win-virtio-qga.script"
+            mode: "0644"
+            content: |
+              run
+              inspect-os
+              mount /dev/sda2 /
+
+              # Upload QGA MSI
+              upload {{ windows_qga_msi }} /Windows/Temp/qemu-ga.msi
+
+              # Upload VirtIO driver tree
+              mkdir-p /Drivers/VirtIO
+              upload {{ windows_virtio_dir }} /Drivers/VirtIO
+
+              # Upload unattend.xml
+              upload /tmp/unattend.xml /Windows/Panther/Unattend.xml
+
+        - name: Windows | Inject QGA + VirtIO drivers + unattend.xml
+          ansible.builtin.command: >
+            guestfish --rw -a {{ image_path }} -f /tmp/win-virtio-qga.script
+          register: win_inject
+          changed_when: true
+
+        - name: Windows | Show guestfish output
+          ansible.builtin.debug:
+            var: win_inject.stdout
+
+        - name: Windows | Convert QCOW2 to VirtIO-ready QCOW2
+          ansible.builtin.command: >
+            qemu-img convert -O qcow2 {{ image_path }} {{ output_path }}
+          register: win_convert
+          changed_when: true
+
+        - name: Windows | Show conversion output
+          ansible.builtin.debug:
+            var: win_convert.stdout
+
+    - name: Ensure the destination directory exists on the Proxmox server
+      ansible.builtin.file:
+        path: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}"
+        state: directory
+        mode: "0755"
+      delegate_to: proxmox_server
+      become: true
+
+    - name: Build SCP command as array
+      ansible.builtin.set_fact:
+        scp_cmd: # noqa: var-naming
+          - sshpass
+          - "-p"
+          - "{{ imagebuilder_env_proxmox_password }}"
+          - scp
+          - "-q"
+          - "-C"
+          - "-P"
+          - "22"
+          - "-o"
+          - "StrictHostKeyChecking=no"
+          - "-o"
+          - "UserKnownHostsFile=/dev/null"
+          - "-o"
+          - "ServerAliveInterval=30"
+          - "-o"
+          - "ServerAliveCountMax=120"
+          - "-o"
+          - "TCPKeepAlive=yes"
+          - "{{ imagebuilder_build_savedir }}/{{ id }}.virtio.{{ imagebuilder_profile_hash }}.qcow2"
+          - "{{ imagebuilder_env_proxmox_user }}@{{ imagebuilder_env_proxmox_server }}:/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
+
+    - name: Copy large file in async
+      ansible.builtin.command: "{{ scp_cmd | join(' ') }}"
+      async: 3600
+      poll: 0
+      register: copy_sleeper # noqa: var-naming
+      changed_when: true
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Check if async task has finished
+      ansible.builtin.async_status:
+        jid: "{{ copy_sleeper.ansible_job_id }}"
+      register: job_result # noqa: var-naming
+      until: job_result.finished
+      retries: 720
+      delay: 5
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Delete template if it exists
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
+        state: absent
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+      ignore_errors: true # noqa: ignore-errors
+
+    - name: Create new VM
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
+        cores: "1"
+        vcpus: "2"
+        cpu: "host"
+        memory: "{{ imagebuilder_env_build_memory }}"
+        agent: true
+        net:
+          net0: 'virtio,bridge=vmbr0'
+        timeout: 600
+        description: |
+          Template built on {{ ansible_date_time.iso8601 }}
+          Build ID: {{ id }}
+          Built by: {{ imagebuilder_env_ansible_user }}
+          Source: Proxmox automation pipeline
+      delegate_to: "{{ run_on | default('localhost') }}"
+      register: nvm # noqa: var-naming
+
+    - name: Add existing disk
+      community.proxmox.proxmox_disk:
+        vmid: "{{ nvm.vmid }}"
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
+        name: "{{ id }}"
+        disk: virtio0
+        storage: "{{ imagebuilder_env_proxmox_storage }}"
+        import_from: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
+        timeout: 6000
+        state: present
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Update VM boot order
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
+        boot: "order=virtio0"
+        update: true
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    # - name: Set VM notes
+    #   community.proxmox.proxmox_kvm:
+    #     api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+    #     api_password: "{{ imagebuilder_env_proxmox_password }}"
+    #     api_host: "{{ imagebuilder_env_proxmox_server }}"
+    #     node: "{{ imagebuilder_env_proxmox_node }}"
+    #     name: "template-{{ id }}"
+    #     update: true
+    #     description: |
+    #       Template built on {{ ansible_date_time.iso8601 }}
+    #       Build ID: {{ id }}
+    #       Built by: {{ imagebuilder_env_ansible_user }}
+    #       Source: Proxmox automation pipeline
+    #   delegate_to: "{{ run_on | default('localhost') }}"
+    - name: Update VM to template
+      community.proxmox.proxmox_kvm:
+        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+        api_password: "{{ imagebuilder_env_proxmox_password }}"
+        api_host: "{{ imagebuilder_env_proxmox_server }}"
+        name: "template-{{ id }}"
+        node: "{{ imagebuilder_env_proxmox_node }}"
+        update: true
+        state: template
+        timeout: 600
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+  rescue:
+    - name: Rescue on failure
+      ansible.builtin.debug:
+        msg: "Rescue: error during Proxmox template upload"
+
+  always:
+    - name: Remove the directory on the Proxmox server
+      ansible.builtin.file:
+        path: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}"
+        state: absent
+      delegate_to: proxmox_server
+      become: true
