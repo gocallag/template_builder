@@ -63,24 +63,24 @@
             ansible_winrm_read_timeout_sec: 1800
             ansible_psrp_read_timeout_sec: 1800
 
-      - name: (SETUP) Update apt cache
-        ansible.builtin.apt:
-            update_cache: true
-        become: true
-        when: ansible_facts['os_family'] | lower == 'debian'
+      # - name: (SETUP) Update apt cache
+      #   ansible.builtin.apt:
+      #       update_cache: true
+      #   become: true
+      #   when: ansible_facts['os_family'] | lower == 'debian'
 
-      - name: (SETUP) Install required packages
-        ansible.builtin.package:
-            name: "{{ imagebuilder_package_lists[ansible_facts['os_family'] | lower] }}"
-            state: present
-        become: true
+      # - name: (SETUP) Install required packages
+      #   ansible.builtin.package:
+      #       name: "{{ imagebuilder_package_lists[ansible_facts['os_family'] | lower] }}"
+      #       state: present
+      #   become: true
 
-      - name: (SETUP) Install required pip packages
-        ansible.builtin.pip:
-            name: "{{ imagebuilder_pip_packages[ansible_facts['os_family'] | lower] }}"
-            state: present
-            extra_args: "--break-system-packages"
-        become: true
+      # - name: (SETUP) Install required pip packages
+      #   ansible.builtin.pip:
+      #       name: "{{ imagebuilder_pip_packages[ansible_facts['os_family'] | lower] }}"
+      #       state: present
+      #       extra_args: "--break-system-packages"
+      #   become: true
 
       - name: (SETUP) get current user info
         ansible.builtin.command: whoami
