@@ -186,10 +186,19 @@
         api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "template-{{ id }}"
         node: "{{ imagebuilder_env_proxmox_node }}"
-        vcpus: "1"
+        cores: "1"
+        vcpus: "2"
         cpu: "host"
         memory: "{{ imagebuilder_env_build_memory }}"
+        agent: true
+        net:
+          net0: 'virtio,bridge=vmbr0'
         timeout: 600
+        description: |
+          Template built on {{ ansible_date_time.iso8601 }}
+          Build ID: {{ id }}
+          Built by: {{ imagebuilder_env_ansible_user }}
+          Source: Proxmox automation pipeline
       delegate_to: "{{ run_on | default('localhost') }}"
       register: nvm # noqa: var-naming
 
@@ -200,7 +209,7 @@
         api_password: "{{ imagebuilder_env_proxmox_password }}"
         api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "{{ id }}"
-        disk: sata0
+        disk: virtio0
         storage: "{{ imagebuilder_env_proxmox_storage }}"
         import_from: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ id }}/{{ id }}.qcow2"
         timeout: 6000
@@ -214,25 +223,25 @@
         api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "template-{{ id }}"
         node: "{{ imagebuilder_env_proxmox_node }}"
-        boot: "order=sata0"
+        boot: "order=virtio0"
         update: true
         timeout: 600
       delegate_to: "{{ run_on | default('localhost') }}"
 
-    - name: Set VM notes
-      community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
-        api_password: "{{ imagebuilder_env_proxmox_password }}"
-        api_host: "{{ imagebuilder_env_proxmox_server }}"
-        node: "{{ imagebuilder_env_proxmox_node }}"
-        name: "template-{{ id }}"
-        update: true
-        description: |
-          Template built on {{ ansible_date_time.iso8601 }}
-          Build ID: {{ id }}
-          Built by: {{ imagebuilder_env_ansible_user }}
-          Source: Proxmox automation pipeline
-      delegate_to: "{{ run_on | default('localhost') }}"
+    # - name: Set VM notes
+    #   community.proxmox.proxmox_kvm:
+    #     api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+    #     api_password: "{{ imagebuilder_env_proxmox_password }}"
+    #     api_host: "{{ imagebuilder_env_proxmox_server }}"
+    #     node: "{{ imagebuilder_env_proxmox_node }}"
+    #     name: "template-{{ id }}"
+    #     update: true
+    #     description: |
+    #       Template built on {{ ansible_date_time.iso8601 }}
+    #       Build ID: {{ id }}
+    #       Built by: {{ imagebuilder_env_ansible_user }}
+    #       Source: Proxmox automation pipeline
+    #   delegate_to: "{{ run_on | default('localhost') }}"
     - name: Update VM to template
       community.proxmox.proxmox_kvm:
         api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
