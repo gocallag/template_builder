@@ -1,0 +1,28 @@
+---
+- name: CENTOS_9S    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: centos-9s
+    version: 9.s
+    os:
+      config:
+        disks:
+          - 50
+        timezone: Australia/Melbourne
+        nicdriver: e1000
+      type: linux
+      variant: CentOS
+      # iso: https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-dvd1.iso
+      iso: http://192.168.1.161:8180/centos/CentOS-9/CentOS-Stream-9-20260127.1-x86_64-dvd1.iso
+      checksum: 38f13b8bbbd689570388248c56cdce5513ae6bb64c6a55c0f6efbe76e2efd56e
+      console_boot: |
+        <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
