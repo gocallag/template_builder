@@ -1,0 +1,28 @@
+---
+- name: CENTOS_10S    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: centos-10s
+    version: 10.s
+    os:
+      config:
+        disks:
+          - 20
+        timezone: Australia/Melbourne
+        nicdriver: e1000
+      type: linux
+      variant: CentOS
+      # iso: https://mirror.aarnet.edu.au/pub/centos-stream/10-stream/BaseOS/x86_64/iso/CentOS-Stream-10-latest-x86_64-dvd1.iso
+      iso: http://192.168.1.161:8180/centos/CentOS-10/CentOS-Stream-10-20251201.0-x86_64-dvd1.iso
+      checksum: 079d0c5fa2e111d6a05ec20073046c8c59b8368849553ba30cc8f6b4301e3c1b
+      console_boot: |
+           <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
