@@ -1,10 +1,15 @@
 ---
 - name: (MAIN) Display build banner
   ansible.builtin.include_tasks: banner.yml
-  tags:
-    - always
   vars:
     imagebuilder_banner_message: "Starting build: {{ id }}"
+  tags:
+    - always            # list all the tags used role-wide so we can see them with a list-tags command
+    - build_fetch_iso
+    - build_base
+    - build_aux
+    - build_customise
+    - build_cleanup
 
 - name: (MAIN) Check if environmental variables file exists in the standard location
   ansible.builtin.stat:
@@ -58,13 +63,6 @@
     - always
 
 - name: (MAIN) Assert required build variables are defined
-  tags:                       # list all the tags used role wide so we can see them with a list-tags command
-    - always
-    - build_fetch_iso
-    - build_base
-    - build_aux
-    - build_customise
-    - build_cleanup
   ansible.builtin.assert:
     that:
       - os is defined and os.iso is defined and os.iso | trim | length > 0
@@ -79,6 +77,8 @@
       - imagebuilder_env_ansible_key is defined and imagebuilder_env_ansible_key | trim | length > 0
     fail_msg: "(MAIN) One or more required variables are not defined correctly."
     success_msg: "(MAIN) All required variables are defined. Proceeding with build."
+  tags:
+    - always
 
 - name: (MAIN) Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml
@@ -126,7 +126,7 @@
       args:
         creates: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
       tags:
-        - build_customise
+        - always
 
     # - name: (MAIN) cleanup build path
     #   ansible.builtin.file:
