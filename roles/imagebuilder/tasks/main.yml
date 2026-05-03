@@ -1,4 +1,7 @@
 ---
+- name: (MAIN) setup to get facts
+  ansible.builtin.setup:
+
 - name: (MAIN) Display build banner
   ansible.builtin.include_tasks: banner.yml
   vars:
@@ -16,6 +19,7 @@
     path: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_envfile_stat
   failed_when: not imagebuilder_envfile_stat.stat.exists
+  changed_when: false
   tags:
     - always
 
@@ -23,6 +27,7 @@
   ansible.builtin.slurp:
     src: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_raw_env
+  changed_when: false
   tags:
     - always
 
@@ -96,7 +101,10 @@
   tags:
     - always
 
-- name: (MAIN) Perform any downloads needed for the build)
+- name: (MAIN) Restore Image(s) if they exist
+  ansible.builtin.include_tasks: restore.yml
+
+- name: (MAIN) Perform any downloads needed for the build
   ansible.builtin.include_role:
     name: "{{ rolename }}"
     tasks_from: download.yml

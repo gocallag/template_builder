@@ -1,0 +1,78 @@
+- name: (RESTORE) delete any existing QEMU VM disk image(s) in the build directory
+  block:
+    - name: (RESTORE) delete any existing QEMU VM disk image
+      ansible.builtin.file:
+        path: "{{ qemufile }}"
+        state: absent
+      loop_control:
+        loop_var: qemufile
+      loop:
+        - "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+
+    - name: (RESTORE) stat any saved custom image
+      ansible.builtin.stat:
+        path: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+      register: imagebuilder_custom_qemu_disk_stat # noqa: var-naming
+
+    - name: (RESTORE) restore custom image if it exists
+      ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+      changed_when: true
+      when:
+        - imagebuilder_custom_qemu_disk_stat.stat.exists
+        - imagebuilder_custom_qemu_disk_stat.stat.size > 0
+      register: imagebuilder_custom_qemu_disk_restore # noqa: var-naming
+
+    - name: (RESTORE) record we restored from a custom image
+      when: imagebuilder_custom_qemu_disk_restore is defined and imagebuilder_custom_qemu_disk_restore.changed
+      ansible.builtin.set_fact:
+        imagebuilder_restored_from_image: true
+
+    - name: (RESTORE) Show restore result
+      when: imagebuilder_custom_qemu_disk_restore is defined and imagebuilder_custom_qemu_disk_restore.changed
+      ansible.builtin.debug:
+        msg: "Restored custom image from {{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+
+    - name: (RESTORE) Base Image Exists?
+      when: not imagebuilder_restored_from_image
+      block:
+        - name: (RESTORE) stat any saved base image
+          ansible.builtin.stat:
+            path: "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+          register: qemu_disk_stat # noqa: var-naming
+
+        - name: (RESTORE) restore base image if it exists
+          ansible.builtin.command: cp "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+          changed_when: true
+          when:
+            - qemu_disk_stat.stat.exists
+            - qemu_disk_stat.stat.size > 0
+          register: qemu_disk_restore # noqa: var-naming
+
+        - name: (RESTORE) record we restored from a base image
+          ansible.builtin.set_fact:
+            imagebuilder_restored_from_image: true
+          when:
+            - qemu_disk_stat.stat.exists
+            - qemu_disk_stat.stat.size > 0
+
+        - name: (RESTORE) Show restore result
+          ansible.builtin.debug:
+            msg: "Restored base image from {{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+          when:
+            - qemu_disk_stat.stat.exists
+            - qemu_disk_stat.stat.size > 0
+
+    - name: (RESTORE) if no image was restored, create an empty disk for the build
+      when: not imagebuilder_restored_from_image
+      block:
+        - name: (RESTORE) Create VM disk image
+          ansible.builtin.command: qemu-img create -f qcow2 "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ os.config.disks[0] }}G"
+          args:
+            creates: "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2"
+          register: qemu_disk # noqa: var-naming
+          failed_when: qemu_disk.rc != 0
+
+        - name: (RESTORE) Show disk creation result
+          ansible.builtin.include_tasks: banner.yml
+          vars:
+            imagebuilder_banner_message: "Created disk at {{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2 with size {{ os.config.disks[0] }}G"
