@@ -20,16 +20,12 @@
   register: imagebuilder_envfile_stat
   failed_when: not imagebuilder_envfile_stat.stat.exists
   changed_when: false
-  tags:
-    - always
 
 - name: (MAIN) Load env file (a=b format)
   ansible.builtin.slurp:
     src: "{{ imagebuilder_envfile_path }}"
   register: imagebuilder_raw_env
   changed_when: false
-  tags:
-    - always
 
 - name: (MAIN) Convert env file to dict
   ansible.builtin.set_fact:
@@ -43,8 +39,6 @@
           | regex_replace('=', ': ', multiline=True)
           | from_yaml
         }}
-  tags:
-    - always
 
 - name: (MAIN) Map imagebuilder_env.* into individual vars
   ansible.builtin.set_fact:
@@ -64,8 +58,11 @@
     imagebuilder_env_proxmox_node: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_NODE }}"
     imagebuilder_env_build_memory: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_MEMORY | default(8192) }}"
     imagebuilder_env_build_cpu: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_CPU | default(4) }}"
-  tags:
-    - always
+    imagebuilder_env_vsphere_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_PASSWORD }}"
+    imagebuilder_env_vsphere_username: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_USERNAME }}"
+    imagebuilder_env_vsphere_vcenter: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_VCENTER }}"
+    imagebuilder_env_vsphere_datacenter: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_DATACENTER }}"
+    imagebuilder_env_vsphere_datastore: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_DATASTORE }}"
 
 - name: (MAIN) Assert required build variables are defined
   ansible.builtin.assert:
@@ -80,26 +77,23 @@
       - imagebuilder_env_win_admin_user is defined and imagebuilder_env_win_admin_user | trim | length > 0
       - imagebuilder_env_win_admin_password is defined and imagebuilder_env_win_admin_password | trim | length > 0
       - imagebuilder_env_ansible_key is defined and imagebuilder_env_ansible_key | trim | length > 0
+      - imagebuilder_env_vsphere_password is defined and imagebuilder_env_vsphere_password | trim | length > 0
+      - imagebuilder_env_vsphere_username is defined and imagebuilder_env_vsphere_username | trim | length > 0
+      - imagebuilder_env_vsphere_vcenter is defined and imagebuilder_env_vsphere_vcenter | trim | length > 0
+      - imagebuilder_env_vsphere_datacenter is defined and imagebuilder_env_vsphere_datacenter | trim | length > 0
+      - imagebuilder_env_vsphere_datastore is defined and imagebuilder_env_vsphere_datastore | trim | length > 0
     fail_msg: "(MAIN) One or more required variables are not defined correctly."
     success_msg: "(MAIN) All required variables are defined. Proceeding with build."
-  tags:
-    - always
 
 - name: (MAIN) Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml
-  tags:
-    - always
 
 - name: (MAIN) add default build steps if none are defined defined by the build task
   ansible.builtin.set_fact:
     imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
-  tags:
-    - always
 
 - name: (MAIN) Build the image profile based on our configuration
   ansible.builtin.include_tasks: buildprofile.yml
-  tags:
-    - always
 
 - name: (MAIN) Restore Image(s) if they exist
   ansible.builtin.include_tasks: restore.yml
@@ -111,30 +105,49 @@
   loop: "{{ ansible_play_role_names }}"
   loop_control:
     loop_var: rolename
-  tags:
-    - always
 
 - name: (MAIN) Perform the defined build
+  when: not imagebuilder_restored_from_custom_image | default(false)
   block:
     - name: (MAIN) include build roles if any are defined
       ansible.builtin.include_role:
         name: imagebuilder
         tasks_from: "glue/glue.yml"
-      tags:
-        - always
       vars:
         imagebuilder_stage: "{{ imagebuilder_buildtask.name }}"
         imagebuilder_task_vars: "{{ imagebuilder_buildtask.task_vars | default({}) }}"
       loop: "{{ imagebuilder_build | default([]) }}"
       loop_control:
         loop_var: imagebuilder_buildtask
+    - name: (QEMU) wait for 60 seconds for the system to be shutdown before we try to save the image
+      ansible.builtin.wait_for:
+        timeout: 60
+    # Ensure qcow2 is not open by any process
+    - name: Check for open handles on qcow2
+      ansible.builtin.shell: lsof "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" || true
+      register: imagebuilder_qcow2_lsof
+      changed_when: false
+      delegate_to: localhost
 
-    - name: (MAIN) save base image
-      ansible.builtin.command: cp "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-      args:
-        creates: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-      tags:
-        - always
+    - name: Fail if qcow2 is still open
+      ansible.builtin.debug:
+        msg: "qcow2 still open by a process: {{ imagebuilder_qcow2_lsof.stdout }}"
+
+    # Flush host page cache before conversion
+    - name: Sync host filesystem
+      ansible.builtin.command: sync
+      changed_when: false
+      delegate_to: localhost
+
+    - name: (QEMU) save custom image
+      block:
+        - name: (QEMU) convert custom image with free block cleanup
+          ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp"
+          changed_when: true
+
+        - name: (QEMU) finalize custom image
+          ansible.builtin.command: mv "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+          changed_when: true
 
     # - name: (MAIN) cleanup build path
     #   ansible.builtin.file:
@@ -151,17 +164,12 @@
         msg: >-
           (MAIN) Task '{{ ansible_failed_task }}' failed.
           {{ ansible_failed_result.msg | default('no additional message') }}
-      tags:
-        - always
-
   always:
 
     - name: (MAIN) Display Webserver job_id
       ansible.builtin.debug:
         msg: "(MAIN) Webserver jobid is {{ webserver.ansible_job_id }} "
       when: webserver is defined and webserver.ansible_job_id is defined
-      tags:
-        - always
 
     - name: (MAIN) kill dangly web servers
       ansible.builtin.shell: |
@@ -170,5 +178,3 @@
         kill -9 {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
       when: webserver is defined and webserver.ansible_job_pid is defined
       changed_when: false
-      tags:
-        - always
