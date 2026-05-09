@@ -28,14 +28,21 @@ RUN apt-get update && apt-get install -y \
     libxslt1-dev \
     genisoimage \
     ipxe-qemu \
-    qemu-system-common \ 
+    qemu-system-common \
     qemu-system-data \
     xorriso \
-    libnbd-bin \ 
+    libnbd-bin \
     nbdkit \
     guestfish \
     curl \
-    python3-dev  python3-setuptools gcc g++  build-essential software-properties-common gosu vim
+    python3-dev python3-setuptools gcc g++ build-essential software-properties-common gosu vim
+
+# Install govc CLI
+RUN curl -L https://github.com/vmware/govmomi/releases/latest/download/govc_Linux_x86_64.tar.gz -o /tmp/govc.tar.gz && \
+    tar -xzf /tmp/govc.tar.gz -C /tmp && \
+    mv /tmp/govc /usr/local/bin/govc && \
+    chmod +x /usr/local/bin/govc && \
+    rm /tmp/govc.tar.gz
 
 # Install ansible-core + ansible-runner
 RUN pip3 install --break-system-packages --no-cache-dir \
