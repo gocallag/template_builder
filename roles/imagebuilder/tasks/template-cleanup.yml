@@ -140,65 +140,51 @@
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Get mounted filesystems
-              ansible.builtin.command: df --output=target
-              register: mounted_filesystems # noqa: var-naming
+            - name: Get discard info
+              ansible.builtin.command: lsblk -D
+              register: imagebuilder_lsblk_d
               changed_when: false
-              become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Debug mounted filesystems
-              ansible.builtin.debug:
-                  var: builder_mounted_filesystems.stdout_lines
+            - name: Extract TRIM-capable devices
+              ansible.builtin.set_fact:
+                  imagebuilder_trim_capable_devices: >-
+                      {{
+                        imagebuilder_lsblk_d.stdout_lines
+                        | reject('match', '^NAME')
+                        | map('split')
+                        | selectattr('2', 'match', '^[1-9]')
+                        | selectattr('3', 'match', '^[1-9]')
+                        | map('first')
+                        | list
+                      }}
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Check if fstrim is available
-              ansible.builtin.command: which fstrim
-              register: fstrim_check # noqa: var-naming
-              ignore_errors: true
+            - name: Map mountpoints to devices
+              ansible.builtin.command: findmnt -n -o TARGET,SOURCE
+              register: imagebuilder_findmnt_map
               changed_when: false
-              become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Use fstrim on all filesystems if available
+            - name: Build TRIM-capable mount list
+              ansible.builtin.set_fact:
+                  imagebuilder_trim_mounts: >-
+                    {{
+                      imagebuilder_findmnt_map.stdout_lines
+                      | map('split')
+                      | selectattr('1', 'defined')
+                      | map('list')
+                      | select('match', '.* /dev/.*')
+                      | map('first')
+                      | list
+                    }}
+
+            - name: Run fstrim on TRIM-capable filesystems
               ansible.builtin.command: fstrim -v {{ item }}
-              loop: "{{ mounted_filesystems.stdout_lines }}"
-              when:
-                  - fstrim_check.rc == 0
-                  - item not in ['/proc', '/sys', '/dev', '/run', '/snap']  # Exclude non-TRIM filesystems
-              changed_when: false
-              become: true
-              ignore_errors: true # noqa: ignore-errors
-              delegate_to: bob_build
-
-            - name: (TEMPLATE-CLEANUP, common Linux) Check if fallocate is available
-              ansible.builtin.command: which fallocate
-              register: fallocate_check # noqa: var-naming
-              ignore_errors: true # noqa: ignore-errors
+              loop: "{{ imagebuilder_trim_mounts }}"
               changed_when: false
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Use fallocate to zero free space on all filesystems
-              ansible.builtin.shell: "set -o pipefail; fallocate --zero-range -o 0 -l $(df --output=avail {{ item }} | tail -1)K {{ item }}/zeroed_file || rm -f {{ item }}/zeroed_file"
-              loop: "{{ mounted_filesystems.stdout_lines }}"
-              when:
-                  - fstrim_check.rc != 0
-                  - fallocate_check.rc == 0
-                  - item not in ['/proc', '/sys', '/dev', '/run']  # Exclude non-TRIM filesystems
-              become: true
-              changed_when: true
-              delegate_to: bob_build
-
-            - name: (TEMPLATE-CLEANUP, common Linux) Fallback to dd if fallocate is not available
-              ansible.builtin.shell: dd if=/dev/zero of={{ item }}/zeroed_file bs=1M oflag=direct || rm -f {{ item }}/zeroed_file
-              loop: "{{ mounted_filesystems.stdout_lines }}"
-              when:
-                  - fstrim_check.rc != 0
-                  - fallocate_check.rc != 0
-                  - item not in ['/proc', '/sys', '/dev', '/run']  # Exclude non-TRIM filesystems
-              become: true
-              changed_when: true
-              delegate_to: bob_build
 
             - name: (TEMPLATE-CLEANUP, common Linux) Sync disk
               ansible.builtin.command: sync
