@@ -33,22 +33,22 @@
             --install qemu-guest-agent
             --run-command 'systemctl enable qemu-guest-agent || true'
             --selinux-relabel
-          register: linux_customize
+          register: target_proxmox_linux_customize
           changed_when: true
 
         - name: Linux | Show virt-customize output
           ansible.builtin.debug:
-            var: linux_customize.stdout
+            var: target_proxmox_linux_customize.stdout
 
         - name: Linux | Convert QCOW2 to VirtIO-ready QCOW2
           ansible.builtin.command: >
             qemu-img convert -O qcow2 "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.virtio.{{ imagebuilder_profile_hash }}.qcow2"
-          register: linux_convert
+          register: target_proxmox_linux_convert
           changed_when: true
 
         - name: Linux | Show conversion output
           ansible.builtin.debug:
-            var: linux_convert.stdout
+            var: target_proxmox_linux_convert.stdout
 
     ###########################################################################
     # WINDOWS PATH
@@ -68,16 +68,17 @@
             url: "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest/qemu-ga-x86_64.msi"
             dest: "/tmp/qga/qemu-ga-x86_64.msi"
             mode: "0644"
-          register: qga_download
+          register: target_proxmox_windows_qga_download
 
         - name: Windows | Set QGA MSI path
           ansible.builtin.set_fact:
-            windows_qga_msi: "/tmp/qga/qemu-ga-x86_64.msi"
+            target_proxmox_windows_qga_msi: "/tmp/qga/qemu-ga-x86_64.msi"
 
         - name: Windows | Render unattend.xml
           ansible.builtin.template:
             src: "{{ windows_unattend_template }}"
             dest: "/tmp/unattend.xml"
+            mode: "0644"
 
         - name: Windows | Build guestfish script
           ansible.builtin.copy:
@@ -89,11 +90,11 @@
               mount /dev/sda2 /
 
               # Upload QGA MSI
-              upload {{ windows_qga_msi }} /Windows/Temp/qemu-ga.msi
+              upload {{ target_proxmox_windows_qga_msi }} /Windows/Temp/qemu-ga.msi
 
               # Upload VirtIO driver tree
               mkdir-p /Drivers/VirtIO
-              upload {{ windows_virtio_dir }} /Drivers/VirtIO
+              upload {{ target_proxmox_windows_virtio_dir }} /Drivers/VirtIO
 
               # Upload unattend.xml
               upload /tmp/unattend.xml /Windows/Panther/Unattend.xml
@@ -101,22 +102,22 @@
         - name: Windows | Inject QGA + VirtIO drivers + unattend.xml
           ansible.builtin.command: >
             guestfish --rw -a {{ image_path }} -f /tmp/win-virtio-qga.script
-          register: win_inject
+          register: target_proxmox_windows_inject
           changed_when: true
 
         - name: Windows | Show guestfish output
           ansible.builtin.debug:
-            var: win_inject.stdout
+            var: target_proxmox_windows_inject.stdout
 
         - name: Windows | Convert QCOW2 to VirtIO-ready QCOW2
           ansible.builtin.command: >
             qemu-img convert -O qcow2 {{ image_path }} {{ output_path }}
-          register: win_convert
+          register: target_proxmox_windows_convert
           changed_when: true
 
         - name: Windows | Show conversion output
           ansible.builtin.debug:
-            var: win_convert.stdout
+            var: target_proxmox_windows_convert.stdout
 
     - name: Ensure the destination directory exists on the Proxmox server
       ansible.builtin.file:
