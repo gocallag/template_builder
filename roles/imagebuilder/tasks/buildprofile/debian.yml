@@ -1,35 +1,14 @@
----
-# Debian-Based Systems
-- name: (BUILDAUX, debian)
+# ansible-lint: ignore=line-length
+
+# RedHat-Based Systems
+- name: (BUILDPROFILE, redhat)
   tags:
-      - build_aux
+      - always
   block:
-      - name: (BUILDAUX, debian) create build directories
-        ansible.builtin.file:
-            path: "{{ file }}"
-            state: directory
-            mode: "0755"
-        loop_control:
-            loop_var: file
-        loop:
-            - "{{ build_basedir }}/build"
-            - "{{ build_basedir }}/build/mnt"
-
-      - name: (BUILDAUX, debian) remove existing aux ISO (if it exists)
-        ansible.builtin.file:
-            path: "{{ build_basedir }}/build/aux.iso"
-            state: absent
-
-      - name: (BUILDAUX, debian) create temporary iso contents dir
-        ansible.builtin.file:
-            path: "{{ build_basedir }}/build/iso_contents"
-            state: directory
-            mode: "0755"
       - name: (BUILDAUX, debian) Generate hashed password (Debian)
-        ansible.builtin.shell: "set -o pipefail; printf '{{ env_ansible_password }}' | openssl passwd -6 -stdin"
+        ansible.builtin.shell: "set -o pipefail; printf '{{ imagebuilder_env_ansible_password }}' | openssl passwd -6 -stdin"
         register: builder_hashed_password # noqa: var-naming
         changed_when: false
-
       - name: (BUILDAUX, debian) Set hashed password fact (Debian)
         ansible.builtin.set_fact:
             builder_hashed_password: "{{ builder_hashed_password.stdout }}" # noqa: var-naming
@@ -67,9 +46,9 @@
                   ### Account setup
                   d-i passwd/root-login boolean false
                   d-i passwd/user-fullname string Ansible User
-                  d-i passwd/username string {{ env_ansible_user }}
-                  d-i passwd/user-password password {{ env_ansible_password }}
-                  d-i passwd/user-password-again password {{ env_ansible_password }}
+                  d-i passwd/username string {{ imagebuilder_env_ansible_user }}
+                  d-i passwd/user-password password {{ imagebuilder_env_ansible_password }}
+                  d-i passwd/user-password-again password {{ imagebuilder_env_ansible_password }}
                   d-i passwd/user-default-groups string audio cdrom video sudo
 
                   ### Clock and time zone setup
@@ -116,40 +95,17 @@
                   sed -i '/^deb cdrom:/d' /target/etc/apt/sources.list && \
                   echo "deb http://deb.debian.org/debian trixie main contrib non-free-firmware" > /target/etc/apt/sources.list && \
                   echo "deb http://deb.debian.org/debian-security trixie-security main contrib non-free-firmware" >> /target/etc/apt/sources.list && \
-                  echo "{{ env_ansible_user }} ALL=(ALL:ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/{{ env_ansible_user }} ; \
-                  chmod 0440 /target/etc/sudoers.d/{{ env_ansible_user }}
+                  echo "{{ imagebuilder_env_ansible_user }} ALL=(ALL:ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/{{ imagebuilder_env_ansible_user }} ; \
+                  chmod 0440 /target/etc/sudoers.d/{{ imagebuilder_env_ansible_user }}
 
 
                   ### Exit
                   d-i debian-installer/exit/poweroff boolean true
-            when: preseed is not defined or preseed | length == 0
-      - name: (BUILDAUX, debian) Copy preseed to ISO contents
-        ansible.builtin.copy:
-            content: "{{ preseed }}"
-            dest: "{{ build_httpdir }}/preseed.cfg"
-            mode: "0644"
-        become: true
-
-      - name: (BUILDAUX, debian) Build aux ISO from contents (label PRESEED)
-        ansible.builtin.command: >
-          genisoimage -output aux.iso -volid PRESEED -joliet -rock .
-        args:
-            chdir: "{{ build_basedir }}/build/iso_contents"
-            creates: "{{ build_basedir }}/build/aux.iso"
-        register: mkiso # noqa: var-naming
-        failed_when: mkiso.rc != 0
-
-      - name: (BUILDAUX, debian) Move aux ISO to build directory
-        ansible.builtin.command: >
-          mv {{ build_basedir }}/build/iso_contents/aux.iso {{ build_basedir }}/build/aux.iso
-        args:
-            creates: "{{ build_basedir }}/build/aux.iso"
-
-      - name: (BUILDAUX, debian) create sha256 of build profile
+      - name: (BUILDPROFILE, debian) build profile fact
         ansible.builtin.set_fact:
-            build_profile: # noqa: var-naming
-                os_iso: "{{ os.iso }}" # noqa: var-naming
-                os_preseed: "{{ preseed }}" # noqa: var-naming
-      - name: (BUILDAUX, debian) create sha256 of build profile
+            imagebuilder_build_profile:
+                os: "{{ os | to_json }}"  # noqa: var-naming
+                preseed: "{{ preseed }}"            # noqa: var-naming
+      - name: (BUILDPROFILE, debian) create sha256 of build profile
         ansible.builtin.set_fact:
-            profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"
