@@ -9,7 +9,8 @@
   tags:
     - always
 
-- debug:
+- name: Debug
+  ansible.builtin.debug:
     msg: "Waiting for {{ wait_proto }} to be available on {{ wait_host_ip }}:{{ wait_port }}"
   tags:
     - always

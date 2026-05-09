@@ -1,0 +1,4 @@
+---
+- name: No downloads required
+  debug:
+    msg: "Skipping download step"

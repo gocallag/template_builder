@@ -6,9 +6,9 @@
     # Common Tasks
     - name: (PATCHING-PATCH, Common) Set the retry count
       ansible.builtin.set_fact:
-        retry_count: "{{ 0 if retry_count is undefined else retry_count | int + 1 }}"
-        waitfor_host: "{{ hostvars.get(delegate, {}).get('ansible_host') | default(ansible_host) }}"
-        waitfor_port: "{{ hostvars.get(delegate, {}).get('ansible_port') | default(ansible_port) }}"
+        retry_count: "{{ 0 if retry_count is undefined else retry_count | int + 1 }}" # noqa: var-naming
+        waitfor_host: "{{ hostvars.get(delegate, {}).get('ansible_host') | default(ansible_host) }}" # noqa: var-naming
+        waitfor_port: "{{ hostvars.get(delegate, {}).get('ansible_port') | default(ansible_port) }}" # noqa: var-naming
 
     - name: (PATCHING-PATCH, Common) Wait for admin port to be available
       ansible.builtin.wait_for:
@@ -19,26 +19,5 @@
         state: started
       delegate_to: "{{ run_on | default('localhost') }}"
     # RedHat-Based Systems
-    - name: (PATCHING-PATCH, RedHat) Apply patches and updates
-      ansible.builtin.include_tasks: patching/patch/redhat.yml
-      when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower in ["redhat", "centos", "rocky", "almalinux","oraclelinux"]
-
-    # Debian-Based Systems
-    - name: (PATCHING-PATCH, Debian) Apply patches and updates
-      ansible.builtin.include_tasks: patching/patch/debian.yml
-      when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower in ["debian"]
-
-    # Ubuntu-based Systems
-    - name: (PATCHING-PATCH, Ubuntu) Apply patches and updates
-      ansible.builtin.include_tasks: patching/patch/ubuntu.yml
-      when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower in ["ubuntu"]
-
-    # Windows Systems
-    - name: (PATCHING-PATCH, Windows) Apply patches and updates
-      ansible.builtin.include_tasks: patching/patch/windows.yml
-      when: ansible_facts['os_family'] | lower == "windows"
-
-    # SUSE Systems
-    - name: (PATCHING-PATCH, SUSE) Apply patches and updates
-      ansible.builtin.include_tasks: patching/patch/suse.yml
-      when: ansible_facts['os_family'] | lower == "suse"
+    - name: PATCHING_PATCH- Apply OS patches
+      ansible.builtin.include_tasks: "patching/patch/{{ ansible_facts['os_family'] | lower }}.yml"

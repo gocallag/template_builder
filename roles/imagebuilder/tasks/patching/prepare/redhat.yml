@@ -1,0 +1,6 @@
+# Alma Linux Systems
+- name: (PATCHING-PREPARE, redhat) Red Hat Linux-specific preparation tasks
+  block:
+    - name: (PATCHING-PREPARE, redhat) Placeholder for Red Hat Linux-specific preparation tasks
+      ansible.builtin.debug:
+        msg: "No preparation tasks defined for Red Hat Linux systems yet."
