@@ -1,7 +1,6 @@
 ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" # noqa: var-naming
 imagebuilder_envfile_path: "{{ '~/.template_builder/env.sh' | expanduser }}"
 imagebuilder_useauxiso: false
-imagebuilder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
 imagebuilder_prefix_port_offset_map:
     alma: 0
     ol: 1
