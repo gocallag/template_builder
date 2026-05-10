@@ -1,0 +1,51 @@
+---
+- name: (TARGET-OVIRT)
+  tags:
+    - build_targets
+    - build_target_ovirt
+  block:
+
+    - name: Copy oVirt upload script
+      ansible.builtin.template:
+        src: "files/ovirt/ovirt-uploaddisk.py"
+        dest: "{{ build_basedir }}/ovirt-uploaddisk.py"
+        mode: '0755'
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Copy oVirt convert-to-template script
+      ansible.builtin.template:
+        src: "files/ovirt/ovirt-converttotemplate.py"
+        dest: "{{ build_basedir }}/ovirt-converttotemplate.py"
+        mode: '0755'
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Build oVirt upload command
+      ansible.builtin.set_fact:
+        ovirt_upload_cmd: # noqa: var-naming
+          - python3
+          - "{{ build_basedir }}/ovirt-uploaddisk.py"
+
+    - name: Run oVirt upload script
+      ansible.builtin.command: "{{ ovirt_upload_cmd | join(' ') }}"
+      register: upload_result # noqa: var-naming
+      failed_when: upload_result.rc != 0
+      changed_when: true
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+  rescue:
+    - name: (TARGET-OVIRT) Rescue on failure
+      ansible.builtin.debug:
+        msg: "Rescue: error during oVirt upload"
+
+  always:
+    - name: Remove upload script
+      ansible.builtin.file:
+        path: "{{ build_basedir }}/ovirt-uploaddisk.py"
+        state: absent
+      delegate_to: "{{ run_on | default('localhost') }}"
+
+    - name: Remove convert script
+      ansible.builtin.file:
+        path: "{{ build_basedir }}/ovirt-converttotemplate.py"
+        state: absent
+      delegate_to: "{{ run_on | default('localhost') }}"
