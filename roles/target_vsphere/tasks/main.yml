@@ -86,6 +86,13 @@
               -g "{{ imagebuilder_env_vsphere_guestosid | default('other3xLinux64Guest') }}" \
               -on=false \
               "{{ id }}"
+            sleep 10
+            govc device.remove -vm "{{ id }}" -device ethernet-0
+            sleep 10
+            govc device.remove -vm "{{ id }}" -device scsi0
+            sleep 10
+            govc device.scsi.add -vm "{{ id }}" -type pvscsi
+            sleep 10
           changed_when: true
 
         - name: Fix VMDK descriptor filename
@@ -119,6 +126,7 @@
             govc datastore.upload \
               "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}-flat.vmdk" \
               "{{ id }}/{{ id }}-flat.vmdk"
+            sleep 20
           changed_when: true
 
         - name: Attach uploaded VMDK to VM
@@ -128,12 +136,11 @@
             export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
             export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
             export GOVC_INSECURE=1
-            govc device.remove -vm "alma-8" -device scsi0
-            govc device.scsi.add -vm "{{ id }}" -type pvscsi
             govc vm.disk.attach \
             -vm "{{ id }}" \
             -disk "[{{ imagebuilder_env_vsphere_datastore }}] {{ id }}/{{ id }}.vmdk" \
             -controller pvscsi
+            sleep 10
           changed_when: true
 
 
@@ -144,11 +151,12 @@
             export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
             export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
             export GOVC_INSECURE=1
-            govc device.remove -vm "alma-8" -device ethernet-0
+
             govc device.network.add \
               -vm "{{ id }}" \
               -net "{{ imagebuilder_env_vsphere_network | default('VM Network') }}"
               -net.adapter vmxnet3
+            sleep 10
           changed_when: true
 
     ###########################################################################
