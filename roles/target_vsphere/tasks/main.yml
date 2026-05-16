@@ -89,9 +89,9 @@
             sleep 10
             govc device.remove -vm "{{ id }}" -device ethernet-0
             sleep 10
-            govc device.remove -vm "{{ id }}" -device scsi0
-            sleep 10
             govc device.scsi.add -vm "{{ id }}" -type pvscsi
+            sleep 10
+            govc device.remove -vm "{{ id }}" -device scsi0
             sleep 10
           changed_when: true
 
