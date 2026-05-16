@@ -36,6 +36,7 @@ RUN dnf -y update && \
       vim \
       libxml2-devel \
       libxslt-devel \
+      sshpass \
     && dnf clean all
 
 # Create an isolated venv for Python tooling and put it on PATH
