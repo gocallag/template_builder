@@ -38,11 +38,47 @@ imagebuilder_package_lists:
         - nbdkit
         - guestfish
         - python3-pip
+
+    fedora:
+        - libguestfs-tools-c
+        - libguestfs-tools
+        - supermin
+        - qemu-system-x86-core
+        - qemu-img
+        - dracut
+        - python3
+        - python3-pip
+        - python3-virtualenv
+        - python3-devel
+        - libxml2-devel
+        - libxslt-devel
+        - gcc
+        - gcc-c++
+        - make
+        - openssh-clients
+        - git
+        - jq
+        - tar
+        - gzip
+        - sudo
+        - curl
+        - xorriso
+        - nbdkit
+        - genisoimage
+        - ipxe-bootimgs
+        - vim
+
 imagebuilder_pip_packages:
     debian:
         - pywinrm
         - proxmoxer
         - ovirt-engine-sdk-python
+
+    fedora:
+        - pywinrm
+        - proxmoxer
+        - ovirt-engine-sdk-python
+
 imagebuilder_base_qemu_command: "qemu-system-x86_64"
 
 # default build steps

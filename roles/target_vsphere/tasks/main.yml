@@ -4,15 +4,6 @@
     - build_targets
     - build_target_vsphere
   block:
-
-    - name: Validate OS family
-      ansible.builtin.fail:
-        msg: "os.type must be 'linux' or 'windows'"
-      when: os.type not in ["linux", "windows"]
-
-    ###########################################################################
-    # LINUX PATH
-    ###########################################################################
     - name: Linux | Prepare VMware artifacts
       when: os.type == "linux"
       block:
@@ -20,30 +11,34 @@
           ansible.builtin.copy:
             src: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
             dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
-            remote_src: true
             mode: "0644"
+            remote_src: true
+          register: target_vsphere_linux_copy_qcow2
+        - name: Linux | Show copy result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_copy_qcow2
 
-        - name: Linux | Install open-vm-tools for VMware
+        - name: Linux | Install open-vm-tools and prepare PVSCSI / VMXNET3 driver
           ansible.builtin.command: >
             virt-customize
             -a "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
             --install open-vm-tools
-            --run-command 'systemctl enable vmtoolsd.service || true'
-            --run-command 'systemctl enable vmware-vmblock-fuse.service || true'
+            --run-command 'echo "add_drivers+= \" vmw_pvscsi \"" > /etc/dracut.conf.d/vmw_pvscsi.conf'
+            --run-command 'kver=$(ls /lib/modules | sort -V | tail -1); dracut -f --kver "$kver" --add-drivers "vmw_pvscsi vmxnet3 scsi_mod sd_mod"'
+            --run-command 'lsinitrd /boot/initramfs-$(ls /lib/modules | sort -V | tail -1).img | grep vmw || true'
             --selinux-relabel
           register: target_vsphere_linux_customize
           changed_when: true
-
         - name: Linux | Show virt-customize output
           ansible.builtin.debug:
-            var: target_vsphere_linux_customize.stdout
+            var: target_vsphere_linux_customize
 
         - name: Convert QCOW2 to VMDK (VMware)
           ansible.builtin.command: >
             qemu-img convert
             -f qcow2
             -O vmdk
-            -o subformat=streamOptimized,adapter_type=lsilogic
+            -o subformat=monolithicFlat,adapter_type=lsilogic
             "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
             "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
           register: target_vsphere_linux_convert_vmdk
@@ -63,202 +58,99 @@
           ansible.builtin.debug:
             var: target_vsphere_linux_filesystems.stdout
 
-        - name: Linux | Show conversion output
-          ansible.builtin.debug:
-            var: target_vsphere_linux_convert_vmdk.stdout
-
-        - name: Ensure VMDK exists
-          ansible.builtin.stat:
-            path: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
-          register: target_vsphere_linux_vmdk_stat
-          failed_when: not target_vsphere_linux_vmdk_stat.stat.exists
-
-        # =====================================================================
-        # CREATE INDIVIDUAL VMDK FILE
-        # =====================================================================
-        - name: Copy VMDK to standardized location
-          ansible.builtin.copy:
-            src: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmdk"
-            remote_src: true
-            mode: "0644"
-
-        - name: Show VMDK path
-          ansible.builtin.debug:
-            msg: "VMDK created: {{ imagebuilder_build_savedir }}/{{ id }}.vmdk"
-
-        # =====================================================================
-        # CREATE VMX FILE
-        # =====================================================================
-        - name: Render VMX configuration file
-          ansible.builtin.template:
-            src: "vmx-template.j2"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmx"
-            mode: "0644"
-          vars:
-            vmx_name: "{{ id }}"
-            vmx_vmdk_filename: "{{ id }}.vmdk"
-
-        - name: Show VMX path
-          ansible.builtin.debug:
-            msg: "VMX created: {{ imagebuilder_build_savedir }}/{{ id }}.vmx"
-
-        - name: Set upload path for VMX and VMDK
-          ansible.builtin.set_fact:
-            target_vsphere_vsphere_upload_path: "{{ imagebuilder_env_vsphere_upload_path | default('') }}/{{ id }}"
-        # =====================================================================
-        # UPLOAD TO VCENTER USING GOVC
-        # =====================================================================
-        - name: Upload VMX and VMDK to vCenter
+        - name: Delete old vm first
           ansible.builtin.shell: |
             export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
             export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
             export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
             export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_DATASTORE="{{ imagebuilder_env_vsphere_datastore }}"
             export GOVC_INSECURE=1
 
-            govc datastore.upload "{{ imagebuilder_build_savedir }}/{{ id }}.vmx" "{{ target_vsphere_vsphere_upload_path }}/{{ id }}.vmx"
-          environment:
-            GOVC_URL: "{{ imagebuilder_env_vsphere_vcenter }}"
-            GOVC_USERNAME: "{{ imagebuilder_env_vsphere_username }}"
-            GOVC_PASSWORD: "{{ imagebuilder_env_vsphere_password }}"
-            GOVC_DATACENTER: "{{ imagebuilder_env_vsphere_datacenter }}"
-            GOVC_DATASTORE: "{{ imagebuilder_env_vsphere_datastore }}"
-            GOVC_INSECURE: "1"
-          register: target_vsphere_linux_govc_upload
+            # Ignore missing VM errors when destroying a previous instance
+            govc vm.destroy -force "{{ id }}" >/dev/null 2>&1 || true
           changed_when: true
-          when:
-            - imagebuilder_env_vsphere_vcenter is defined
-            - imagebuilder_env_vsphere_username is defined
-            - imagebuilder_env_vsphere_password is defined
-            - imagebuilder_env_vsphere_datacenter is defined
-            - imagebuilder_env_vsphere_datastore is defined
-            - imagebuilder_env_vsphere_upload_path is defined
-          # no_log: true
-
-        - name: Show govc upload result (Linux)
-          ansible.builtin.debug:
-            msg: "VMX and VMDK uploaded to {{ target_vsphere_vsphere_upload_path }}"
-          when:
-            - target_vsphere_linux_govc_upload is defined
-            - target_vsphere_linux_govc_upload.changed
-
-        - name: Import VMDK into vCenter using govc
+        - name: Create VM shell (no disk)
           ansible.builtin.shell: |
             export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
             export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
             export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
             export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_DATASTORE="{{ imagebuilder_env_vsphere_datastore }}"
-            export GOVC_INSECURE=1
-
-            govc import.vmdk \
-              -ds "{{ imagebuilder_env_vsphere_datastore }}" \
-              -pool "{{ imagebuilder_env_vsphere_resource_pool | default('Resources') }}" \
-              -folder "{{ imagebuilder_env_vsphere_folder | default('vm') }}" \
-              "{{ imagebuilder_build_savedir }}/{{ id }}.vmdk"
-          environment:
-            GOVC_URL: "{{ imagebuilder_env_vsphere_vcenter }}"
-            GOVC_USERNAME: "{{ imagebuilder_env_vsphere_username }}"
-            GOVC_PASSWORD: "{{ imagebuilder_env_vsphere_password }}"
-            GOVC_DATACENTER: "{{ imagebuilder_env_vsphere_datacenter }}"
-            GOVC_DATASTORE: "{{ imagebuilder_env_vsphere_datastore }}"
-            GOVC_INSECURE: "1"
-          register: target_vsphere_linux_govc_import
-          changed_when: true
-          when:
-            - imagebuilder_env_vsphere_vcenter is defined
-            - imagebuilder_env_vsphere_username is defined
-            - imagebuilder_env_vsphere_password is defined
-            - imagebuilder_env_vsphere_datacenter is defined
-            - imagebuilder_env_vsphere_datastore is defined
-          # no_log: true
-
-        - name: Show govc import result (Linux)
-          ansible.builtin.debug:
-            msg: "VMDK imported into vCenter as {{ imagebuilder_env_vsphere_vm_name | default(id) }}"
-          when:
-            - target_vsphere_linux_govc_import is defined
-            - target_vsphere_linux_govc_import.changed
-
-        - name: Create VM
-          ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_DATASTORE="{{ imagebuilder_env_vsphere_datastore }}"
             export GOVC_INSECURE=1
 
             govc vm.create \
               -ds "{{ imagebuilder_env_vsphere_datastore }}" \
               -pool "{{ imagebuilder_env_vsphere_resource_pool | default('Resources') }}" \
               -folder "{{ imagebuilder_env_vsphere_folder | default('vm') }}" \
-              -disk "{{ id }}.vmdk" \
-              "{{ vsphere_vm_name | default(id) }}"
-
-          environment:
-            GOVC_URL: "{{ imagebuilder_env_vsphere_vcenter }}"
-            GOVC_USERNAME: "{{ imagebuilder_env_vsphere_username }}"
-            GOVC_PASSWORD: "{{ imagebuilder_env_vsphere_password }}"
-            GOVC_DATACENTER: "{{ imagebuilder_env_vsphere_datacenter }}"
-            GOVC_DATASTORE: "{{ imagebuilder_env_vsphere_datastore }}"
-            GOVC_INSECURE: "1"
-          register: target_vsphere_linux_govc_vmcreate
-          changed_when: true
-          when:
-            - imagebuilder_env_vsphere_vcenter is defined
-            - imagebuilder_env_vsphere_username is defined
-            - imagebuilder_env_vsphere_password is defined
-            - imagebuilder_env_vsphere_datacenter is defined
-            - imagebuilder_env_vsphere_datastore is defined
-          # no_log: true
-
-        - name: Show govc vm.create result (Linux)
-          ansible.builtin.debug:
-            msg: "VM created in vCenter as {{ imagebuilder_env_vsphere_vm_name | default(id) }}"
-          when:
-            - target_vsphere_linux_govc_vmcreate is defined
-            - target_vsphere_linux_govc_vmcreate.changed
-        # =====================================================================
-        # CREATE OVA ARCHIVE
-        # =====================================================================
-        - name: Render OVF (UEFI + PVSCSI + VMXNET3)
-          ansible.builtin.template:
-            src: "ovf-template.j2"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.ovf"
-            mode: "0644"
-          vars:
-            ovf_id: "{{ id }}"
-            ovf_vmdk: "{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
-            ovf_size: "{{ target_vsphere_linux_vmdk_stat.stat.size }}"
-
-        - name: Build OVA archive
-          community.general.archive:
-            path:
-              - "{{ imagebuilder_build_savedir }}/{{ id }}.ovf"
-              - "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.ova"
-            format: tar
-            mode: 644
-            force_archive: true
+              -m "{{ imagebuilder_env_vsphere_memory_mb | default(4096) }}" \
+              -c "{{ imagebuilder_env_vsphere_cpu_count | default(2) }}" \
+              -g "{{ imagebuilder_env_vsphere_guestosid | default('other3xLinux64Guest') }}" \
+              -on=false \
+              "{{ id }}"
           changed_when: true
 
-        - name: Show OVA path
-          ansible.builtin.debug:
-            msg: "OVA created: {{ imagebuilder_build_savedir }}/{{ id }}.ova"
+        - name: Fix VMDK descriptor filename
+          ansible.builtin.replace:
+            path: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            regexp: 'FLAT ".*" 0'
+            replace: 'FLAT "{{ id }}-flat.vmdk" 0'
 
-        # =====================================================================
-        # SUMMARY OF vSPHERE ARTIFACTS
-        # =====================================================================
-        - name: Display all vSphere artifacts created
-          ansible.builtin.debug:
-            msg: |
-              vSphere artifacts ready for deployment:
-                OVA (for import):  {{ imagebuilder_build_savedir }}/{{ id }}.ova
-                VMX (config file): {{ imagebuilder_build_savedir }}/{{ id }}.vmx
-                VMDK (disk image): {{ imagebuilder_build_savedir }}/{{ id }}.vmdk
+        - name: Upload descriptor VMDK (monolithicFlat)
+          ansible.builtin.shell: |
+            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
+            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
+            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
+            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
+            export GOVC_INSECURE=1
+
+            govc datastore.upload \
+              "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk" \
+              "{{ id }}/{{ id }}.vmdk"
+          changed_when: true
+
+
+        - name: Upload flat backing file
+          ansible.builtin.shell: |
+            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
+            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
+            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
+            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
+            export GOVC_INSECURE=1
+
+            govc datastore.upload \
+              "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}-flat.vmdk" \
+              "{{ id }}/{{ id }}-flat.vmdk"
+          changed_when: true
+
+        - name: Attach uploaded VMDK to VM
+          ansible.builtin.shell: |
+            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
+            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
+            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
+            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
+            export GOVC_INSECURE=1
+            govc device.remove -vm "alma-8" -device scsi0
+            govc device.scsi.add -vm "{{ id }}" -type pvscsi
+            govc vm.disk.attach \
+            -vm "{{ id }}" \
+            -disk "[{{ imagebuilder_env_vsphere_datastore }}] {{ id }}/{{ id }}.vmdk" \
+            -controller pvscsi
+          changed_when: true
+
+
+        - name: Add network interface
+          ansible.builtin.shell: |
+            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
+            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
+            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
+            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
+            export GOVC_INSECURE=1
+            govc device.remove -vm "alma-8" -device ethernet-0
+            govc device.network.add \
+              -vm "{{ id }}" \
+              -net "{{ imagebuilder_env_vsphere_network | default('VM Network') }}"
+              -net.adapter vmxnet3
+          changed_when: true
+
     ###########################################################################
     # WINDOWS PATH
     ###########################################################################
@@ -432,10 +324,10 @@
       ansible.builtin.debug:
         msg: "Rescue: error during vSphere template preparation"
 
-  always:
-    - name: Cleanup temporary QCOW2 working files
-      ansible.builtin.file:
-        path: "{{ item }}"
-        state: absent
-      loop:
-        - "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+  # always:
+    # - name: Cleanup temporary QCOW2 working files
+    #   ansible.builtin.file:
+    #     path: "{{ item }}"
+    #     state: absent
+    #   loop:
+    #     - "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
