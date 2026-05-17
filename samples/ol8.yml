@@ -1,0 +1,27 @@
+---
+- name: OL_8    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: ol-8
+    version: "8.10"
+    os:
+      config:
+        disks:
+          - 50
+        timezone: Australia/Melbourne
+      type: linux
+      variant: OracleLinux
+      iso: http://192.168.1.161:8180/Oracle/OL-8/OracleLinux-R8-U10-x86_64-dvd.iso
+      checksum: 7676a80eeaafa16903eebb2abba147a3afe230b130cc066d56fdd6854d8da900
+      console_boot: |
+          <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
+    - target_vsphere
