@@ -37,6 +37,7 @@ RUN dnf -y update && \
       libxml2-devel \
       libxslt-devel \
       sshpass \
+      lsof \
     && dnf clean all
 
 # Create an isolated venv for Python tooling and put it on PATH
