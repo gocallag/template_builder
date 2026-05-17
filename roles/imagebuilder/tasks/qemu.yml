@@ -113,7 +113,8 @@
           block:
             # Ensure qcow2 is not open by any process
             - name: Check for open handles on qcow2
-              ansible.builtin.command: lsof "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" || true
+              ansible.builtin.shell: |
+                  lsof "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" || true
               changed_when: false
               register: imagebuilder_qcow2_lsof
 
