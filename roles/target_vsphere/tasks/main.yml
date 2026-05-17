@@ -1,9 +1,14 @@
 ---
 - name: (TARGET-VSPHERE) Prepare vSphere VM files (OVA, VMX, VMDK)
-  tags:
-    - build_targets
-    - build_target_vsphere
   block:
+    - name: Set govc environment variables
+      ansible.builtin.set_fact:
+        GOVC_ENV: # noqa: var-naming
+          GOVC_URL: "{{ imagebuilder_env_vsphere_vcenter }}"
+          GOVC_USERNAME: "{{ imagebuilder_env_vsphere_username }}"
+          GOVC_PASSWORD: "{{ imagebuilder_env_vsphere_password }}"
+          GOVC_DATACENTER: "{{ imagebuilder_env_vsphere_datacenter }}"
+          GOVC_INSECURE: 1
     - name: Linux | Prepare VMware artifacts
       when: os.type == "linux"
       block:
@@ -60,23 +65,16 @@
 
         - name: Delete old vm first
           ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_INSECURE=1
-
-            # Ignore missing VM errors when destroying a previous instance
             govc vm.destroy -force "{{ id }}" >/dev/null 2>&1 || true
+          environment: "{{ GOVC_ENV }}"
           changed_when: true
+          register: target_vsphere_linux_delete_old_vm
+        - name: Show delete old VM result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_delete_old_vm
+
         - name: Create VM shell (no disk)
           ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_INSECURE=1
-
             govc vm.create \
               -ds "{{ imagebuilder_env_vsphere_datastore }}" \
               -pool "{{ imagebuilder_env_vsphere_resource_pool | default('Resources') }}" \
@@ -87,13 +85,48 @@
               -on=false \
               "{{ id }}"
             sleep 10
-            govc device.remove -vm "{{ id }}" -device ethernet-0
-            sleep 10
-            govc device.scsi.add -vm "{{ id }}" -type pvscsi
-            sleep 10
-            govc device.remove -vm "{{ id }}" -device scsi0
-            sleep 10
           changed_when: true
+          environment: "{{ GOVC_ENV }}"
+          register: target_vsphere_linux_create_vm
+        - name: Show create VM result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_create_vm
+        - name: List devices
+          ansible.builtin.shell: |
+            set -o pipefail
+            govc device.ls -vm "{{ id }}" | awk '{print $1}' | grep -E "^(ethernet|lsilogic)-" || true
+            sleep 10
+          environment: "{{ GOVC_ENV }}"
+          register: target_vsphere_linux_devices
+          changed_when: false
+        - name: Show devices
+          ansible.builtin.debug:
+            var: target_vsphere_linux_devices.stdout_lines
+        - name: Remove NIC
+          ansible.builtin.shell: |
+              govc device.remove -vm "{{ id }}" {{ item }}
+              sleep 10
+          environment: "{{ GOVC_ENV }}"
+          loop: "{{ target_vsphere_linux_devices.stdout_lines | select('search', '^ethernet-') | list }}"
+          when: target_vsphere_linux_devices.stdout is search('ethernet-')
+          register: target_vsphere_linux_remove_nic
+          changed_when: true
+        - name: Show remove NIC result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_remove_nic
+
+        - name: Remove LSILogic controller
+          ansible.builtin.shell: |
+            govc device.remove -vm "{{ id }}" {{ item }}
+            sleep 10
+          environment: "{{ GOVC_ENV }}"
+          loop: "{{ target_vsphere_linux_devices.stdout_lines | select('search', '^lsilogic-') | list }}"
+          when: target_vsphere_linux_devices.stdout is search('lsilogic-')
+          register: target_vsphere_linux_remove_scsi
+          changed_when: true
+        - name: Show remove SCSI controller result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_remove_scsi
 
         - name: Fix VMDK descriptor filename
           ansible.builtin.replace:
@@ -103,61 +136,67 @@
 
         - name: Upload descriptor VMDK (monolithicFlat)
           ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_INSECURE=1
-
             govc datastore.upload \
               "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk" \
               "{{ id }}/{{ id }}.vmdk"
+          environment: "{{ GOVC_ENV }}"
           changed_when: true
+          register: target_vsphere_linux_upload_descriptor
+        - name: Show upload descriptor result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_upload_descriptor
 
 
         - name: Upload flat backing file
           ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_INSECURE=1
-
-            govc datastore.upload \
+              govc datastore.upload \
               "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}-flat.vmdk" \
               "{{ id }}/{{ id }}-flat.vmdk"
-            sleep 20
+              sleep 20
+          environment: "{{ GOVC_ENV }}"
+          changed_when: true
+          register: target_vsphere_linux_upload_flat
+
+        - name: Show upload flat backing file result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_upload_flat
+
+        - name: Add PVSCSI controller
+          ansible.builtin.shell: |
+              govc device.scsi.add -vm "{{ id }}" -type pvscsi
+              sleep 10
+          environment: "{{ GOVC_ENV }}"
+          register: target_vsphere_linux_add_pvscsi
           changed_when: true
 
-        - name: Attach uploaded VMDK to VM
+        - name: Attach disk to PVSCSI
           ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_INSECURE=1
-            govc vm.disk.attach \
-            -vm "{{ id }}" \
-            -disk "[{{ imagebuilder_env_vsphere_datastore }}] {{ id }}/{{ id }}.vmdk" \
-            -controller pvscsi
-            sleep 10
+              govc vm.disk.attach \
+              -vm "{{ id }}" \
+              -disk "[{{ imagebuilder_env_vsphere_datastore }}] {{ id }}/{{ id }}.vmdk" \
+              -controller "{{ target_vsphere_linux_add_pvscsi.stdout }}"
+              sleep 10
+          environment: "{{ GOVC_ENV }}"
+          register: target_vsphere_linux_attach_disk
           changed_when: true
+        - name: Show attach disk result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_attach_disk
 
 
         - name: Add network interface
           ansible.builtin.shell: |
-            export GOVC_URL="{{ imagebuilder_env_vsphere_vcenter }}"
-            export GOVC_USERNAME="{{ imagebuilder_env_vsphere_username }}"
-            export GOVC_PASSWORD="{{ imagebuilder_env_vsphere_password }}"
-            export GOVC_DATACENTER="{{ imagebuilder_env_vsphere_datacenter }}"
-            export GOVC_INSECURE=1
-
-            govc device.network.add \
+              govc device.network.add \
               -vm "{{ id }}" \
-              -net "{{ imagebuilder_env_vsphere_network | default('VM Network') }}"
+              -net "{{ imagebuilder_env_vsphere_network | default('VM Network') }}" \
               -net.adapter vmxnet3
-            sleep 10
+              sleep 10
+          environment: "{{ GOVC_ENV }}"
           changed_when: true
+          register: target_vsphere_linux_add_network
+        - name: Show add network result
+          ansible.builtin.debug:
+            var: target_vsphere_linux_add_network
 
     ###########################################################################
     # WINDOWS PATH
