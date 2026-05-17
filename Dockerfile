@@ -71,12 +71,10 @@ RUN set -eux; \
 COPY . /tmp/build/
 WORKDIR /tmp/build
 RUN ${VENV_PATH}/bin/ansible-galaxy collection build -f . && \
-    mv gocallag-template_builder-*.tar.gz /tmp/gocallag-collection.tar.gz || true
+    mv gocallag-template_builder-*.tar.gz /tmp/gocallag-collection.tar.gz
 
 # Install the built collection into the venv-managed ansible environment
-RUN if [ -f /tmp/gocallag-collection.tar.gz ]; then \
-      ${VENV_PATH}/bin/ansible-galaxy collection install /tmp/gocallag-collection.tar.gz || true; \
-    fi
+RUN ${VENV_PATH}/bin/ansible-galaxy collection install /tmp/gocallag-collection.tar.gz
 
 # Validate libguestfs appliances early, best-effort
 RUN if command -v libguestfs-test-tool >/dev/null 2>&1; then \
