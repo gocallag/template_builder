@@ -5,4 +5,4 @@
   block:
 
     - name: (PATCHING-CLEANUP) Cleanup
-      ansible.builtin.include_tasks: "cleanup/{{ ansible_facts['os_family'] }}.yml"
+      ansible.builtin.include_tasks: "cleanup/{{ ansible_facts['distribution'] | lower }}.yml"
