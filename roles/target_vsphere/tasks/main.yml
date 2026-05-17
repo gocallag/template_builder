@@ -31,6 +31,7 @@
             --run-command 'echo "add_drivers+= \" vmw_pvscsi \"" > /etc/dracut.conf.d/vmw_pvscsi.conf'
             --run-command 'kver=$(ls /lib/modules | sort -V | tail -1); dracut -f --kver "$kver" --add-drivers "vmw_pvscsi vmxnet3 scsi_mod sd_mod"'
             --run-command 'lsinitrd /boot/initramfs-$(ls /lib/modules | sort -V | tail -1).img | grep vmw || true'
+            --run-command 'touch /.autorelabel'
             --selinux-relabel
           register: target_vsphere_linux_customize
           changed_when: true
@@ -186,7 +187,7 @@
 
         - name: Add network interface
           ansible.builtin.shell: |
-              govc device.network.add \
+              govc vm.network.add \
               -vm "{{ id }}" \
               -net "{{ imagebuilder_env_vsphere_network | default('VM Network') }}" \
               -net.adapter vmxnet3
