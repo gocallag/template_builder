@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Envelope
+  xmlns="http://schemas.dmtf.org/ovf/envelope/1"
+  xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1"
+  xmlns:vmw="http://www.vmware.com/schema/ovf"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+
+  <References>
+    <File ovf:id="file1"
+          ovf:href="{{ ovf_vmdk }}"
+          ovf:size="{{ ovf_size }}"/>
+  </References>
+
+  <DiskSection>
+    <Info>Virtual disk information</Info>
+    <Disk ovf:diskId="vmdisk1"
+          ovf:fileRef="file1"
+          ovf:capacity="{{ ovf_size }}"
+          ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized"
+          vmw:diskMode="persistent"/>
+  </DiskSection>
+
+  <VirtualSystem ovf:id="{{ ovf_id }}">
+    <Info>Linux VM with UEFI + PVSCSI</Info>
+
+    <Name>{{ ovf_id }}</Name>
+
+    <!-- Force UEFI firmware -->
+    <vmw:Config ovf:key="firmware" ovf:value="efi"/>
+
+    <OperatingSystemSection ovf:id="1" ovf:version="64">
+      <Info>Linux</Info>
+      <Description>Other Linux (64-bit)</Description>
+    </OperatingSystemSection>
+
+    <VirtualHardwareSection>
+      <Info>Virtual hardware</Info>
+
+      <!-- CPU -->
+      <Item>
+        <rasd:ResourceType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">3</rasd:ResourceType>
+        <rasd:VirtualQuantity xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">2</rasd:VirtualQuantity>
+      </Item>
+
+      <!-- Memory -->
+      <Item>
+        <rasd:ResourceType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">4</rasd:ResourceType>
+        <rasd:VirtualQuantity xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">4096</rasd:VirtualQuantity>
+      </Item>
+
+      <!-- PVSCSI Controller -->
+      <Item>
+        <rasd:ResourceType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">6</rasd:ResourceType>
+        <rasd:ResourceSubType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">vmware.paravirtual</rasd:ResourceSubType>
+        <rasd:InstanceID xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">1000</rasd:InstanceID>
+      </Item>
+
+      <!-- Disk attached to PVSCSI -->
+      <Item>
+        <rasd:ResourceType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">17</rasd:ResourceType>
+        <rasd:HostResource xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">ovf:/disk/vmdisk1</rasd:HostResource>
+        <rasd:Parent xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">1000</rasd:Parent>
+        <rasd:AddressOnParent xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">0</rasd:AddressOnParent>
+      </Item>
+
+      <!-- VMXNET3 NIC -->
+      <Item>
+        <rasd:ResourceType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">10</rasd:ResourceType>
+        <rasd:ResourceSubType xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">vmxnet3</rasd:ResourceSubType>
+        <rasd:InstanceID xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData">4000</rasd:InstanceID>
+      </Item>
+
+    </VirtualHardwareSection>
+  </VirtualSystem>
+</Envelope>
