@@ -1,6 +1,5 @@
 # Oracle Linux Systems
 - name: (PATCHING-CLEANUP) Cleanup Oracle Linux
-  when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "oraclelinux"
   block:
     - name: (PATCHING-CLEANUP, oracle) Clean dnf cache
       ansible.builtin.command: dnf clean all
