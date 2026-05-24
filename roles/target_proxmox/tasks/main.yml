@@ -32,6 +32,7 @@
             -a "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
             --install qemu-guest-agent
             --run-command 'systemctl enable qemu-guest-agent || true'
+            --run-command 'touch /.autorelabel'
             --selinux-relabel
           register: target_proxmox_linux_customize
           changed_when: true
@@ -80,30 +81,23 @@
             dest: "/tmp/unattend.xml"
             mode: "0644"
 
-        - name: Windows | Build guestfish script
+        - name: Windows | Copy Windows guestfish injection helper
           ansible.builtin.copy:
-            dest: "/tmp/win-virtio-qga.script"
-            mode: "0644"
-            content: |
-              run
-              inspect-os
-              mount /dev/sda2 /
-
-              # Upload QGA MSI
-              upload {{ target_proxmox_windows_qga_msi }} /Windows/Temp/qemu-ga.msi
-
-              # Upload VirtIO driver tree
-              mkdir-p /Drivers/VirtIO
-              upload {{ target_proxmox_windows_virtio_dir }} /Drivers/VirtIO
-
-              # Upload unattend.xml
-              upload /tmp/unattend.xml /Windows/Panther/Unattend.xml
+            src: "roles/imagebuilder/files/windows-guestfish-inject.sh"
+            dest: "/tmp/windows-guestfish-inject.sh"
+            mode: "0755"
+          delegate_to: "{{ run_on | default('localhost') }}"
 
         - name: Windows | Inject QGA + VirtIO drivers + unattend.xml
           ansible.builtin.command: >
-            guestfish --rw -a {{ image_path }} -f /tmp/win-virtio-qga.script
+            /tmp/windows-guestfish-inject.sh
+            "{{ image_path }}"
+            "/tmp/unattend.xml:/Windows/Panther/Unattend.xml"
+            "{{ target_proxmox_windows_qga_msi }}:/Windows/Temp/qemu-ga.msi"
+            "{{ target_proxmox_windows_virtio_dir }}:/Drivers/VirtIO"
           register: target_proxmox_windows_inject
           changed_when: true
+          delegate_to: "{{ run_on | default('localhost') }}"
 
         - name: Windows | Show guestfish output
           ansible.builtin.debug:
@@ -267,3 +261,10 @@
         state: absent
       delegate_to: proxmox_server
       become: true
+
+    - name: Remove Windows guestfish injection helper
+      ansible.builtin.file:
+        path: "/tmp/windows-guestfish-inject.sh"
+        state: absent
+      delegate_to: "{{ run_on | default('localhost') }}"
+      ignore_errors: true # noqa: ignore-errors
