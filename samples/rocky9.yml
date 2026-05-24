@@ -1,0 +1,26 @@
+---
+- hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: rocky-9
+    version: "9.7"
+    os:
+      config:
+        disks:
+          - 20
+        timezone: Australia/Melbourne
+        nicdriver: e1000
+      type: linux
+      variant: rockylinux
+      iso: http://192.168.1.161:8180/rocky/9/Rocky-9.7-x86_64-dvd.iso
+      checksum: d48e902325dce6793935b4e13672a0d9a4f958e02d4e23fcf0a8a34c49ef03da
+      console_boot: |
+          <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
+    - target_vsphere
