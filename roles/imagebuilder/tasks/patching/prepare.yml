@@ -1,14 +1,3 @@
 ---
-- name: (PATCHING) Setup variables and facts
-  tags:
-    - always
-  block:
-    # Debug Information
-    - name: (PATCHING-PREPARE) Debug OS Information
-      ansible.builtin.debug:
-        msg:
-          - "OS Family: {{ ansible_facts['os_family'] }}"
-          - "OS Distribution: {{ ansible_facts['distribution'] }}"
-
-    - name: PATCHING_PREPARE - Include patch preparation tasks
-      ansible.builtin.include_tasks: "patching/prepare/{{ ansible_facts['os_family'] | lower }}.yml"
+- name: PATCHING_PREPARE - Include patch preparation tasks
+  ansible.builtin.include_tasks: "patching/prepare/{{ ansible_facts['os_family'] | lower }}.yml"

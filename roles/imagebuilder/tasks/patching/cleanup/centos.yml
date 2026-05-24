@@ -1,0 +1,7 @@
+# CentOS Linux Systems
+- name: (PATCHING-CLEANUP, centos) Clean dnf cache
+  ansible.builtin.command: dnf clean all
+  register: imagebuilder_dnf_clean
+  failed_when: imagebuilder_dnf_clean.rc != 0
+  changed_when: false
+  become: true
