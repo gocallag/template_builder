@@ -1,0 +1,159 @@
+---
+- name: (TARGET-AZURE) Prepare and convert templates to Azure VHD format
+  tags:
+    - build_targets
+    - build_target_azure
+  block:
+
+    - name: Validate OS family
+      ansible.builtin.fail:
+        msg: "os_type must be 'linux' or 'windows'"
+      when: os_type not in ["linux", "windows"]
+
+    ###########################################################################
+    # LINUX PATH
+    ###########################################################################
+    - name: Linux | Prepare Azure Linux Agent and drivers
+      when: os_type == "linux"
+      block:
+
+        - name: Linux | Copy base QCOW2 for Azure
+          ansible.builtin.copy:
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+            mode: "0644"
+            remote_src: true
+
+        - name: Linux | Install Azure Linux Agent and network utilities
+          ansible.builtin.command: >
+            virt-customize
+            -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+            --install waagent,net-tools,wget
+            --run-command 'systemctl enable waagent || true'
+            --run-command 'echo "add_drivers+= \" ata_piix ata_generic pata_acpi pata_atiixp \"" > /etc/dracut.conf.d/azure.conf'
+            --run-command 'kver=$(ls /lib/modules | sort -V | tail -1); dracut -f --kver "$kver" --add-drivers "ata_piix ata_generic pata_acpi pata_atiixp" 2>&1 || true'
+            --run-command 'sed -i "s/^#OS.EnableRDMA=.*/OS.EnableRDMA=n/" /etc/waagent.conf || true'
+            --run-command 'touch /.autorelabel'
+            --selinux-relabel
+          register: target_azure_linux_customize
+          changed_when: true
+
+        - name: Linux | Show virt-customize output
+          ansible.builtin.debug:
+            var: target_azure_linux_customize.stdout
+
+        - name: Linux | Convert QCOW2 to VHD (Azure)
+          ansible.builtin.command: >
+            qemu-img convert
+            -f qcow2
+            -O vpc
+            -o force_size
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vhd"
+          register: target_azure_linux_convert
+          changed_when: true
+
+        - name: Linux | Show conversion output
+          ansible.builtin.debug:
+            var: target_azure_linux_convert.stdout
+
+    ###########################################################################
+    # WINDOWS PATH
+    ###########################################################################
+    - name: Windows | Prepare Windows for Azure
+      when: os_type == "windows"
+      block:
+
+        - name: Windows | Copy base QCOW2 for Azure
+          ansible.builtin.copy:
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+            mode: "0644"
+            remote_src: true
+
+        - name: Windows | Render unattend.xml
+          ansible.builtin.template:
+            src: "{{ windows_unattend_template }}"
+            dest: "/tmp/unattend.xml"
+            mode: "0644"
+
+        - name: Windows | Copy Windows guestfish injection helper
+          ansible.builtin.copy:
+            src: "roles/imagebuilder/files/windows-guestfish-inject.sh"
+            dest: "/tmp/windows-guestfish-inject.sh"
+            mode: "0755"
+          delegate_to: "{{ run_on | default('localhost') }}"
+
+        - name: Windows | Inject Azure configuration + unattend.xml
+          ansible.builtin.command: >
+            /tmp/windows-guestfish-inject.sh
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+            "/tmp/unattend.xml:/Windows/Panther/Unattend.xml"
+          register: target_azure_windows_inject
+          changed_when: true
+          delegate_to: "{{ run_on | default('localhost') }}"
+
+        - name: Windows | Show guestfish output
+          ansible.builtin.debug:
+            var: target_azure_windows_inject.stdout
+
+        - name: Windows | Convert QCOW2 to VHD (Azure)
+          ansible.builtin.command: >
+            qemu-img convert
+            -f qcow2
+            -O vpc
+            -o force_size
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vhd"
+          register: target_azure_windows_convert
+          changed_when: true
+
+        - name: Windows | Show conversion output
+          ansible.builtin.debug:
+            var: target_azure_windows_convert.stdout
+
+    ###########################################################################
+    # VALIDATION AND OUTPUT
+    ###########################################################################
+
+    - name: Validate converted VHD image
+      ansible.builtin.stat:
+        path: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vhd"
+      register: target_azure_azure_image_stat
+
+    - name: Show Azure VHD image details
+      ansible.builtin.debug:
+        msg: |
+          Azure VHD Image Created Successfully!
+          Path: {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vhd
+          Size: {{ (target_azure_azure_image_stat.stat.size / 1024 / 1024 / 1024) | round(2) }} GB
+          OS Type: {{ os_type | capitalize }}
+          Ready for upload to Azure Storage via az cli or portal
+      when: target_azure_azure_image_stat.stat.exists
+
+    - name: Fail if image was not created
+      ansible.builtin.fail:
+        msg: "Failed to create Azure VHD image at {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vhd"
+      when: not target_azure_azure_image_stat.stat.exists
+
+  rescue:
+    - name: (TARGET-AZURE) Rescue on failure
+      ansible.builtin.debug:
+        msg: "Rescue: error during Azure VHD image creation"
+
+  always:
+    - name: Clean up temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/windows-guestfish-inject.sh"
+        - "/tmp/azure-config.script"
+        - "/tmp/unattend.xml"
+      ignore_errors: true # noqa: ignore-errors
+
+    - name: Remove intermediate QCOW2
+      ansible.builtin.file:
+        path: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.azure.{{ imagebuilder_profile_hash }}.qcow2"
+        state: absent
+      ignore_errors: true # noqa: ignore-errors

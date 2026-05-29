@@ -1,14 +1,16 @@
 # set a whole bunch of variables for the build process - we set them all in advance to avoid multiple set_fact calls during the build which can cause performance issues with Ansible
 
 imagebuilder_id_prefix: "{{ id | regex_replace('^(.*?)-.*$', '\\1') }}"
+imagebuilder_id_base: "{{ id | regex_replace('(\\.\\d+)$', '') }}"
+imagebuilder_id_version: "{{ id | regex_replace('^.*-', '') }}"
 imagebuilder_env_qemu_ssh_port: "{{ 10222 + (imagebuilder_port_offset | default(0) | int) }}"
 imagebuilder_env_qemu_psrp_port: "{{ 5986 + (imagebuilder_port_offset | default(0) | int) }}"
 imagebuilder_env_qemu_monport: "{{ 4445 + (imagebuilder_port_offset | default(0) | int) }}"
 version_major: "{{ version | regex_replace('^(\\d+)\\..*$', '\\1') | int }}" # noqa: var-naming
 version_minor: "{{ version | regex_replace('^\\d+\\.(\\d+).*$', '\\1') | int }}" # noqa: var-naming
-imagebuilder_build_basedir: "{{ imagebuilder_env_build_path }}/{{ id }}"
+imagebuilder_build_basedir: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}"
 imagebuilder_build_savedir: "{{ imagebuilder_env_build_path }}/images"
-imagebuilder_build_id: "{{ id }}"
+imagebuilder_build_id: "{{ imagebuilder_id_base }}"
 imagebuilder_build_iso: "{{ imagebuilder_env_build_path }}/{{ id }}/downloads/{{ os.iso | basename }}"
 imagebuilder_build_aux: "{{ imagebuilder_env_build_path }}/{{ id }}/build/{{ id }}.img"
 imagebuilder_build_disks: "{{ os.config.disks }}"
@@ -24,7 +26,7 @@ imagebuilder_build_downloadsdir: "{{ imagebuilder_build_basedir }}/downloads"
 imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
 imagebuilder_iso_file: "{{ imagebuilder_build_basedir }}/build/{{ id }}.iso"
 wait_host: "{{ imagebuilder_env_qemu_ip }}" # noqa: var-naming
-wait_port: "{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
-wait_proto: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
+wait_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
+wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
 imagebuilder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
 imagebuilder_restored_from_image: false
