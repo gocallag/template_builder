@@ -1,0 +1,198 @@
+---
+- name: (TARGET-HYPERV) Prepare and convert templates to Hyper-V format (VHD/VHDX)
+  tags:
+    - build_targets
+    - build_target_hyperv
+  block:
+
+    - name: Validate OS family
+      ansible.builtin.fail:
+        msg: "os_type must be 'linux' or 'windows'"
+      when: os_type not in ["linux", "windows"]
+
+    - name: Validate Hyper-V format
+      ansible.builtin.fail:
+        msg: "imagebuilder_env_hyperv_format must be 'vhd' or 'vhdx'"
+      when: imagebuilder_env_hyperv_format | default('vhdx') not in ["vhd", "vhdx"]
+
+    ###########################################################################
+    # LINUX PATH
+    ###########################################################################
+    - name: Linux | Prepare Hyper-V Integration Services
+      when: os_type == "linux"
+      block:
+
+        - name: Linux | Copy base QCOW2 for Hyper-V
+          ansible.builtin.copy:
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+            mode: "0644"
+            remote_src: true
+
+        - name: Linux | Install Hyper-V Integration Services and prepare drivers
+          ansible.builtin.command: >
+            virt-customize
+            -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+            --install hyperv-daemons
+            --run-command 'systemctl enable hv-kvp-daemon || systemctl enable hyper-v || true'
+            --run-command 'echo "add_drivers+= \" hv_vmbus hv_storvsc hv_netvsc \"" > /etc/dracut.conf.d/hyperv.conf'
+            --run-command 'kver=$(ls /lib/modules | sort -V | tail -1); dracut -f --kver "$kver" --add-drivers "hv_vmbus hv_storvsc hv_netvsc" 2>&1 || true'
+            --run-command 'touch /.autorelabel'
+            --selinux-relabel
+          register: target_hyperv_linux_customize
+          changed_when: true
+
+        - name: Linux | Show virt-customize output
+          ansible.builtin.debug:
+            var: target_hyperv_linux_customize.stdout
+
+        - name: Linux | Convert QCOW2 to VHDX (Hyper-V)
+          ansible.builtin.command: >
+            qemu-img convert
+            -f qcow2
+            -O vhdx
+            -o subformat={{ imagebuilder_env_hyperv_format | default('vhdx') }},block_size={{ imagebuilder_env_hyperv_vhdx_block_size | default('33554432') }}
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.{{ imagebuilder_env_hyperv_format | default('vhdx') }}"
+          register: target_hyperv_linux_convert
+          changed_when: true
+
+        - name: Linux | Show conversion output
+          ansible.builtin.debug:
+            var: target_hyperv_linux_convert.stdout
+
+    ###########################################################################
+    # WINDOWS PATH
+    ###########################################################################
+    - name: Windows | Prepare Hyper-V Integration Services
+      when: os_type == "windows"
+      block:
+
+        - name: Windows | Copy base QCOW2 for Hyper-V
+          ansible.builtin.copy:
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+            mode: "0644"
+            remote_src: true
+
+        - name: Windows | Ensure integration services installer exists
+          ansible.builtin.stat:
+            path: "/tmp/hyperv-is"
+          register: target_hyperv_hyperv_is_stat
+
+        - name: Windows | Create integration services directory
+          ansible.builtin.file:
+            path: "/tmp/hyperv-is"
+            state: directory
+            mode: "0755"
+
+        - name: Windows | Prepare integration services configuration
+          ansible.builtin.copy:
+            dest: "/tmp/hyperv-is-config.ps1"
+            mode: "0644"
+            content: |
+              # Hyper-V Integration Services configuration
+              Write-Host "Configuring Hyper-V Integration Services..."
+
+              # Enable required Windows features (if not already installed)
+              $features = @('Hyper-V-Guest-Integration-Services')
+              foreach ($feature in $features) {
+                  try {
+                      Enable-WindowsOptionalFeature -Online -FeatureName $feature -NoRestart -ErrorAction SilentlyContinue
+                      Write-Host "Enabled: $feature"
+                  } catch {
+                      Write-Host "Feature $feature not available on this Windows version"
+                  }
+              }
+
+              Write-Host "Integration Services configuration completed"
+
+        - name: Windows | Render unattend.xml
+          ansible.builtin.template:
+            src: "{{ windows_unattend_template }}"
+            dest: "/tmp/unattend.xml"
+            mode: "0644"
+
+        - name: Windows | Copy Windows guestfish injection helper
+          ansible.builtin.copy:
+            src: "roles/imagebuilder/files/windows-guestfish-inject.sh"
+            dest: "/tmp/windows-guestfish-inject.sh"
+            mode: "0755"
+          delegate_to: "{{ run_on | default('localhost') }}"
+
+        - name: Windows | Inject Hyper-V configuration + unattend.xml
+          ansible.builtin.command: >
+            /tmp/windows-guestfish-inject.sh
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+            "/tmp/unattend.xml:/Windows/Panther/Unattend.xml"
+            "/tmp/hyperv-is-config.ps1:/Windows/Temp/hyperv-config.ps1"
+          register: target_hyperv_windows_inject
+          changed_when: true
+          delegate_to: "{{ run_on | default('localhost') }}"
+
+        - name: Windows | Show guestfish output
+          ansible.builtin.debug:
+            var: target_hyperv_windows_inject.stdout
+
+        - name: Windows | Convert QCOW2 to VHDX (Hyper-V)
+          ansible.builtin.command: >
+            qemu-img convert
+            -f qcow2
+            -O vhdx
+            -o subformat={{ imagebuilder_env_hyperv_format | default('vhdx') }},block_size={{ imagebuilder_env_hyperv_vhdx_block_size | default('33554432') }}
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.{{ imagebuilder_env_hyperv_format | default('vhdx') }}"
+          register: target_hyperv_windows_convert
+          changed_when: true
+
+        - name: Windows | Show conversion output
+          ansible.builtin.debug:
+            var: target_hyperv_windows_convert.stdout
+
+    ###########################################################################
+    # VALIDATION AND OUTPUT
+    ###########################################################################
+
+    - name: Validate converted image
+      ansible.builtin.stat:
+        path: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.{{ imagebuilder_env_hyperv_format | default('vhdx') }}"
+      register: target_hyperv_hyperv_image_stat
+
+    - name: Show Hyper-V image details
+      ansible.builtin.debug:
+        msg: |
+          Hyper-V Image Created Successfully!
+          Path: {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.{{ imagebuilder_env_hyperv_format | default('vhdx') }}
+          Size: {{ (target_hyperv_hyperv_image_stat.stat.size / 1024 / 1024 / 1024) | round(2) }} GB
+          Format: {{ imagebuilder_env_hyperv_format | default('vhdx') | upper }}
+          OS Type: {{ os_type | capitalize }}
+      when: target_hyperv_hyperv_image_stat.stat.exists
+
+    - name: Fail if image was not created
+      ansible.builtin.fail:
+        msg: "Failed to create Hyper-V image at {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.{{ imagebuilder_env_hyperv_format | default('vhdx') }}"
+      when: not hyperv_image_stat.stat.exists
+
+  rescue:
+    - name: (TARGET-HYPERV) Rescue on failure
+      ansible.builtin.debug:
+        msg: "Rescue: error during Hyper-V image creation"
+
+  always:
+    - name: Clean up temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "/tmp/windows-guestfish-inject.sh"
+        - "/tmp/hyperv-config.script"
+        - "/tmp/hyperv-is-config.ps1"
+        - "/tmp/hyperv-is"
+        - "/tmp/unattend.xml"
+      ignore_errors: true # noqa: ignore-errors
+
+    - name: Remove intermediate QCOW2
+      ansible.builtin.file:
+        path: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.hyperv.{{ imagebuilder_profile_hash }}.qcow2"
+        state: absent
+      ignore_errors: true # noqa: ignore-errors

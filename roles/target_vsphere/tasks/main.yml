@@ -10,12 +10,12 @@
           GOVC_DATACENTER: "{{ imagebuilder_env_vsphere_datacenter }}"
           GOVC_INSECURE: 1
     - name: Linux | Prepare VMware artifacts
-      when: os.type == "linux"
+      when: os_type == "linux"
       block:
         - name: Copy base QCOW for update
           ansible.builtin.copy:
-            src: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
             mode: "0644"
             remote_src: true
           register: target_vsphere_linux_copy_qcow2
@@ -26,7 +26,7 @@
         - name: Linux | Install open-vm-tools and prepare PVSCSI / VMXNET3 driver
           ansible.builtin.command: >
             virt-customize
-            -a "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+            -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
             --install open-vm-tools
             --run-command 'echo "add_drivers+= \" vmw_pvscsi \"" > /etc/dracut.conf.d/vmw_pvscsi.conf'
             --run-command 'kver=$(ls /lib/modules | sort -V | tail -1); dracut -f --kver "$kver" --add-drivers "vmw_pvscsi vmxnet3 scsi_mod sd_mod"'
@@ -45,15 +45,15 @@
             -f qcow2
             -O vmdk
             -o subformat=monolithicFlat,adapter_type=lsilogic
-            "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
-            "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
           register: target_vsphere_linux_convert_vmdk
           changed_when: true
 
         - name: Linux | Check VMDK filesystems
           ansible.builtin.command: >
             virt-filesystems
-            -a "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
             --all
             --long
             --uuid
@@ -66,7 +66,7 @@
 
         - name: Delete old vm first
           ansible.builtin.shell: |
-            govc vm.destroy -force "{{ id }}" >/dev/null 2>&1 || true
+            govc vm.destroy -force "{{ imagebuilder_id_base }}" >/dev/null 2>&1 || true
           environment: "{{ GOVC_ENV }}"
           changed_when: true
           register: target_vsphere_linux_delete_old_vm
@@ -84,7 +84,7 @@
               -c "{{ imagebuilder_env_vsphere_cpu_count | default(2) }}" \
               -g "{{ imagebuilder_env_vsphere_guestosid | default('other3xLinux64Guest') }}" \
               -on=false \
-              "{{ id }}"
+              "{{ imagebuilder_id_base }}"
             sleep 10
           changed_when: true
           environment: "{{ GOVC_ENV }}"
@@ -95,7 +95,7 @@
         - name: List devices
           ansible.builtin.shell: |
             set -o pipefail
-            govc device.ls -vm "{{ id }}" | awk '{print $1}' | grep -E "^(ethernet|lsilogic)-" || true
+            govc device.ls -vm "{{ imagebuilder_id_base }}" | awk '{print $1}' | grep -E "^(ethernet|lsilogic)-" || true
             sleep 10
           environment: "{{ GOVC_ENV }}"
           register: target_vsphere_linux_devices
@@ -105,7 +105,7 @@
             var: target_vsphere_linux_devices.stdout_lines
         - name: Remove NIC
           ansible.builtin.shell: |
-              govc device.remove -vm "{{ id }}" {{ item }}
+              govc device.remove -vm "{{ imagebuilder_id_base }}" {{ item }}
               sleep 10
           environment: "{{ GOVC_ENV }}"
           loop: "{{ target_vsphere_linux_devices.stdout_lines | select('search', '^ethernet-') | list }}"
@@ -118,7 +118,7 @@
 
         - name: Remove LSILogic controller
           ansible.builtin.shell: |
-            govc device.remove -vm "{{ id }}" {{ item }}
+            govc device.remove -vm "{{ imagebuilder_id_base }}" {{ item }}
             sleep 10
           environment: "{{ GOVC_ENV }}"
           loop: "{{ target_vsphere_linux_devices.stdout_lines | select('search', '^lsilogic-') | list }}"
@@ -131,15 +131,15 @@
 
         - name: Fix VMDK descriptor filename
           ansible.builtin.replace:
-            path: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            path: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
             regexp: 'FLAT ".*" 0'
-            replace: 'FLAT "{{ id }}-flat.vmdk" 0'
+            replace: 'FLAT "{{ imagebuilder_id_base }}-flat.vmdk" 0'
 
         - name: Upload descriptor VMDK (monolithicFlat)
           ansible.builtin.shell: |
             govc datastore.upload \
-              "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk" \
-              "{{ id }}/{{ id }}.vmdk"
+              "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk" \
+              "{{ imagebuilder_id_base }}/{{ imagebuilder_id_base }}.vmdk"
           environment: "{{ GOVC_ENV }}"
           changed_when: true
           register: target_vsphere_linux_upload_descriptor
@@ -151,8 +151,8 @@
         - name: Upload flat backing file
           ansible.builtin.shell: |
               govc datastore.upload \
-              "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}-flat.vmdk" \
-              "{{ id }}/{{ id }}-flat.vmdk"
+              "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}-flat.vmdk" \
+              "{{ imagebuilder_id_base }}/{{ imagebuilder_id_base }}-flat.vmdk"
               sleep 20
           environment: "{{ GOVC_ENV }}"
           changed_when: true
@@ -164,7 +164,7 @@
 
         - name: Add PVSCSI controller
           ansible.builtin.shell: |
-              govc device.scsi.add -vm "{{ id }}" -type pvscsi
+              govc device.scsi.add -vm "{{ imagebuilder_id_base }}" -type pvscsi
               sleep 10
           environment: "{{ GOVC_ENV }}"
           register: target_vsphere_linux_add_pvscsi
@@ -173,8 +173,8 @@
         - name: Attach disk to PVSCSI
           ansible.builtin.shell: |
               govc vm.disk.attach \
-              -vm "{{ id }}" \
-              -disk "[{{ imagebuilder_env_vsphere_datastore }}] {{ id }}/{{ id }}.vmdk" \
+              -vm "{{ imagebuilder_id_base }}" \
+              -disk "[{{ imagebuilder_env_vsphere_datastore }}] {{ imagebuilder_id_base }}/{{ imagebuilder_id_base }}.vmdk" \
               -controller "{{ target_vsphere_linux_add_pvscsi.stdout }}"
               sleep 10
           environment: "{{ GOVC_ENV }}"
@@ -188,7 +188,7 @@
         - name: Add network interface
           ansible.builtin.shell: |
               govc vm.network.add \
-              -vm "{{ id }}" \
+              -vm "{{ imagebuilder_id_base }}" \
               -net "{{ imagebuilder_env_vsphere_network | default('VM Network') }}" \
               -net.adapter vmxnet3
               sleep 10
@@ -203,12 +203,12 @@
     # WINDOWS PATH
     ###########################################################################
     - name: Windows | Prepare VMware artifacts
-      when: os.type == "windows"
+      when: os_type == "windows"
       block:
         - name: Windows | Copy base QCOW for update
           ansible.builtin.copy:
-            src: "{{ imagebuilder_build_savedir }}/{{ id }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
             remote_src: true
             mode: "0644"
 
@@ -217,8 +217,8 @@
             qemu-img convert
             -O vmdk
             -o subformat=streamOptimized,adapter_type=lsilogic
-            "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
-            "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+            "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
           register: target_vsphere_windows_convert_vmdk
           changed_when: true
 
@@ -228,33 +228,33 @@
 
         - name: Windows | Ensure VMDK exists
           ansible.builtin.stat:
-            path: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            path: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
           register: target_vsphere_windows_vmdk_stat
           failed_when: not target_vsphere_windows_vmdk_stat.stat.exists
 
         - name: Windows | Copy VMDK to standardized location
           ansible.builtin.copy:
-            src: "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmdk"
+            src: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmdk"
             remote_src: true
             mode: "0644"
 
         - name: Windows | Show VMDK path
           ansible.builtin.debug:
-            msg: "VMDK created: {{ imagebuilder_build_savedir }}/{{ id }}.vmdk"
+            msg: "VMDK created: {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmdk"
 
         - name: Windows | Render VMX configuration file
           ansible.builtin.template:
             src: "vmx-template.j2"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.vmx"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmx"
             mode: "0644"
           vars:
-            vmx_name: "{{ id }}"
-            vmx_vmdk_filename: "{{ id }}.vmdk"
+            vmx_name: "{{ imagebuilder_id_base }}"
+            vmx_vmdk_filename: "{{ imagebuilder_id_base }}.vmdk"
 
         - name: Windows | Show VMX path
           ansible.builtin.debug:
-            msg: "VMX created: {{ imagebuilder_build_savedir }}/{{ id }}.vmx"
+            msg: "VMX created: {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmx"
 
         # =====================================================================
         # UPLOAD TO VCENTER USING GOVC
@@ -268,8 +268,8 @@
             export GOVC_DATASTORE="{{ vsphere_datastore }}"
             export GOVC_INSECURE=1
 
-            govc datastore.upload "{{ imagebuilder_build_savedir }}/{{ id }}.vmx" "{{ vsphere_upload_path }}/{{ id }}.vmx"
-            govc datastore.upload "{{ imagebuilder_build_savedir }}/{{ id }}.vmdk" "{{ vsphere_upload_path }}/{{ id }}.vmdk"
+            govc datastore.upload "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmx" "{{ vsphere_upload_path }}/{{ imagebuilder_id_base }}.vmx"
+            govc datastore.upload "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmdk" "{{ vsphere_upload_path }}/{{ imagebuilder_id_base }}.vmdk"
           environment:
             GOVC_URL: "{{ vsphere_server }}"
             GOVC_USERNAME: "{{ vsphere_username }}"
@@ -309,7 +309,7 @@
               -pool "{{ vsphere_resource_pool | default('Resources') }}" \
               -folder "{{ vsphere_folder | default('vm') }}" \
               -name "{{ vsphere_vm_name | default(id) }}" \
-              "{{ imagebuilder_build_savedir }}/{{ id }}.vmdk"
+              "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmdk"
           environment:
             GOVC_URL: "{{ vsphere_server }}"
             GOVC_USERNAME: "{{ vsphere_username }}"
@@ -337,19 +337,19 @@
         - name: Windows | Render OVF (UEFI + PVSCSI + VMXNET3)
           ansible.builtin.template:
             src: "ovf-template.j2"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.ovf"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.ovf"
             mode: "0644"
           vars:
-            ovf_id: "{{ id }}"
-            ovf_vmdk: "{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            ovf_id: "{{ imagebuilder_id_base }}"
+            ovf_vmdk: "{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
             ovf_size: "{{ target_vsphere_windows_vmdk_stat.stat.size }}"
 
         - name: Build OVA archive
           community.general.archive:
             path:
-              - "{{ imagebuilder_build_savedir }}/{{ id }}.ovf"
-              - "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
-            dest: "{{ imagebuilder_build_savedir }}/{{ id }}.ova"
+              - "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.ovf"
+              - "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.vmdk"
+            dest: "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.ova"
             format: tar
             mode: 644
             force_archive: true
@@ -357,15 +357,15 @@
 
         - name: Windows | Show OVA path
           ansible.builtin.debug:
-            msg: "OVA created: {{ imagebuilder_build_savedir }}/{{ id }}.ova"
+            msg: "OVA created: {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.ova"
 
         - name: Windows | Display all vSphere artifacts created
           ansible.builtin.debug:
             msg: |
               vSphere artifacts ready for deployment:
-                OVA (for import):  {{ imagebuilder_build_savedir }}/{{ id }}.ova
-                VMX (config file): {{ imagebuilder_build_savedir }}/{{ id }}.vmx
-                VMDK (disk image): {{ imagebuilder_build_savedir }}/{{ id }}.vmdk
+                OVA (for import):  {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.ova
+                VMX (config file): {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmx
+                VMDK (disk image): {{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmdk
 
   rescue:
     - name: Rescue on failure
@@ -378,4 +378,4 @@
     #     path: "{{ item }}"
     #     state: absent
     #   loop:
-    #     - "{{ imagebuilder_build_savedir }}/{{ id }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"
+    #     - "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.vmware.{{ imagebuilder_profile_hash }}.qcow2"

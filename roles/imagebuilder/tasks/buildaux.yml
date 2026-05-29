@@ -13,5 +13,5 @@
     - "{{ imagebuilder_build_basedir }}/build/iso_contents/patches"
 - name: (BUILDAUX) include variant-specific tasks
   ansible.builtin.include_tasks:
-    file: buildaux/{{ os.variant | lower }}.yml
-  when: os.variant is defined
+    file: buildaux/{{ os_variant | lower }}.yml
+  when: os_variant is defined

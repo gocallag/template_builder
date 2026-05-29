@@ -248,7 +248,7 @@
 
       - name: (BUILDAUX, windows) Copy support scripts (Windows)
         ansible.builtin.template:
-            src: "files/{{ os.type }}/{{ item }}"
+            src: "files/{{ os_type }}/{{ item }}"
             dest: "{{ build_basedir }}/build/iso_contents/{{ item }}"
             mode: "0755"
         loop:

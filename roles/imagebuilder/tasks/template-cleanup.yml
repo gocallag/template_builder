@@ -9,11 +9,11 @@
             msg:
                 - "OS Family: {{ ansible_os_family }}"
                 - "OS Distribution: {{ ansible_distribution }}"
-                - "OS Variant: {{ os.variant | default('unknown') | lower }}"
+                - "OS Variant: {{ os_variant | default('unknown') | lower }}"
 
     # RedHat-Based Systems
       - name: (TEMPLATE-CLEANUP, redhat) Setup
-        when: os.variant|lower in ["redhat","almalinux"]
+        when: os_variant|lower in ["redhat","almalinux"]
         block:
             - name: (TEMPLATE-CLEANUP, redhat) Ensure dnf-utils is installed
               ansible.builtin.shell: |
@@ -63,7 +63,7 @@
 
       # Common Linux Cleanup Tasks
       - name: (TEMPLATE-CLEANUP, common Linux) Common Linux Cleanup
-        when: os.type | lower == "linux"
+        when: os_type | lower == "linux"
         block:
             - name: (TEMPLATE-CLEANUP, common Linux) Find temporary files
               ansible.builtin.find:
@@ -200,10 +200,10 @@
         ignore_unreachable: true
         changed_when: true
         delegate_to: bob_build
-        when: os.type == "linux"
+        when: os_type == "linux"
       # Windows Systems
       - name: (TEMPLATE-CLEANUP, windows) Cleanup block
-        when: os.variant|lower == "windows"
+        when: os_variant|lower == "windows"
         block:
             - name: (TEMPLATE-CLEANUP, windows) Check if SoftwareDistribution folder exists
               ansible.windows.win_stat:

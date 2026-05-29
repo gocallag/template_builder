@@ -6,15 +6,24 @@
         ansible.builtin.fail:
             msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. I don't know how to build it. Please check your ID and the documentation for supported prefixes."
         when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
-
+      - name: (SETUP) get os_type
+        set_fact:
+            os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}"
+        when: imagebuilder_id_prefix in imagebuilder_prefix_ostype_map
+        failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_ostype_map
+      - name: (SETUP) get os_variant
+        set_fact:
+            os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}"
+        when: imagebuilder_id_prefix in imagebuilder_prefix_variant_map
+        failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_variant_map
       - name: (SETUP) Add new system to in-memory inventory
         ansible.builtin.add_host:
             name: 'bob_build'
             ansible_host: "{{ imagebuilder_localip }}"
             ansible_user: "{{ imagebuilder_env_ansible_user }}"
             ansible_password: "{{ imagebuilder_env_ansible_password }}"
-            ansible_port: "{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
-            ansible_connection: "{{ (os.type | lower == 'windows') | ternary('psrp', 'ssh') }}"
+            ansible_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
+            ansible_connection: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}"
             ansible_psrp_auth: "negotiate"
             ansible_winrm_server_cert_validation: ignore
             ansible_psrp_cert_validation: ignore
@@ -63,7 +72,7 @@
       - name: (SETUP) copy qemu monitor script
         ansible.builtin.template:
             src: "files/qemu/sendkeys.py"
-            dest: "{{ imagebuilder_env_build_path }}/{{ id }}/sendkeys.py"
+            dest: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}/sendkeys.py"
             mode: '0755'
         delegate_to: "{{ run_on | default('localhost') }}"
 
@@ -75,12 +84,12 @@
             | xargs -r kill -15 2>/dev/null || true
 
           # Kill QEMU (TERM -> wait -> KILL)
-          pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ id }}" \
+          pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
             | xargs -r kill -15 2>/dev/null || true
 
           sleep 5
 
-          pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ id }}" \
+          pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
             | xargs -r kill -9 2>/dev/null || true
         changed_when: true
         failed_when: false

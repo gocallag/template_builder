@@ -36,22 +36,22 @@
                   partition /boot/efi --fstype=efi --label EFI  --size=200 --ondisk=sda
                   part /boot --size=1024 --ondisk sda --fstype xfs
                   part pv.1 --size 1 --grow --asprimary --ondisk sda
-                  volgroup {{ os.variant | lower }} pv.1
+                  volgroup {{ os_variant | lower }} pv.1
                   # UPDATE filesystem config/sizing - Most of these are recommended for CIS
-                  logvol / --fstype xfs --name lvroot --vgname {{ os.variant | lower }} --size 1024
-                  logvol /home --fstype xfs --name lvhome --vgname {{ os.variant | lower }} --size 512
-                  logvol /opt --fstype xfs --name lvopt --vgname {{ os.variant | lower }} --size 512
-                  logvol /tmp --fstype xfs --name lvtmp --vgname {{ os.variant | lower }} --size 512
-                  logvol /usr --fstype xfs --name lvusr --vgname {{ os.variant | lower }} --size 4096
-                  logvol /var --fstype xfs --name lvvar --vgname {{ os.variant | lower }} --size 3172
-                  logvol /var/log --fstype xfs --name=lvvarlog --vgname {{ os.variant | lower }} --size 1024
-                  logvol /var/log/audit --fstype xfs --name lvvarlogaud --vgname {{ os.variant | lower }} --size 512
-                  logvol swap --fstype swap --recommended --name swap --vgname {{ os.variant | lower }}
+                  logvol / --fstype xfs --name lvroot --vgname {{ os_variant | lower }} --size 1024
+                  logvol /home --fstype xfs --name lvhome --vgname {{ os_variant | lower }} --size 512
+                  logvol /opt --fstype xfs --name lvopt --vgname {{ os_variant | lower }} --size 512
+                  logvol /tmp --fstype xfs --name lvtmp --vgname {{ os_variant | lower }} --size 512
+                  logvol /usr --fstype xfs --name lvusr --vgname {{ os_variant | lower }} --size 4096
+                  logvol /var --fstype xfs --name lvvar --vgname {{ os_variant | lower }} --size 3172
+                  logvol /var/log --fstype xfs --name=lvvarlog --vgname {{ os_variant | lower }} --size 1024
+                  logvol /var/log/audit --fstype xfs --name lvvarlogaud --vgname {{ os_variant | lower }} --size 512
+                  logvol swap --fstype swap --recommended --name swap --vgname {{ os_variant | lower }}
 
                   user --name={{ imagebuilder_env_ansible_user }} --groups=wheel --plaintext --password={{ imagebuilder_env_ansible_password }}
 
                   %packages --ignoremissing --excludedocs {{ ('--instLangs') if (version_major | default('') | int) == 8 else ('--inst-langs') if (version_major | default('') | int) >= 9 else '' }}=en_US.utf8
-                  {% if os.variant is defined and (os.variant | lower) == 'fedora' %}
+                  {% if os_variant is defined and (os_variant | lower) == 'fedora' %}
                   # Fedora-specific packages
                   {% if (version_major | default('') | int) >= 43 %}
                   # Fedora 43 and later
@@ -61,7 +61,7 @@
                   # Fedora versions prior to 43
                   # None Added
                             {% endif %}
-                          {% elif os.variant is defined and (os.variant | lower) == 'centos' %}
+                          {% elif os_variant is defined and (os_variant | lower) == 'centos' %}
                             {% if (version_major | default('') | int) == 8 %}
                   # CentOS 8-specific packages
                   @^minimal-environment
@@ -71,7 +71,7 @@
                             {% endif %}
                   # CentOS-common specific packages
                   # None Added
-                          {% elif os.variant is defined and (os.variant | lower) == 'rhel' %}
+                          {% elif os_variant is defined and (os_variant | lower) == 'rhel' %}
                             {% if (version_major | default('') | int) == 8 %}
                               # RHEL 8-specific packages
                               @^minimal-environment
@@ -88,7 +88,7 @@
                             {% endif %}
                             # RHEL-specific packages
                             # None Added
-                          {% elif os.variant is defined and (os.variant | lower) == 'almalinux' %}
+                          {% elif os_variant is defined and (os_variant | lower) == 'almalinux' %}
                             {% if (version_major | default('') | int) == 8 %}
                               # AlmaLinux 8-specific packages
                               @^minimal-environment
@@ -99,7 +99,7 @@
                             {% endif %}
                             # AlmaLinux-specific packages
                             # None Added
-                          {% elif os.variant is defined and (os.variant | lower) == 'rockylinux' %}
+                          {% elif os_variant is defined and (os_variant | lower) == 'rockylinux' %}
                             {% if (version_major | default('') | int) == 8 %}
                               # Rocky Linux 8-specific packages
                               @^minimal-environment
@@ -110,7 +110,7 @@
                             {% endif %}
                             # Rocky Linux-specific packages
                             # None Added
-                        {% elif os.variant is defined and (os.variant | lower) == 'oraclelinux' %}
+                        {% elif os_variant is defined and (os_variant | lower) == 'oraclelinux' %}
                             {% if (version_major | default('') | int) == 8 %}
                               # Oracle Linux 8-specific packages
                               @^minimal-environment

@@ -8,7 +8,7 @@
           - "-cpu host"
           - "-smp {{ imagebuilder_build_vcpus }}"
           - "-m {{ imagebuilder_build_ram }}"
-          - "-netdev user,id=net0,hostfwd=tcp:0.0.0.0:{{ (os.type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}-:{{ (os.type | lower == 'windows') | ternary(5986, 22) }}"
+          - "-netdev user,id=net0,hostfwd=tcp:0.0.0.0:{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}-:{{ (os_type | lower == 'windows') | ternary(5986, 22) }}"
           - "-device {{ os.config.nicdriver | default('e1000') }},netdev=net0"
           - "-device ich9-ahci,id=ahci"
           - "-drive file={{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2,media=disk,if=none,format=qcow2,id=disk0"
