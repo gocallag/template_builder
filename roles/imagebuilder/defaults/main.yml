@@ -13,6 +13,30 @@ imagebuilder_prefix_port_offset_map:
     centos: 8
     rhel: 9
     leap: 10
+imagebuilder_prefix_ostype_map:
+    alma: linux
+    ol: linux
+    rocky: linux
+    debian: linux
+    ubuntu: linux
+    windows: windows
+    suse: linux
+    fedora: linux
+    centos: linux
+    rhel: linux
+    leap: linux
+imagebuilder_prefix_variant_map:
+    alma: almalinux
+    ol: oraclelinux
+    rocky: rockylinux
+    debian: debian
+    ubuntu: ubuntu
+    windows: windows
+    suse: sles
+    fedora: fedora
+    centos: centos
+    rhel: rhel
+    leap: leap
 imagebuilder_port_offset: "{{ imagebuilder_prefix_port_offset_map[imagebuilder_id_prefix] }}"
 imagebuilder_localport: "{{ 8180 + (imagebuilder_port_offset | default(0) | int) }}"
 imagebuilder_package_lists:
