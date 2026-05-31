@@ -5,16 +5,13 @@
   become: false
 
   vars:
-    id: alma-9
-    version: 9.8
+    id: alma-9.8
     os:
       config:
         disks:
           - 20
         timezone: Australia/Melbourne
         nicdriver: e1000
-      type: linux
-      variant: almalinux
       iso: http://192.168.1.161:8180/almalinux/9/AlmaLinux-9.8-x86_64-dvd.iso
       checksum: 7a392bdc879afd159b30da39a356b7b26c1ddf618b01549164da9aadbc40d814
       console_boot: |
