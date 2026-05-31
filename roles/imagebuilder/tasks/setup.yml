@@ -7,13 +7,13 @@
             msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. I don't know how to build it. Please check your ID and the documentation for supported prefixes."
         when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
       - name: (SETUP) get os_type
-        set_fact:
-            os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}"
+        ansible.builtin.set_fact:
+            os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}" # noqa: var-naming
         when: imagebuilder_id_prefix in imagebuilder_prefix_ostype_map
         failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_ostype_map
       - name: (SETUP) get os_variant
-        set_fact:
-            os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}"
+        ansible.builtin.set_fact:
+            os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}" # noqa: var-naming
         when: imagebuilder_id_prefix in imagebuilder_prefix_variant_map
         failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_variant_map
       - name: (SETUP) Add new system to in-memory inventory
