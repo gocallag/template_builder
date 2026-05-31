@@ -4,17 +4,6 @@
     - build_targets
     - build_target_proxmox
   block:
-
-    - name: (TARGET-PROXMOX) Assert required Proxmox variables are defined
-      ansible.builtin.assert:
-        that:
-          - imagebuilder_env_proxmox_server is defined and imagebuilder_env_proxmox_server | trim | length > 0
-          - imagebuilder_env_proxmox_user is defined and imagebuilder_env_proxmox_user | trim | length > 0
-          - imagebuilder_env_proxmox_password is defined and imagebuilder_env_proxmox_password | trim | length > 0
-          - imagebuilder_env_proxmox_storage is defined and imagebuilder_env_proxmox_storage | trim | length > 0
-          - imagebuilder_env_proxmox_node is defined and imagebuilder_env_proxmox_node | trim | length > 0
-        fail_msg: "(TARGET-PROXMOX) Missing required variables: proxmox_server, proxmox_user, proxmox_password, proxmox_storage, or proxmox_node"
-
     - name: Add the host for the Proxmox server
       ansible.builtin.add_host:
         name: proxmox_server

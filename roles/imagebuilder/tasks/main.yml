@@ -66,6 +66,14 @@
 - name: (MAIN) Restore Image(s) if they exist
   ansible.builtin.include_tasks: restore.yml
 
+- name: (MAIN) Run the credentials & other assertions for the build (and targets) if any are defined
+  ansible.builtin.include_role:
+    name: "{{ rolename }}"
+    tasks_from: asserts.yml
+  loop: "{{ ansible_play_role_names }}"
+  loop_control:
+    loop_var: rolename
+
 - name: (MAIN) Perform any downloads needed for the build
   ansible.builtin.include_role:
     name: "{{ rolename }}"
