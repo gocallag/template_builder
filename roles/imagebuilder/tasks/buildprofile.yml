@@ -1,9 +1,8 @@
 ---
-- name: (BUILDPROFILE) Include build profile implementation
-  tags:
-      - always
-  block:
-      - name: (BUILDPROFILE) include variant-specific tasks
-        ansible.builtin.include_tasks:
-            file: buildprofile/{{ os_variant | lower }}.yml
-        when: os_variant is defined
+- name: (BUILDPROFILE) include variant-specific tasks
+  ansible.builtin.include_tasks:
+    file: buildprofile/{{ os_variant | lower }}.yml
+  when: os_variant is defined
+- name: (BUILDPROFILE) Display build hash
+  ansible.builtin.debug:
+    msg: "Build profile hash: {{ imagebuilder_profile_hash }}"
