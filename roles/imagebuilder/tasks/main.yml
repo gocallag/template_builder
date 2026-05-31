@@ -1,18 +1,11 @@
 ---
-- name: (MAIN) setup to get facts
+- name: (MAIN) setup to get facts for the build system
   ansible.builtin.setup:
 
 - name: (MAIN) Display build banner
   ansible.builtin.include_tasks: banner.yml
   vars:
     imagebuilder_banner_message: "Starting build: {{ imagebuilder_id_base }}"
-  tags:
-    - always            # list all the tags used role-wide so we can see them with a list-tags command
-    - build_fetch_iso
-    - build_base
-    - build_aux
-    - build_customise
-    - build_cleanup
 
 - name: (MAIN) Check if environmental variables file exists in the standard location
   ansible.builtin.stat:
