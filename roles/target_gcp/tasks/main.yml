@@ -10,15 +10,12 @@
         msg: "os_type must be 'linux' or 'windows'"
       when: os_type not in ["linux", "windows"]
 
-    - name: Validate GCP project
-      ansible.builtin.fail:
-        msg: "imagebuilder_env_gcp_project must be set"
-      when: not imagebuilder_env_gcp_project or imagebuilder_env_gcp_project == ""
-
-    - name: Validate GCP bucket
-      ansible.builtin.fail:
-        msg: "imagebuilder_env_gcp_bucket must be set"
-      when: not imagebuilder_env_gcp_bucket or imagebuilder_env_gcp_bucket == ""
+    - name: (TARGET-GCP) Assert required GCP variables are defined
+      ansible.builtin.assert:
+        that:
+          - imagebuilder_env_gcp_project is defined and imagebuilder_env_gcp_project | trim | length > 0
+          - imagebuilder_env_gcp_bucket is defined and imagebuilder_env_gcp_bucket | trim | length > 0
+        fail_msg: "(TARGET-GCP) Missing required variables: gcp_project or gcp_bucket"
 
     - name: Set GCP image name
       ansible.builtin.set_fact:

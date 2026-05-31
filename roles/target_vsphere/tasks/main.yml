@@ -1,6 +1,16 @@
 ---
 - name: (TARGET-VSPHERE) Prepare vSphere VM files (OVA, VMX, VMDK)
   block:
+    - name: (TARGET-VSPHERE) Assert required vSphere variables are defined
+      ansible.builtin.assert:
+        that:
+          - imagebuilder_env_vsphere_vcenter is defined and imagebuilder_env_vsphere_vcenter | trim | length > 0
+          - imagebuilder_env_vsphere_username is defined and imagebuilder_env_vsphere_username | trim | length > 0
+          - imagebuilder_env_vsphere_password is defined and imagebuilder_env_vsphere_password | trim | length > 0
+          - imagebuilder_env_vsphere_datacenter is defined and imagebuilder_env_vsphere_datacenter | trim | length > 0
+          - imagebuilder_env_vsphere_datastore is defined and imagebuilder_env_vsphere_datastore | trim | length > 0
+        fail_msg: "(TARGET-VSPHERE) Missing required variables: vcenter, username, password, datacenter, or datastore"
+
     - name: Set govc environment variables
       ansible.builtin.set_fact:
         GOVC_ENV: # noqa: var-naming

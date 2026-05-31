@@ -7,80 +7,51 @@
   vars:
     imagebuilder_banner_message: "Starting build: {{ imagebuilder_id_base }}"
 
-- name: (MAIN) Check if environmental variables file exists in the standard location
-  ansible.builtin.stat:
-    path: "{{ imagebuilder_envfile_path }}"
-  register: imagebuilder_envfile_stat
-  failed_when: not imagebuilder_envfile_stat.stat.exists
-  changed_when: false
-
-- name: (MAIN) Load env file (a=b format)
-  ansible.builtin.slurp:
-    src: "{{ imagebuilder_envfile_path }}"
-  register: imagebuilder_raw_env
-  changed_when: false
-
-- name: (MAIN) Convert env file to dict
+- name: (MAIN) Load env file and map imagebuilder env variables
   ansible.builtin.set_fact:
-    imagebuilder_env:
-      >-
-        {{
-          imagebuilder_raw_env.content
-          | b64decode
-          | regex_replace('^\\s*#.*$', '', multiline=True)
-          | regex_replace('^\\s*$', '', multiline=True)
-          | regex_replace('=', ': ', multiline=True)
-          | from_yaml
-        }}
+    imagebuilder_env: "{{ env_data }}"
+    imagebuilder_env_qemu_ip: "{{ env_data.IMAGEBUILDER_ENV_QEMU_IP | default('') }}"
+    imagebuilder_env_build_path: "{{ env_data.IMAGEBUILDER_ENV_BUILD_PATH | default('') }}"
+    imagebuilder_env_ansible_user: "{{ env_data.IMAGEBUILDER_ENV_ANSIBLE_USER | default('') }}"
+    imagebuilder_env_ansible_password: "{{ env_data.IMAGEBUILDER_ENV_ANSIBLE_PASSWORD | default('') }}"
+    imagebuilder_env_linux_admin_user: "{{ env_data.IMAGEBUILDER_ENV_LINUX_ADMIN_USER | default('') }}"
+    imagebuilder_env_linux_admin_password: "{{ env_data.IMAGEBUILDER_ENV_LINUX_ADMIN_PASSWORD | default('') }}"
+    imagebuilder_env_win_admin_user: "{{ env_data.IMAGEBUILDER_ENV_WIN_ADMIN_USER | default('') }}"
+    imagebuilder_env_win_admin_password: "{{ env_data.IMAGEBUILDER_ENV_WIN_ADMIN_PASSWORD | default('') }}"
+    imagebuilder_env_ansible_key: "{{ env_data.IMAGEBUILDER_ENV_ANSIBLE_KEY | default('') }}"
+    imagebuilder_env_proxmox_server: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_SERVER | default('') }}"
+    imagebuilder_env_proxmox_user: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_USER | default('') }}"
+    imagebuilder_env_proxmox_password: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_PASSWORD | default('') }}"
+    imagebuilder_env_proxmox_storage: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_STORAGE | default('') }}"
+    imagebuilder_env_proxmox_node: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_NODE | default('') }}"
+    imagebuilder_env_build_memory: "{{ env_data.IMAGEBUILDER_ENV_BUILD_MEMORY | default(8192) }}"
+    imagebuilder_env_build_cpu: "{{ env_data.IMAGEBUILDER_ENV_BUILD_CPU | default(4) }}"
+    imagebuilder_env_vsphere_password: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_PASSWORD | default('') }}"
+    imagebuilder_env_vsphere_username: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_USERNAME | default('') }}"
+    imagebuilder_env_vsphere_vcenter: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_VCENTER | default('') }}"
+    imagebuilder_env_vsphere_datacenter: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_DATACENTER | default('') }}"
+    imagebuilder_env_vsphere_datastore: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_DATASTORE | default('') }}"
+    imagebuilder_env_rhsm_userid: "{{ env_data.IMAGEBUILDER_ENV_RHSM_USERID | default('') }}"
+    imagebuilder_env_rhsm_password: "{{ env_data.IMAGEBUILDER_ENV_RHSM_PASSWORD | default('') }}"
+  no_log: true
+  vars:
+    env_data: >-
+      {{
+        lookup('file', imagebuilder_envfile_path)
+        | regex_replace('^\\s*#.*$', '', multiline=True)
+        | regex_replace('^\\s*$', '', multiline=True)
+        | regex_replace('=', ': ', multiline=True)
+        | from_yaml
+      }}
 
-- name: (MAIN) Map imagebuilder_env.* into individual vars
-  ansible.builtin.set_fact:
-    imagebuilder_env_qemu_ip: "{{ imagebuilder_env.IMAGEBUILDER_ENV_QEMU_IP }}"
-    imagebuilder_env_build_path: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_PATH }}"
-    imagebuilder_env_ansible_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_USER }}"
-    imagebuilder_env_ansible_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_PASSWORD }}"
-    imagebuilder_env_linux_admin_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_LINUX_ADMIN_USER }}"
-    imagebuilder_env_linux_admin_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_LINUX_ADMIN_PASSWORD }}"
-    imagebuilder_env_win_admin_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_WIN_ADMIN_USER }}"
-    imagebuilder_env_win_admin_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_WIN_ADMIN_PASSWORD }}"
-    imagebuilder_env_ansible_key: "{{ imagebuilder_env.IMAGEBUILDER_ENV_ANSIBLE_KEY }}"
-    imagebuilder_env_proxmox_server: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_SERVER }}"
-    imagebuilder_env_proxmox_user: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_USER }}"
-    imagebuilder_env_proxmox_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_PASSWORD }}"
-    imagebuilder_env_proxmox_storage: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_STORAGE }}"
-    imagebuilder_env_proxmox_node: "{{ imagebuilder_env.IMAGEBUILDER_ENV_PROXMOX_NODE }}"
-    imagebuilder_env_build_memory: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_MEMORY | default(8192) }}"
-    imagebuilder_env_build_cpu: "{{ imagebuilder_env.IMAGEBUILDER_ENV_BUILD_CPU | default(4) }}"
-    imagebuilder_env_vsphere_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_PASSWORD }}"
-    imagebuilder_env_vsphere_username: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_USERNAME }}"
-    imagebuilder_env_vsphere_vcenter: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_VCENTER }}"
-    imagebuilder_env_vsphere_datacenter: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_DATACENTER }}"
-    imagebuilder_env_vsphere_datastore: "{{ imagebuilder_env.IMAGEBUILDER_ENV_VSPHERE_DATASTORE }}"
-    imagebuilder_env_rhsm_userid: "{{ imagebuilder_env.IMAGEBUILDER_ENV_RHSM_USERID }}"
-    imagebuilder_env_rhsm_password: "{{ imagebuilder_env.IMAGEBUILDER_ENV_RHSM_PASSWORD }}"
-
-- name: (MAIN) Assert required build variables are defined
+- name: (MAIN) Assert core build variables are defined
   ansible.builtin.assert:
     that:
       - os is defined and os.iso is defined and os.iso | trim | length > 0
-      - imagebuilder_env_qemu_ip is defined and imagebuilder_env_qemu_ip | trim | length > 0
       - imagebuilder_env_build_path is defined and imagebuilder_env_build_path | trim | length > 0
-      - imagebuilder_env_ansible_user is defined and imagebuilder_env_ansible_user | trim | length > 0
-      - imagebuilder_env_ansible_password is defined and imagebuilder_env_ansible_password | trim | length > 0
-      - imagebuilder_env_linux_admin_user is defined and imagebuilder_env_linux_admin_user | trim | length > 0
-      - imagebuilder_env_linux_admin_password is defined and imagebuilder_env_linux_admin_password | trim | length > 0
-      - imagebuilder_env_win_admin_user is defined and imagebuilder_env_win_admin_user | trim | length > 0
-      - imagebuilder_env_win_admin_password is defined and imagebuilder_env_win_admin_password | trim | length > 0
-      - imagebuilder_env_ansible_key is defined and imagebuilder_env_ansible_key | trim | length > 0
-      - imagebuilder_env_vsphere_password is defined and imagebuilder_env_vsphere_password | trim | length > 0
-      - imagebuilder_env_vsphere_username is defined and imagebuilder_env_vsphere_username | trim | length > 0
-      - imagebuilder_env_vsphere_vcenter is defined and imagebuilder_env_vsphere_vcenter | trim | length > 0
-      - imagebuilder_env_vsphere_datacenter is defined and imagebuilder_env_vsphere_datacenter | trim | length > 0
-      - imagebuilder_env_vsphere_datastore is defined and imagebuilder_env_vsphere_datastore | trim | length > 0
-      - imagebuilder_env_rhsm_userid is defined and imagebuilder_env_rhsm_userid | trim | length > 0
-      - imagebuilder_env_rhsm_password is defined and imagebuilder_env_rhsm_password | trim | length > 0
-    fail_msg: "(MAIN) One or more required variables are not defined correctly."
-    success_msg: "(MAIN) All required variables are defined. Proceeding with build."
+      - imagebuilder_env_qemu_ip is defined and imagebuilder_env_qemu_ip | trim | length > 0
+    fail_msg: "(MAIN) Missing core variables: os, imagebuilder_env_build_path, or imagebuilder_env_qemu_ip"
+    success_msg: "(MAIN) Core variables defined. Target-specific roles will validate their own credentials."
 
 - name: (MAIN) Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml

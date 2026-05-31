@@ -10,15 +10,12 @@
         msg: "os_type must be 'linux' or 'windows'"
       when: os_type not in ["linux", "windows"]
 
-    - name: Validate OCI configuration
-      ansible.builtin.fail:
-        msg: "imagebuilder_env_oci_compartment_ocid must be set"
-      when: not imagebuilder_env_oci_compartment_ocid or imagebuilder_env_oci_compartment_ocid == ""
-
-    - name: Validate OCI bucket
-      ansible.builtin.fail:
-        msg: "imagebuilder_env_oci_bucket must be set"
-      when: not imagebuilder_env_oci_bucket or imagebuilder_env_oci_bucket == ""
+    - name: (TARGET-OCI) Assert required OCI variables are defined
+      ansible.builtin.assert:
+        that:
+          - imagebuilder_env_oci_compartment_ocid is defined and imagebuilder_env_oci_compartment_ocid | trim | length > 0
+          - imagebuilder_env_oci_bucket is defined and imagebuilder_env_oci_bucket | trim | length > 0
+        fail_msg: "(TARGET-OCI) Missing required variables: oci_compartment_ocid or oci_bucket"
 
     ###########################################################################
     # LINUX PATH
