@@ -25,8 +25,8 @@ try:
 
     build_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     version_string = f"build ({build_time})"
-    tempvm_name = f"{{ id }}_tmpvm"
-    template_name=f"{{ id }}_template"
+    tempvm_name = f"{{ imagebuilder_id_base }}_tmpvm"
+    template_name=f"{{ imagebuilder_id_base }}_template"
 
     # Check if the template exists
     templates_service = connection.system_service().templates_service()
@@ -79,11 +79,11 @@ try:
         print(f"VM '{tempvm_name}' deleted successfully.")
     # Create new disk
     provisioned_bytes = int({{ os.config.disks[0] }}) * 1024**3
-    print(f"Creating new disk '{{ id }}_disk' (size: {provisioned_bytes} bytes)...")
+    print(f"Creating new disk '{{ imagebuilder_id_base }}_disk' (size: {provisioned_bytes} bytes)...")
     disk_service = connection.system_service().disks_service()
     new_disk = disk_service.add(
         Disk(
-            name='{{ id }}_disk',
+            name='{{ imagebuilder_id_base }}_disk',
             format=DiskFormat.COW,
             provisioned_size=provisioned_bytes,
             storage_domains=[StorageDomain(id=storage_domain.id)],
@@ -93,7 +93,7 @@ try:
     # Wait for new disk to be ready
     for _ in range(30):
         created_disk = disk_service.disk_service(new_disk.id).get()
-        print(f"Waiting for disk '{{ id }}_disk' to be ready...", end='', flush=True)
+        print(f"Waiting for disk '{{ imagebuilder_id_base }}_disk' to be ready...", end='', flush=True)
         print(getattr(created_disk, 'status', None))
         if created_disk and getattr(created_disk, 'status', None) not in ('locked', 'maintenance'):
             break
@@ -103,12 +103,12 @@ try:
     sleep(20)  # Extra wait to ensure disk is fully ready
 
     # Start image transfer
-    print(f"Transferring disk '{{ id }}_disk")
+    print(f"Transferring disk '{{ imagebuilder_id_base }}_disk")
     image_transfers_service = connection.system_service().image_transfers_service()
     transfer = image_transfers_service.add(ImageTransfer(disk=Disk(id=new_disk.id)))
 
     # Wait for transfer URL to be available
-    print(f"Wait for transfer URL for disk '{{ id }}_disk'...")
+    print(f"Wait for transfer URL for disk '{{ imagebuilder_id_base }}_disk'...")
     transfer_service = image_transfers_service.image_transfer_service(transfer.id)
     for _ in range(30):
         tr = transfer_service.get()

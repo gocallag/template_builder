@@ -3,7 +3,7 @@
     - name: (QEMU) Set QEMU arguments
       ansible.builtin.set_fact:
         qemu_args: # noqa: var-naming
-          - "-name {{ id }}"
+          - "-name {{ imagebuilder_id_base }}"
           - "-enable-kvm"
           - "-cpu host"
           - "-smp {{ imagebuilder_build_vcpus }}"
@@ -11,7 +11,7 @@
           - "-netdev user,id=net0,hostfwd=tcp:0.0.0.0:{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}-:{{ (os_type | lower == 'windows') | ternary(5986, 22) }}"
           - "-device {{ os.config.nicdriver | default('e1000') }},netdev=net0"
           - "-device ich9-ahci,id=ahci"
-          - "-drive file={{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2,media=disk,if=none,format=qcow2,id=disk0"
+          - "-drive file={{ imagebuilder_build_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2,media=disk,if=none,format=qcow2,id=disk0"
           - "-device ide-hd,drive=disk0,bus=ahci.0"
           - "-vnc 0.0.0.0:{{ imagebuilder_port_offset }}"
 
@@ -32,11 +32,13 @@
       poll: 0            # run in background
       register: webserver # noqa: var-naming
       changed_when: true
-
     - name: (QEMU) Build base
       when:
         - not imagebuilder_restored_from_image | default(false) | bool
       block:
+        - name: (QEMU) Show QEMU command
+          ansible.builtin.debug:
+            msg: "{{ imagebuilder_qemu_command }} -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off -mon chardev=mon0, -boot order=d -drive file={{ imagebuilder_build_iso }},media=cdrom,if=ide,index=1"
         - name: (QEMU) Launch QEMU VM
           ansible.builtin.command: >
               {{ imagebuilder_qemu_command }} \
@@ -93,7 +95,7 @@
           ansible.builtin.shell: |
             max_retries=600
             count=0
-            while pgrep -f "^qemu.*{{ id }}.x86_64.qcow2" >/dev/null 2>&1; do
+            while pgrep -f "^qemu.*{{ imagebuilder_id_base }}.x86_64.qcow2" >/dev/null 2>&1; do
               sleep 10
               count=$((count+1))
               if [ "$count" -ge "$max_retries" ]; then
@@ -106,22 +108,25 @@
           failed_when: qemu_wait.rc != 0
           changed_when: false
           delegate_to: "{{ run_on | default('localhost') }}"
-          tags:
-            - build_base
 
         - name: (QEMU) save base image
           block:
             # Ensure qcow2 is not open by any process
-            - name: Check for open handles on qcow2
+            - name: Wait for qcow2 to be released by all processes
               ansible.builtin.shell: |
-                  lsof "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" || true
+                  set -o pipefail;
+                  lsof "{{ imagebuilder_build_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" 2>/dev/null | tail -n +2 | wc -l
               changed_when: false
               register: imagebuilder_qcow2_lsof
+              retries: 30
+              delay: 2
+              until: imagebuilder_qcow2_lsof.stdout | int == 0
+              failed_when: false
 
-            - name: Fail if qcow2 is still open
+            - name: Fail if qcow2 is still open after wait
               ansible.builtin.fail:
-                msg: "qcow2 still open by a process: {{ imagebuilder_qcow2_lsof.stdout }}"
-              when: imagebuilder_qcow2_lsof.stdout != ""
+                msg: "qcow2 still open after waiting 60 seconds"
+              when: imagebuilder_qcow2_lsof.stdout | int != 0
 
             # Flush host page cache before conversion
             - name: Sync host filesystem
@@ -129,11 +134,11 @@
               changed_when: false
 
             - name: (QEMU) convert base image with free block cleanup
-              ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_build_imagedir }}/{{ id }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp"
+              ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_build_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp"
               changed_when: true
 
             - name: (QEMU) finalize base image
-              ansible.builtin.command: mv "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_build_savedir }}/{{ id }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+              ansible.builtin.command: mv "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
               changed_when: true
 
 
@@ -154,12 +159,12 @@
           | xargs -r kill -15 2>/dev/null || true
 
         # Kill QEMU (TERM -> wait -> KILL)
-        pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ id }}" \
+        pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
           | xargs -r kill -15 2>/dev/null || true
 
         sleep 5
 
-        pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ id }}" \
+        pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
           | xargs -r kill -9 2>/dev/null || true
       changed_when: true
       failed_when: false

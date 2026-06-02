@@ -59,7 +59,7 @@
                     keyboard:
                       layout: us
                     identity:
-                      hostname: {{ id }}
+                      hostname: {{ imagebuilder_id_base }}
                       password: {{ hashed_password }}
                       username: {{ env_ansible_user }}
                     ssh:

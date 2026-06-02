@@ -9,7 +9,7 @@
         ansible.builtin.set_fact:
             ks: # noqa: var-naming
                 |
-                  #default kickstart for redhat based systems
+                  #default kickstart for redhat based systems {{ version_major }} {{ version_minor }} - will be used if no ks is provided for the build
                   {% if (version_major | default('') | int) == 8 %}
                   repo --name=epel --baseurl=https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/
                   {% endif %}
@@ -27,8 +27,8 @@
                   poweroff
                   services --disabled="kdump" --enabled="auditd,chronyd,rsyslog,sshd"
                   timezone {{ os.config.timezone }} {{ ('--isUtc') if (version_major | default('') | int) == 8 else ('--utc') if (version_major | default('') | int) >= 9 else '' }}
-                  #network --hostname={{ id }}  --noipv6 --bootproto=dhcp
-                  network --hostname={{ id }} --bootproto=dhcp --activate --onboot=on --noipv6
+                  #network --hostname={{ imagebuilder_id_base }}  --noipv6 --bootproto=dhcp
+                  network --hostname={{ imagebuilder_id_base }} --bootproto=dhcp --activate --onboot=on --noipv6
                   clearpart --all --disklabel gpt --drives=sda
                   bootloader --location mbr
                   ignoredisk --only-use=sda

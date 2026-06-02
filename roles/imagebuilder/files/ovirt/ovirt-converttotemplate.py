@@ -9,8 +9,8 @@ CONFIG = {
     'url': '{{ env_ovirt_ovirt_url }}',
     'username': '{{ env_ovirt_ovirt_username }}',
     'password': '{{ env_ovirt_ovirt_password }}',
-    'vm_name': '{{ id }}_template',
-    'template_name': '{{ id }}_template',
+    'vm_name': '{{ imagebuilder_id_base }}_template',
+    'template_name': '{{ imagebuilder_id_base }}_template',
     'insecure': True
 }
 
