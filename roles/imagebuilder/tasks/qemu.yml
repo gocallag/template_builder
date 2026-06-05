@@ -91,20 +91,13 @@
             delay: 20
             timeout: 120
 
-        - name: "(QEMU) Wait for QEMU async job to finish (poll process)"
-          ansible.builtin.shell: |
-            max_retries=600
-            count=0
-            while pgrep -f "^qemu.*{{ imagebuilder_id_base }}.x86_64.qcow2" >/dev/null 2>&1; do
-              sleep 10
-              count=$((count+1))
-              if [ "$count" -ge "$max_retries" ]; then
-                echo "timeout waiting for qemu process to exit"
-                exit 2
-              fi
-            done
-            exit 0
+        - name: "(QEMU) Wait for QEMU async job to finish"
+          ansible.builtin.async_status:
+            jid: "{{ qemu_boot.ansible_job_id }}"
           register: qemu_wait # noqa: var-naming
+          until: qemu_wait.finished
+          retries: 30
+          delay: 60
           failed_when: qemu_wait.rc != 0
           changed_when: false
           delegate_to: "{{ run_on | default('localhost') }}"

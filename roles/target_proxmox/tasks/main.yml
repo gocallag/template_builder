@@ -3,6 +3,13 @@
   tags:
     - build_targets
     - build_target_proxmox
+  vars:
+    target_host: "{{ run_on | default('localhost') }}"
+    proxmox_api_base: &proxmox_api_base
+      api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
+      api_password: "{{ imagebuilder_env_proxmox_password }}"
+      api_host: "{{ imagebuilder_env_proxmox_server }}"
+      timeout: 600
   block:
     - name: Add the host for the Proxmox server
       ansible.builtin.add_host:
@@ -85,7 +92,7 @@
             src: "roles/imagebuilder/files/windows-guestfish-inject.sh"
             dest: "/tmp/windows-guestfish-inject.sh"
             mode: "0755"
-          delegate_to: "{{ run_on | default('localhost') }}"
+          delegate_to: "{{ target_host }}"
 
         - name: Windows | Inject QGA + VirtIO drivers + unattend.xml
           ansible.builtin.command: >
@@ -96,7 +103,7 @@
             "{{ target_proxmox_windows_virtio_dir }}:/Drivers/VirtIO"
           register: target_proxmox_windows_inject
           changed_when: true
-          delegate_to: "{{ run_on | default('localhost') }}"
+          delegate_to: "{{ target_host }}"
 
         - name: Windows | Show guestfish output
           ansible.builtin.debug:
@@ -150,7 +157,7 @@
       poll: 0
       register: copy_sleeper # noqa: var-naming
       changed_when: true
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
 
     - name: Check if async task has finished
       ansible.builtin.async_status:
@@ -163,23 +170,18 @@
 
     - name: Delete template if it exists
       community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
-        api_password: "{{ imagebuilder_env_proxmox_password }}"
-        api_host: "{{ imagebuilder_env_proxmox_server }}"
-        name: "template-{{ imagebuilder_id_base }}"
+        <<: *proxmox_api_base
         node: "{{ imagebuilder_env_proxmox_node }}"
+        name: "template-{{ imagebuilder_id_base }}"
         state: absent
-        timeout: 600
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
       ignore_errors: true # noqa: ignore-errors
 
     - name: Create new VM
       community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
-        api_password: "{{ imagebuilder_env_proxmox_password }}"
-        api_host: "{{ imagebuilder_env_proxmox_server }}"
-        name: "template-{{ imagebuilder_id_base }}"
+        <<: *proxmox_api_base
         node: "{{ imagebuilder_env_proxmox_node }}"
+        name: "template-{{ imagebuilder_id_base }}"
         cores: "1"
         vcpus: "2"
         cpu: "host"
@@ -187,40 +189,33 @@
         agent: true
         net:
           net0: 'virtio,bridge=vmbr0'
-        timeout: 600
         description: |
           Template built on {{ ansible_date_time.iso8601 }}
           Build ID: {{ imagebuilder_id_base }}
           Built by: {{ imagebuilder_env_ansible_user }}
           Source: Proxmox automation pipeline
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
       register: nvm # noqa: var-naming
 
     - name: Add existing disk
       community.proxmox.proxmox_disk:
+        <<: *proxmox_api_base
         vmid: "{{ nvm.vmid }}"
-        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
-        api_password: "{{ imagebuilder_env_proxmox_password }}"
-        api_host: "{{ imagebuilder_env_proxmox_server }}"
         name: "{{ imagebuilder_id_base }}"
         disk: virtio0
         storage: "{{ imagebuilder_env_proxmox_storage }}"
         import_from: "/mnt/pve/{{ imagebuilder_env_proxmox_storage }}/tmp/{{ imagebuilder_id_base }}/{{ imagebuilder_id_base }}.qcow2"
-        timeout: 6000
         state: present
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
 
     - name: Update VM boot order
       community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
-        api_password: "{{ imagebuilder_env_proxmox_password }}"
-        api_host: "{{ imagebuilder_env_proxmox_server }}"
-        name: "template-{{ imagebuilder_id_base }}"
+        <<: *proxmox_api_base
         node: "{{ imagebuilder_env_proxmox_node }}"
+        name: "template-{{ imagebuilder_id_base }}"
         boot: "order=virtio0"
         update: true
-        timeout: 600
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
 
     # - name: Set VM notes
     #   community.proxmox.proxmox_kvm:
@@ -238,15 +233,12 @@
     #   delegate_to: "{{ run_on | default('localhost') }}"
     - name: Update VM to template
       community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_env_proxmox_user }}@pam"
-        api_password: "{{ imagebuilder_env_proxmox_password }}"
-        api_host: "{{ imagebuilder_env_proxmox_server }}"
-        name: "template-{{ imagebuilder_id_base }}"
+        <<: *proxmox_api_base
         node: "{{ imagebuilder_env_proxmox_node }}"
+        name: "template-{{ imagebuilder_id_base }}"
         update: true
         state: template
-        timeout: 600
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
 
   rescue:
     - name: Rescue on failure
@@ -265,5 +257,5 @@
       ansible.builtin.file:
         path: "/tmp/windows-guestfish-inject.sh"
         state: absent
-      delegate_to: "{{ run_on | default('localhost') }}"
+      delegate_to: "{{ target_host }}"
       ignore_errors: true # noqa: ignore-errors
