@@ -5,16 +5,13 @@
   become: false
 
   vars:
-    id: alma-8
-    version: 8.10
+    id: alma-8.10
     os:
       config:
         disks:
           - 20
         timezone: Australia/Melbourne
         nicdriver: e1000
-      type: linux
-      variant: almalinux
       iso: http://192.168.1.161:8180/almalinux/8/AlmaLinux-8.10-x86_64-dvd.iso
       checksum: 463fa92155b886e31627f6713e1c2824343762245a914715ffd6f2efc300b7a1
       console_boot: |
@@ -25,6 +22,3 @@
     - imagebuilder
     - target_proxmox
     - target_vsphere
-
-    # - target_hyperv
-    # - target_ovirt
