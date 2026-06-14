@@ -4,15 +4,12 @@
   become: false
 
   vars:
-    id: ol-10
-    version: 10.1
+    id: ol-10.1
     os:
       config:
         disks:
           - 40
         timezone: Australia/Melbourne
-      type: linux
-      variant: OracleLinux
       iso: http://192.168.1.161:8180/Oracle/OL-10/OracleLinux-R10-U1-x86_64-dvd.iso
       checksum: 82fa2b70a18fb268c5ef013e298f85bba0d0e6c7ae882c49a3f67c02ee6d68de
       console_boot: |
