@@ -1,0 +1,7 @@
+# Debian-Based Systems
+- name: (PATCHING-PREPARE, debian) Debian-specific preparation tasks
+  when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower == "debian"
+  block:
+    - name: (PATCHING-PREPARE, debian) Placeholder for Debian-specific preparation tasks
+      ansible.builtin.debug:
+        msg: "No preparation tasks defined for Debian systems yet."

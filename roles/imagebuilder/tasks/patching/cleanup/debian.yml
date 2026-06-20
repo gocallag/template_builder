@@ -1,0 +1,6 @@
+    # Debian-Based Systems (Ubuntu/Debian)
+    - block:
+        - name: (PATCHING-CLEANUP, debian, ubuntu) Placeholder for Debian-based cleanup tasks
+          debug:
+            msg: "No cleanup tasks defined for Debian-based systems yet."
+      when: ansible_facts['os_family'] | lower == "debian"
