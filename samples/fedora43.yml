@@ -1,0 +1,24 @@
+---
+- name: FEDORA_43   # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: fedora-43.0
+    os:
+      config:
+        disks:
+          - 50
+        timezone: Australia/Melbourne
+
+      iso: http://192.168.1.161:8180/fedora/Fedora-Server-dvd-x86_64-43-1.6.iso
+      checksum: aca06983bef83da9b43144c1a2ff4c8483e4745167c17f53725c16a16742e643
+      console_boot: |
+          <up>e<wait><down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff><enter>
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
