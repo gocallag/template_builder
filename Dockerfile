@@ -36,6 +36,7 @@ RUN dnf -y update && \
       vim \
       libxml2-devel \
       libxslt-devel \
+	  openssl \
       sshpass \
       lsof \
     && dnf clean all
