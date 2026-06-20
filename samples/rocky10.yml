@@ -4,16 +4,13 @@
   become: false
 
   vars:
-    id: rocky-10
-    version: "10.1"
+    id: rocky-10.1
     os:
       config:
         disks:
           - 20
         timezone: Australia/Melbourne
         nicdriver: e1000
-      type: linux
-      variant: rockylinux
       iso: http://192.168.1.161:8180/rocky/10/Rocky-10.1-x86_64-dvd1.iso
       # iso: https://download.rockylinux.org/pub/rocky/10.0/isos/x86_64/Rocky-10.0-x86_64-dvd
       checksum: 55f96d45a052c0ed4f06309480155cb66281a008691eb7f3f359957205b1849a
@@ -25,4 +22,4 @@
   roles:
     - imagebuilder
     - target_proxmox
-    - target_vsphere
+    # - target_vsphere

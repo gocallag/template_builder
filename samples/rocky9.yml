@@ -4,16 +4,13 @@
   become: false
 
   vars:
-    id: rocky-9
-    version: "9.7"
+    id: rocky-9.7
     os:
       config:
         disks:
           - 20
         timezone: Australia/Melbourne
         nicdriver: e1000
-      type: linux
-      variant: rockylinux
       iso: http://192.168.1.161:8180/rocky/9/Rocky-9.7-x86_64-dvd.iso
       checksum: d48e902325dce6793935b4e13672a0d9a4f958e02d4e23fcf0a8a34c49ef03da
       console_boot: |

@@ -23,4 +23,4 @@
   roles:
     - imagebuilder
     - target_proxmox
-    - target_vsphere
+    # - target_vsphere
