@@ -1,0 +1,13 @@
+  # OpenSuSE-Based Systems
+- name: (BUILDAUX, OpenSuSE)
+  tags:
+      - build_aux
+  block:
+      - name: (BUILDAUX, opensuse) create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_build_profile: # noqa: var-naming
+                os_iso: "{{ os.iso }}" # noqa: var-naming
+                os_autoinst: "{{ autoinst }}" # noqa: var-naming
+      - name: (BUILDAUX, opensuse) create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}" # noqa: var-naming

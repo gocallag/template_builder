@@ -1,0 +1,123 @@
+---
+- name: ALMA_8    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+  vars:
+    id: leap-16.0
+    os:
+      config:
+        disks:
+          - 50
+      iso: http://192.168.1.161:8180/suse/Leap-16.0-offline-installer-x86_64.install.iso
+      checksum: d780a228058fb4688a31b5bde22d7b97c86e04a2ced33f3d7c8e88a710d96d24
+      console_boot: |
+             <down>e<down><down><down><down><end> ifcfg=enp0s3 netsetup=dhcp inst.auto=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/profile.jsonnet inst.finish=poweroff <leftCtrlOn>x<leftCtrlOff>
+
+    autoinst: |
+        {
+          "product": {
+            "id": "openSUSE_Leap"
+          },
+          "hostname": {
+            "static": "{{ id }}"
+          },
+          "root": {
+            "password": "{{ imagebuilder_env_linux_admin_password }}"
+          },
+          "user": {
+            "fullName": "{{ imagebuilder_env_ansible_user}}",
+            "userName": "{{ imagebuilder_env_ansible_user}}",
+            "password": "{{ imagebuilder_env_ansible_password }}",
+          },
+          "localization": {
+            "language": "en_US.UTF-8",
+            "keyboard": "us"
+
+          },
+          "network": {
+            "connections": [
+              {
+                "id": "eth0-connection",
+                "method4": "auto",
+                "interface": "eth0",
+                "autoconnect": true,
+                "persistent": true
+              }
+            ]
+          },
+          "storage": {
+            "drives": [
+              {
+                "alias": "bootDisk",
+                "search": "/dev/sda",
+                "ptableType": "gpt",
+                "partitions": [
+                  {
+                    "search": "*",
+                    "delete": true
+                  },
+                  {
+                    "filesystem": {
+                      "path": "/"
+                    },
+                    "size": {
+                      "min": "15 GiB"
+                    }
+                  },
+                  {
+                    "filesystem": {
+                      "path": "swap",
+                      "type": "swap"
+                    },
+                    "size": "2 GiB"
+                  }
+                ]
+              }
+            ],
+            "boot": {
+              "configure": true,
+              "device": "bootDisk"
+            }
+          },
+          "software": {
+            "patterns": [
+              "base"
+            ],
+            "packages": []
+          },
+            "files": [
+              {
+                "destination": "/etc/sudoers.d/{{ imagebuilder_env_ansible_user}}",
+                "content": "{{ imagebuilder_env_ansible_user }} ALL=(ALL) NOPASSWD:ALL",
+                "user": "root",
+                "group": "root",
+                "permissions": "0440",
+              },
+              {
+              "destination": "/root/.config/combustion/script",
+              "mode": "0755",
+              "owner": "root",
+              "group": "root",
+              "content": "#!/bin/bash\nset -e\nsystemctl enable sshd.service\nsystemctl start sshd.service\n",
+             },
+            ],
+
+          "scripts": {
+
+              "post": [
+                {
+                  "name": "FIRST-BOOT.sh",
+                  "content": "#!/usr/bin/bash\necho 'System booted for the first time'\nsystemctl enable --now sshd.service\n",
+                  "chroot": true
+                }
+              ]
+            }
+        }
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
+

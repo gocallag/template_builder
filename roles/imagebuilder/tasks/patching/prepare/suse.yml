@@ -1,0 +1,6 @@
+# SuSE-Based Systems
+- name: (PATCHING-PREPARE, suse) SuSE-specific preparation tasks
+  block:
+    - name: (PATCHING-PREPARE, suse) Placeholder for SuSE-specific preparation tasks
+      ansible.builtin.debug:
+        msg: "No preparation tasks defined for SuSE systems yet."
