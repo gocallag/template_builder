@@ -1,6 +1,38 @@
-# Alma Linux Systems
+# Red Hat Linux Systems
 - name: (PATCHING-PREPARE, redhat) Red Hat Linux-specific preparation tasks
   block:
-    - name: (PATCHING-PREPARE, redhat) Placeholder for Red Hat Linux-specific preparation tasks
-      ansible.builtin.debug:
-        msg: "No preparation tasks defined for Red Hat Linux systems yet."
+    - name: (PATCHING-PREPARE, redhat) Register with Red Hat Subscription Manager
+      community.general.redhat_subscription:
+        state: present
+        username: "{{ imagebuilder_env_rhsm_userid | default(omit) }}"
+        password: "{{ imagebuilder_env_rhsm_password | default(omit) }}"
+        org_id: "{{ imagebuilder_env_rhsm_org_id | default(omit) }}"
+        activationkey: "{{ imagebuilder_env_rhsm_activation_key | default(omit) }}"
+      when:
+        - imagebuilder_env_rhsm_userid is defined or imagebuilder_env_rhsm_activation_key is defined
+      register: rhn_register
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
+
+    - name: (PATCHING-PREPARE, redhat) Attach subscription
+      community.general.redhat_subscription:
+        state: present
+        pool_ids: "{{ imagebuilder_env_rhsm_pool_ids | default(omit) }}"
+        auto_attach: "{{ imagebuilder_env_rhsm_auto_attach | default(true) }}"
+      when:
+        - rhn_register is succeeded or (imagebuilder_env_rhsm_userid is defined or imagebuilder_env_rhsm_activation_key is defined)
+      register: rhn_attach
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
+
+    - name: (PATCHING-PREPARE, redhat) Enable required repositories
+      community.general.rhsm_repository:
+        name: "{{ item }}"
+        state: enabled
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
+      loop: "{{ imagebuilder_env_rhsm_repositories | default([]) }}"
+      when:
+        - imagebuilder_env_rhsm_repositories is defined
+        - imagebuilder_env_rhsm_repositories | length > 0
+

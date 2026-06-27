@@ -32,16 +32,33 @@
       when: os_type == "linux"
       block:
 
-        - name: Linux | Install QEMU Guest Agent
+        - name: Linux | Install QGA (RHEL)
+          when: os_variant | lower == "rhel"
+          ansible.builtin.command: >
+            virt-customize
+            -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+            --run-command "subscription-manager register --username='{{ imagebuilder_env_rhsm_userid }}' --password='{{ imagebuilder_env_rhsm_password }}' --auto-attach"
+            --run-command "dnf install -y qemu-guest-agent"
+            --run-command "systemctl enable qemu-guest-agent || true"
+            --run-command "subscription-manager unregister || true"
+            --run-command "subscription-manager clean || true"
+            --run-command 'touch /sysroot/.autorelabel'
+            --selinux-relabel
+          register: target_proxmox_linux_customize
+          changed_when: true
+
+        - name: Linux | Install QGA (non‑RHEL)
+          when: os_variant | lower != "rhel"
           ansible.builtin.command: >
             virt-customize
             -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
             --install qemu-guest-agent
             --run-command 'systemctl enable qemu-guest-agent || true'
-            --run-command 'touch /.autorelabel'
+            --run-command 'touch /sysroot/.autorelabel'
             --selinux-relabel
           register: target_proxmox_linux_customize
           changed_when: true
+
 
         - name: Linux | Show virt-customize output
           ansible.builtin.debug:

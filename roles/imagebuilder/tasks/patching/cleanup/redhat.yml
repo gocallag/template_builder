@@ -1,6 +1,6 @@
-# Alma Linux Systems
-- name: (PATCHING-CLEANUP) Cleanup Alma Linux
-  when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "almalinux"
+# Red Hat Linux Systems
+- name: (PATCHING-CLEANUP) Cleanup Red Hat Linux
+  when: ansible_facts['os_family'] | lower == "redhat" and ansible_facts['distribution'] | lower == "redhat"
   block:
     - name: (PATCHING-CLEANUP, alma) Clean dnf cache
       ansible.builtin.command: dnf clean all
@@ -9,3 +9,22 @@
       changed_when: false
       become: true
       delegate_to: "{{ delegate | default(omit) }}"
+
+    - name: (PATCHING-CLEANUP, redhat) Unregister from Red Hat Subscription Manager
+      community.general.redhat_subscription:
+        state: absent
+      ignore_errors: true
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
+
+    - name: (PATCHING-CLEANUP, redhat) Remove subscription manager data
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/pki/entitlement
+        - /etc/pki/entitlement-host
+        - /etc/rhsm/rhsm.conf.d
+      ignore_errors: true
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
