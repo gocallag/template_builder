@@ -1,0 +1,24 @@
+---
+- name: RHEL_8    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: rhel-8.10
+    os:
+      config:
+        disks:
+          - 50
+        timezone: Australia/Melbourne
+
+      iso: http://192.168.1.161:8180/redhat/RHEL8/rhel-8.10-x86_64-dvd.iso
+      checksum: 9b3c8e31bc2cdd2de9cf96abb3726347f5840ff3b176270647b3e66639af291b
+      console_boot: |
+        <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
+
