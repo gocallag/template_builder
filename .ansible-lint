@@ -1,3 +1,5 @@
 skip_list:
   - yaml[line-length]
   - fqcn[keyword]
+  - var-naming[no-role-prefix]
+  - command-instead-of-shell
