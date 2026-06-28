@@ -1,0 +1,23 @@
+---
+- name: RHEL_10    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: rhel-10.1
+    os:
+      config:
+        disks:
+          - 20
+        timezone: Australia/Melbourne
+        nicdriver: e1000
+      iso: http://192.168.1.161:8180/redhat/RHEL10/rhel-10.1-x86_64-dvd.iso
+      checksum: 5925e05c32d8324a72e146a29293d60707571817769de73df63eab8dbd6d3196
+      console_boot: |
+       <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
