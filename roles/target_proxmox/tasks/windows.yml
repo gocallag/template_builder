@@ -1,0 +1,29 @@
+---
+- name: Windows | Ensure working directory exists
+  ansible.builtin.file:
+    path: "/tmp/qga"
+    state: directory
+    mode: "0755"
+
+- name: Windows | Download QGA MSI
+  ansible.builtin.get_url:
+    url: "https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/latest/qemu-ga-x86_64.msi"
+    dest: "/tmp/qga/qemu-ga-x86_64.msi"
+    mode: "0644"
+  register: qga_download
+
+- name: Windows | Render unattend.xml
+  ansible.builtin.template:
+    src: "{{ windows_unattend_template }}"
+    dest: "/tmp/unattend.xml"
+    mode: "0644"
+
+- name: Windows | Inject drivers + QGA + unattend.xml
+  ansible.builtin.command: >
+    roles/imagebuilder/files/windows-guestfish-inject.sh
+    "{{ image_path }}"
+    "/tmp/unattend.xml:/Windows/Panther/Unattend.xml"
+    "/tmp/qga/qemu-ga-x86_64.msi:/Windows/Temp/qemu-ga.msi"
+    "{{ target_proxmox_windows_virtio_dir }}:/Drivers/VirtIO"
+  register: windows_inject
+  changed_when: true

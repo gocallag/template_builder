@@ -1,0 +1,52 @@
+---
+- name: Run guestfish script for rhel clones
+  ansible.builtin.shell: |
+    guestfish --network -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2" -i <<'GUESTFISH'
+    {% if os_variant|lower == 'rhel' %}
+    command "subscription-manager register --force --username={{ imagebuilder_env_rhsm_userid }} --password={{ imagebuilder_env_rhsm_password }}"
+    command "subscription-manager repos --enable=rhel-10-for-x86_64-appstream-rpms --enable=rhel-10-for-x86_64-baseos-rpms"
+    command "dnf update -y redhat-release"
+    {% endif %}
+    {% if os_variant|lower in ['rhel','rockylinux','almalinux','oraclelinux'] %}
+    command "dnf install -y qemu-guest-agent"
+    command "systemctl enable qemu-guest-agent"
+    command "test -d /sysroot && touch /sysroot/.autorelabel || touch /.autorelabel"
+    command "test -f /etc/selinux/targeted/contexts/files/file_contexts && setfiles /etc/selinux/targeted/contexts/files/file_contexts / || true"
+    command "restorecon -R -v / || true"
+    {% endif %}
+    {% if os_variant|lower == 'rhel' %}
+    command "subscription-manager unregister && subscription-manager clean || true"
+    {% endif %}
+    GUESTFISH
+    exit 0
+  when: os_variant|lower in ['rhel','rockylinux','almalinux','oraclelinux']
+  
+
+# - name: Build virt-customize command for Linux
+#   ansible.builtin.set_fact:
+#     virt_customize_cmd: |
+#       virt-customize \
+#         -a "{{ imagebuilder_build_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2" \
+#         {% if os_variant|lower == 'rhel' %}
+#         --run-command "subscription-manager register --force --username={{ imagebuilder_env_rhsm_userid }} --password={{ imagebuilder_env_rhsm_password }}" \
+#         {% endif %}
+#         {% if os_variant|lower in ['rhel','rockylinux','almalinux','oraclelinux'] %}
+#         --run-command "dnf install -y qemu-guest-agent" \
+#         {% else %}
+#         --install qemu-guest-agent \
+#         {% endif %}
+#         --run-command "systemctl enable qemu-guest-agent || true" \
+#         {% if os_variant|lower in ['rhel','rockylinux','almalinux','oraclelinux'] %}
+#         --run-command "if [ -d /sysroot ]; then touch /sysroot/.autorelabel; else touch /.autorelabel; fi" \
+#         --run-command "setfiles /etc/selinux/targeted/contexts/files/file_contexts /" \
+#         --selinux-relabel \
+#         {% endif %}
+#         {% if os_variant|lower == 'rhel' %}
+#         --run-command "subscription-manager unregister || true" \
+#         --run-command "subscription-manager clean || true" \
+#         {% endif %}
+
+# - name: Run virt-customize for Linux
+#   ansible.builtin.shell: "{{ virt_customize_cmd }}"
+#   register: linux_customize
+#   changed_when: true
