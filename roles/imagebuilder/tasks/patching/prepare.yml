@@ -1,3 +1,3 @@
 ---
 - name: PATCHING_PREPARE - Include patch preparation tasks
-  ansible.builtin.include_tasks: "patching/prepare/{{ ansible_facts['os_family'] | lower }}.yml"
+  ansible.builtin.include_tasks: "patching/prepare/{{ ansible_facts['distribution'] | lower  }}.yml"
