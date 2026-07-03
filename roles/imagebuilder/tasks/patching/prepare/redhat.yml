@@ -10,6 +10,7 @@
         activationkey: "{{ imagebuilder_env_rhsm_activation_key | default(omit) }}"
       when:
         - imagebuilder_env_rhsm_userid is defined or imagebuilder_env_rhsm_activation_key is defined
+        - os_variant | lower == 'rhel'
       register: rhn_register
       delegate_to: "{{ delegate | default(omit) }}"
       become: true
@@ -21,6 +22,7 @@
         auto_attach: "{{ imagebuilder_env_rhsm_auto_attach | default(true) }}"
       when:
         - rhn_register is succeeded or (imagebuilder_env_rhsm_userid is defined or imagebuilder_env_rhsm_activation_key is defined)
+        - os_variant | lower == 'rhel'
       register: rhn_attach
       delegate_to: "{{ delegate | default(omit) }}"
       become: true
@@ -35,4 +37,4 @@
       when:
         - imagebuilder_env_rhsm_repositories is defined
         - imagebuilder_env_rhsm_repositories | length > 0
-
+        - os_variant | lower == 'rhel'
