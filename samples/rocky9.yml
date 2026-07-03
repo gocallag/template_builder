@@ -11,8 +11,8 @@
           - 20
         timezone: Australia/Melbourne
         nicdriver: e1000
-      iso: http://192.168.1.161:8180/rocky/9/Rocky-9.7-x86_64-dvd.iso
-      checksum: d48e902325dce6793935b4e13672a0d9a4f958e02d4e23fcf0a8a34c49ef03da
+      iso: http://192.168.1.161:8180/rocky/9/Rocky-9.8-x86_64-dvd.iso
+      checksum: d2bcbb64c2d67511adf80d40cd9543391a33aea5860a355b1d26d7f55236d01f
       console_boot: |
           <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
   collections:
@@ -20,4 +20,4 @@
   roles:
     - imagebuilder
     - target_proxmox
-    - target_vsphere
+    # - target_vsphere
