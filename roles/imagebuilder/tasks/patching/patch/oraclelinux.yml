@@ -14,7 +14,7 @@
   become: true
   delegate_to: "{{ delegate | default(omit) }}"
 
-- name: PATCHING-PATCH-ROCKY
+- name: PATCHING-PATCH-ORACLELINUX
   ansible.builtin.set_fact:
       ponder: false # noqa var-naming
 
