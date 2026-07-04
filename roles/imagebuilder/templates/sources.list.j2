@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+
+{% set codename = ansible_lsb.codename %}
+{% set components = ['main','restricted','universe','multiverse'] %}
+{% set mirror = mirror | default('http://archive.ubuntu.com/ubuntu') %}
+{% set secmirror = secmirror | default('http://security.ubuntu.com/ubuntu') %}
+
+deb {{ mirror }} {{ codename }} {{ components | join(' ') }}
+deb {{ mirror }} {{ codename }}-updates {{ components | join(' ') }}
+deb {{ mirror }} {{ codename }}-backports {{ components | join(' ') }}
+deb {{ secmirror }} {{ codename }}-security {{ components | join(' ') }}
+
+{% if enable_src | default(false) %}
+deb-src {{ mirror }} {{ codename }} {{ components | join(' ') }}
+deb-src {{ mirror }} {{ codename }}-updates {{ components | join(' ') }}
+deb-src {{ mirror }} {{ codename }}-backports {{ components | join(' ') }}
+deb-src {{ secmirror }} {{ codename }}-security {{ components | join(' ') }}
+{% endif %}

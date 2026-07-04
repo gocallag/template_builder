@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+
+{% set codename = ansible_lsb.codename %}
+{% set components = ['main','restricted','universe','multiverse'] %}
+{% set suites = [codename, codename ~ '-updates', codename ~ '-backports'] %}
+{% set mirror = mirror | default('http://archive.ubuntu.com/ubuntu') %}
+{% set secmirror = secmirror | default('http://security.ubuntu.com/ubuntu') %}
+
+Types: deb
+URIs: {{ mirror }}
+Suites: {{ suites | join(' ') }}
+Components: {{ components | join(' ') }}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+Types: deb
+URIs: {{ secmirror }}
+Suites: {{ codename }}-security
+Components: {{ components | join(' ') }}
+Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg

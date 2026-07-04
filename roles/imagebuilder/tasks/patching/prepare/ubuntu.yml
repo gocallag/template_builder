@@ -2,6 +2,29 @@
 - name: (PATCHING-PREPARE, ubuntu) Ubuntu-specific preparation tasks
   when: ansible_facts['os_family'] | lower == "debian" and ansible_facts['distribution'] | lower == "ubuntu"
   block:
-    - name: (PATCHING-PREPARE, ubuntu) Placeholder for Ubuntu-specific preparation tasks
-      ansible.builtin.debug:
-        msg: "No preparation tasks defined for Ubuntu systems yet."
+    - name: Ensure apt sources directory exists
+      ansible.builtin.file:
+        path: /etc/apt/sources.list.d
+        state: directory
+        mode: '0755'
+      when: ansible_lsb.codename is version('noble', '>=')
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
+
+    - name: Use DEB822 on noble and newer
+      ansible.builtin.template:
+        src: ubuntu.sources.j2
+        dest: /etc/apt/sources.list.d/ubuntu.sources
+        mode: '0644'
+      when: ansible_lsb.codename is version('noble', '>=')
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
+
+    - name: Use classic sources.list on jammy and older
+      ansible.builtin.template:
+        src: sources.list.j2
+        dest: /etc/apt/sources.list
+        mode: '0644'
+      when: ansible_lsb.codename is version('noble', '<')
+      delegate_to: "{{ delegate | default(omit) }}"
+      become: true
