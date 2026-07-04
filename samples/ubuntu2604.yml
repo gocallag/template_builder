@@ -1,0 +1,24 @@
+---
+- name: UBUNTU_2604    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: ubuntu-2604
+    useauxiso: true
+    os:
+      config:
+        disks:
+          - 50
+      iso: http://192.168.1.161:8180/canonical/Ubuntu-2604/ubuntu-26.04-live-server-amd64.iso
+      checksum: dec49008a71f6098d0bcfc822021f4d042d5f2db279e4d75bdd981304f1ca5d9
+      console_boot: |
+          e<down><down><down><end><backspace><backspace><backspace><backspace> autoinstall<leftCtrlOn>x<leftCtrlOff>
+
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
