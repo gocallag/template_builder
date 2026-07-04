@@ -1,0 +1,24 @@
+---
+- name: UBUNTU_2504    # noqa: fqcn[keyword]
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars:
+    id: ubuntu-2504
+    useauxiso: true
+    os:
+      config:
+        disks:
+          - 50
+      iso: http://192.168.1.161:8180/canonical/Ubuntu-2504/ubuntu-25.04-live-server-amd64.iso
+      checksum: 8b44046211118639c673335a80359f4b3f0d9e52c33fe61c59072b1b61bdecc5
+      console_boot: |
+          e<down><down><down><end><backspace><backspace><backspace><backspace> autoinstall<leftCtrlOn>x<leftCtrlOff>
+
+
+  collections:
+    - gocallag.template_builder
+  roles:
+    - imagebuilder
+    - target_proxmox
