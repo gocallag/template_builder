@@ -4,16 +4,16 @@
   become: false
 
   vars:
-    id: rocky-10.1
-    os:
+    id: rocky-10.2
+    os
       config:
         disks:
           - 20
         timezone: Australia/Melbourne
         nicdriver: e1000
-      iso: http://192.168.1.161:8180/rocky/10/Rocky-10.1-x86_64-dvd1.iso
+      iso: http://192.168.1.161:8180/rocky/10/Rocky-10.2-x86_64-dvd1.iso
       # iso: https://download.rockylinux.org/pub/rocky/10.0/isos/x86_64/Rocky-10.0-x86_64-dvd
-      checksum: 55f96d45a052c0ed4f06309480155cb66281a008691eb7f3f359957205b1849a
+      checksum: 16ca9c96cdb221ba6e1f68579f21bd69fd8da81c6a921d9068949796f91c8feb
       console_boot: |
            <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
 

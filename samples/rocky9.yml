@@ -4,7 +4,7 @@
   become: false
 
   vars:
-    id: rocky-9.7
+    id: rocky-9.8
     os:
       config:
         disks:
