@@ -1,0 +1,6 @@
+    # Ubuntu-Based Systems (Ubuntu/Ubuntu)
+    - block:
+        - name: (PATCHING-CLEANUP, ubuntu) Placeholder for Ubuntu-based cleanup tasks
+          debug:
+            msg: "No cleanup tasks defined for Ubuntu-based systems yet."
+      when: ansible_facts['os_family'] | lower == "ubuntu"

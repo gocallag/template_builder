@@ -1,10 +1,10 @@
 ---
 # Ubuntu-Based Systems
-- name: (BUILDAUX, ubuntu)
+- name: (BUILDPROFILE, ubuntu)
   tags:
       - build_aux
   block:
-      - name: (BUILDAUX, ubuntu) create build directories
+      - name: (BUILDPROFILE, ubuntu) create build directories
         ansible.builtin.file:
             path: "{{ file }}"
             state: directory
@@ -12,35 +12,35 @@
         loop_control:
             loop_var: file
         loop:
-            - "{{ build_basedir }}/build"
-            - "{{ build_basedir }}/build/mnt"
+            - "{{ imagebuilder_build_basedir }}/build"
+            - "{{ imagebuilder_build_basedir }}/build/mnt"
 
 
-      - name: (BUILDAUX, ubuntu) remove existing aux ISO (if it exists)
+      - name: (BUILDPROFILE, ubuntu) remove existing aux ISO (if it exists)
         ansible.builtin.file:
-            path: "{{ build_basedir }}/build/aux.iso"
+            path: "{{ imagebuilder_build_basedir }}/build/aux.iso"
             state: absent
 
-      - name: (BUILDAUX, ubuntu) create temporary iso contents dir
+      - name: (BUILDPROFILE, ubuntu) create temporary iso contents dir
         ansible.builtin.file:
-            path: "{{ build_basedir }}/build/iso_contents"
+            path: "{{ imagebuilder_build_basedir }}/build/iso_contents"
             mode: "0755"
             state: directory
 
-      - name: (BUILDAUX, ubuntu) Generate hashed password (Ubuntu)
-        ansible.builtin.shell: "set -o pipefail; printf '{{ env_ansible_password }}' | openssl passwd -6 -stdin"
+      - name: (BUILDPROFILE, ubuntu) Generate hashed password (Ubuntu)
+        ansible.builtin.shell: "set -o pipefail; printf '{{ imagebuilder_env_ansible_password }}' | openssl passwd -6 -stdin"
         register: hashed_password # noqa: var-naming
         changed_when: false
 
-      - name: (BUILDAUX, ubuntu) Set hashed password fact (Ubuntu)
+      - name: (BUILDPROFILE, ubuntu) Set hashed password fact (Ubuntu)
         ansible.builtin.set_fact:
             hashed_password: "{{ hashed_password.stdout }}" # noqa: var-naming
 
-      - name: (BUILDAUX, ubuntu) use default metadata if none provided
+      - name: (BUILDPROFILE, ubuntu) use default metadata if none provided
         ansible.builtin.set_fact:
             metadata: "" # noqa: var-naming
         when: metadata is not defined
-      - name: (BUILDAUX, ubuntu) use default userdata if none provided
+      - name: (BUILDPROFILE, ubuntu) use default userdata if none provided
         ansible.builtin.set_fact:
             userdata: # noqa: var-naming
                 |
@@ -48,6 +48,7 @@
                   autoinstall:
                     version: 1
                     shutdown: poweroff
+
                     storage:
                       layout:
                         name: lvm
@@ -58,13 +59,16 @@
                     locale: en_AU.UTF-8
                     keyboard:
                       layout: us
+
                     identity:
                       hostname: {{ imagebuilder_id_base }}
-                      password: {{ hashed_password }}
-                      username: {{ env_ansible_user }}
+                      username: {{ imagebuilder_env_ansible_user }}
+                      password: "{{ hashed_password }}"
+
                     ssh:
                       allow-pw: true
                       install-server: true
+
                     apt:
                       primary:
                         - arches: [default]
@@ -74,6 +78,7 @@
 
                     packages:
                       - openssh-server
+
                     late-commands:
                       - rm -f /target/etc/netplan/*.yaml
                       - |
@@ -84,57 +89,39 @@
                         EOF
 
                       - |
-                        cat <<EOF | sudo tee /target/etc/sudoers.d/ansible
-                        ansible  ALL=(ALL)       NOPASSWD: ALL
+                        cat <<EOF | sudo tee /target/etc/sudoers.d/{{ imagebuilder_env_ansible_user }}
+                        {{ imagebuilder_env_ansible_user }}  ALL=(ALL)       NOPASSWD: ALL
                         EOF
 
                       - curtin in-target --target /target netplan generate
                       - curtin in-target --target /target netplan apply
 
-                    user-data: # Commands here run during first boot (cannot be interactive)
-                      runcmd:
-                        - ssh-keygen -A
-                        - systemctl enable ssh
+                  # -------------------------------
+                  # Cloud-init section (top-level)
+                  # -------------------------------
+
+                  user-data:
+                    runcmd:
+                      - ssh-keygen -A
+                      - systemctl enable ssh
+
+                  users:
+                    - name: {{ imagebuilder_env_ansible_user }}
+                      sudo: ALL=(ALL) NOPASSWD:ALL
+                      shell: /bin/bash
+
+                  chpasswd:
+                    list: |
+                      {{ imagebuilder_env_ansible_user }}:{{ imagebuilder_env_ansible_password }}
+                    expire: False
+                    hashed: False
+
         when: userdata is not defined or userdata | length == 0
-      - name: (BUILDAUX, ubuntu) Copy meta-data to ISO contents
-        ansible.builtin.copy:
-            content: "{{ metadata }}"
-            dest: "{{ build_basedir }}/build/iso_contents/meta-data"
-            mode: "0644"
-        become: true
-
-      - name: (BUILDAUX, ubuntu) Copy user-data to ISO contents
-        ansible.builtin.copy:
-            content: "{{ userdata }}"
-            dest: "{{ build_basedir }}/build/iso_contents/user-data"
-            mode: "0644"
-        become: true
-
-      - name: (BUILDAUX, ubuntu) Build aux ISO from contents (label CIDATA)
-        ansible.builtin.command: >
-          genisoimage -output aux.iso -volid CIDATA -joliet -rock meta-data user-data
-        args:
-            chdir: "{{ build_basedir }}/build/iso_contents"
-            creates: "{{ build_basedir }}/build/aux.iso"
-        register: mkiso # noqa: var-naming
-        failed_when: mkiso.rc != 0
-
-      - name: (BUILDAUX, ubuntu) Move aux ISO to build directory
-        ansible.builtin.command: >
-          mv {{ build_basedir }}/build/iso_contents/aux.iso {{ build_basedir }}/build/aux.iso
-        args:
-            creates: "{{ build_basedir }}/build/aux.iso"
-
-      - name: (BUILDAUX, ubuntu) Remove temporary ISO contents directory
-        ansible.builtin.file:
-            path: "{{ build_basedir }}/build/iso_contents"
-            state: absent
-        become: true
-      - name: (BUILDAUX, ubuntu) create sha256 of build profile
+      - name: (BUILDPROFILE, ubuntu) create sha256 of build profile
         ansible.builtin.set_fact:
             build_profile: # noqa: var-naming
                 os_iso: "{{ os.iso }}" # noqa: var-naming
                 os_userdata: "{{ userdata }}" # noqa: var-naming
-      - name: (BUILDAUX, ubuntu) create sha256 of build profile
+      - name: (BUILDPROFILE, ubuntu) create sha256 of build profile
         ansible.builtin.set_fact:
-            profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming
+            imagebuilder_profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming
