@@ -1,0 +1,3 @@
+# Red Hat Linux Systems
+- name: (PATCHING-PREPARE, rocky) Rocky Linux-specific preparation tasks
+  ansible.builtin.debug: msg="Rocky Linux preparation tasks are not required at this time."
