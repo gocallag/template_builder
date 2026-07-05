@@ -13,8 +13,8 @@
         timezone: Australia/Melbourne
         nicdriver: e1000
       # iso: https://mirror.stream.centos.org/9-stream/BaseOS/x86_64/iso/CentOS-Stream-9-latest-x86_64-dvd1.iso
-      iso: http://192.168.1.161:8180/centos/CentOS-9/CentOS-Stream-9-20260127.1-x86_64-dvd1.iso
-      checksum: 38f13b8bbbd689570388248c56cdce5513ae6bb64c6a55c0f6efbe76e2efd56e
+      iso: http://192.168.1.161:8180/centos/CentOS-9/CentOS-Stream-9-20260630.2-x86_64-dvd1.iso
+      checksum: 6ed2fac1f1b7f0279b1f5eda1381cc0179775a6649c27d294ae5da4b059d1220
       console_boot: |
         <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
 
