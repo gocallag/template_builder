@@ -18,11 +18,30 @@
      dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}"
      checksum: "sha256:{{ os.checksum }}"
      mode: "0644"
-  retries: 0
+  retries: 5
   delay: 5
   register: imagebuilder_download_result
-  until: imagebuilder_download_result is succeeded
+  until: >-
+    imagebuilder_download_result is succeeded or
+    ('Checksum mismatch' in (imagebuilder_download_result.msg | default('')))
+  ignore_errors: true
   when: imagebuilder_download_status.downloaded is not defined or not imagebuilder_download_status.downloaded
+  tags:
+     - always
+- name: (DOWNLOAD) Fail on checksum mismatch
+  ansible.builtin.fail:
+     msg: "{{ imagebuilder_download_result.msg }}"
+  when:
+     - imagebuilder_download_result is failed
+     - "'Checksum mismatch' in (imagebuilder_download_result.msg | default(''))"
+  tags:
+     - always
+- name: (DOWNLOAD) Fail after download retries are exhausted
+  ansible.builtin.fail:
+     msg: "{{ imagebuilder_download_result.msg }}"
+  when:
+     - imagebuilder_download_result is failed
+     - "'Checksum mismatch' not in (imagebuilder_download_result.msg | default(''))"
   tags:
      - always
 - name: (DOWNLOAD) Save download status
@@ -34,5 +53,6 @@
       checksum: "{{ os.checksum }}"
       dest: "{{ imagebuilder_build_basedir }}/downloads/{{ os.iso | basename }}"
      mode: "0644"
+  when: imagebuilder_download_result is succeeded
   tags:
      - always
