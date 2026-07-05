@@ -55,5 +55,3 @@
   when:
       - imagebuilder_nr is defined
       - imagebuilder_nr.rc == 1
-
-
