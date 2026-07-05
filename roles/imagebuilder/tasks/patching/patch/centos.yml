@@ -1,0 +1,57 @@
+---
+# CentOS Linux-Based Systems
+- name: (PATCHING-PATCH, CentOS) Check if reboot is required
+  ansible.builtin.command: "/usr/bin/needs-restarting -r"
+  register: imagebuilder_nr
+  failed_when: imagebuilder_nr.rc not in [0,1,2]
+  changed_when: false
+  delegate_to: "{{ delegate | default(omit) }}"
+
+
+- name: (PATCHING-PATCH, CentOS) Reboot if required
+  ansible.builtin.reboot:
+      reboot_timeout: 1200
+  become: true
+  delegate_to: "{{ delegate | default(omit) }}"
+
+- name: PATCHING-PATCH-CENTOS
+  ansible.builtin.set_fact:
+      ponder: false # noqa var-naming
+
+- name: (PATCHING-PATCH) Wait for admin port (22) to be available
+  ansible.builtin.wait_for:
+      host: "{{ waitfor_host }}"
+      port: "{{ waitfor_port }}"
+      delay: 10
+      timeout: 1200
+      state: started
+  delegate_to: "{{ run_on | default('localhost') }}"
+  when:
+      - imagebuilder_nr is defined
+      - imagebuilder_nr.rc == 1
+
+- name: (PATCHING-PATCH, CentOS) Update the system
+  ansible.builtin.command: "dnf upgrade -y"
+  delegate_to: "{{ delegate | default(omit) }}"
+  register: imagebuilder_yum
+  become: true
+  changed_when: imagebuilder_yum.rc == 0 and 'Nothing to do' not in imagebuilder_yum.stdout
+  ignore_errors: true
+
+- name: (PATCHING-PATCH, CentOS ) Debug yum output
+  ansible.builtin.debug:
+      msg: >-
+          (PATCHING) Task '{{ imagebuilder_yum }}'.
+
+- name: (PATCHING-PATCH, CentOS) Check if reboot is required post patching
+  ansible.builtin.command: "/usr/bin/needs-restarting -r"
+  register: imagebuilder_nr
+  changed_when: false
+  failed_when: imagebuilder_nr.rc not in [0,1,2]
+  delegate_to: "{{ delegate | default(omit) }}"
+
+- name: (PATCHING-PATCH, CentOS) retry patching if we need to reboot post yum update
+  ansible.builtin.include_tasks: patching/patch/centos.yml
+  when:
+      - imagebuilder_nr is defined
+      - imagebuilder_nr.rc == 1

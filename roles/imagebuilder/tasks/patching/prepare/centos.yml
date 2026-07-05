@@ -1,0 +1,6 @@
+# CentOS Linux Systems
+- name: (PATCHING-PREPARE, CentOS) CentOS Linux-specific preparation tasks
+  block:
+    - name: (PATCHING-PREPARE, CentOS) Placeholder for CentOS Linux-specific preparation tasks
+      ansible.builtin.debug:
+        msg: "No preparation tasks defined for CentOS Linux systems yet."
