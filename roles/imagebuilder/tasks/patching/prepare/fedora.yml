@@ -1,0 +1,6 @@
+# Fedora Linux Systems
+- name: (PATCHING-PREPARE, Fedora) Fedora Linux-specific preparation tasks
+  block:
+    - name: (PATCHING-PREPARE, Fedora) Placeholder for Fedora Linux-specific preparation tasks
+      ansible.builtin.debug:
+        msg: "No preparation tasks defined for Fedora Linux systems yet."
