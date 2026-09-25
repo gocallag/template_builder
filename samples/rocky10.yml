@@ -5,7 +5,7 @@
 
   vars:
     id: rocky-10.2
-    os
+    os:
       config:
         disks:
           - 20

@@ -1,15 +1,15 @@
 # ansible-lint: ignore=line-length
 
 # RedHat-Based Systems
-- name: (BUILDPROFILE, redhat)
+- name: (BUILDPROFILE, OracleLinux)
   tags:
       - always
   block:
-      - name: (BUILDAUX, redhat) use default ks if none provided
+      - name: (BUILDAUX, OracleLinux) use default ks if none provided
         ansible.builtin.set_fact:
             ks: # noqa: var-naming
                 |
-                  #default kickstart for redhat based systems {{ version_major }} {{ version_minor }} - will be used if no ks is provided for the build
+                  #default kickstart for OracleLinux based systems {{ version_major }} {{ version_minor }} - will be used if no ks is provided for the build
                   {% if (version_major | default('') | int) == 8 %}
                   repo --name=epel --baseurl=https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/
                   {% endif %}
@@ -18,7 +18,7 @@
                   eula --agreed
                   lang en_US.UTF-8
                   keyboard us
-                  rootpw {{ imagebuilder_env_linux_admin_password }}
+                  rootpw {{ imagebuilder_config.credentials.linux_admin.password }}
                   selinux --enforcing
                   firstboot --disable
                   firewall --enabled --ssh --port=22/tcp
@@ -48,7 +48,7 @@
                   logvol /var/log/audit --fstype xfs --name lvvarlogaud --vgname {{ os_variant | lower }} --size 512
                   logvol swap --fstype swap --recommended --name swap --vgname {{ os_variant | lower }}
 
-                  user --name={{ imagebuilder_env_ansible_user }} --groups=wheel --plaintext --password={{ imagebuilder_env_ansible_password }}
+                  user --name={{ imagebuilder_config.credentials.ansible.username }} --groups=wheel --plaintext --password={{ imagebuilder_config.credentials.ansible.password }}
 
                   %packages --ignoremissing --excludedocs {{ ('--instLangs') if (version_major | default('') | int) == 8 else ('--inst-langs') if (version_major | default('') | int) >= 9 else '' }}=en_US.utf8
                   {% if os_variant is defined and (os_variant | lower) == 'fedora' %}
@@ -158,19 +158,19 @@
                     alternatives --set python $(command -v python3)
 
                     #---- Install our SSH key ----
-                    id -u {{ imagebuilder_env_ansible_user }} &>/dev/null || useradd -m -s /bin/bash {{ imagebuilder_env_ansible_user }}
-                    mkdir -m0700 /home/{{ imagebuilder_env_ansible_user }}/.ssh/
-                    echo "{{ imagebuilder_env_ansible_key }}" > /home/{{ imagebuilder_env_ansible_user }}/.ssh/authorized_keys
-                    chown -R {{ imagebuilder_env_ansible_user }}:wheel /home/{{ imagebuilder_env_ansible_user }}/.ssh
-                    chmod 0600 /home/{{ imagebuilder_env_ansible_user }}/.ssh/authorized_keys
+                    id -u {{ imagebuilder_config.credentials.ansible.username }} &>/dev/null || useradd -m -s /bin/bash {{ imagebuilder_config.credentials.ansible.username }}
+                    mkdir -m0700 /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/
+                    echo "{{ imagebuilder_config.credentials.ansible.public_key }}" > /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/authorized_keys
+                    chown -R {{ imagebuilder_config.credentials.ansible.username }}:wheel /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh
+                    chmod 0600 /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/authorized_keys
                     # Ensure ansible user is in the wheel group
-                    usermod -aG wheel {{ imagebuilder_env_ansible_user }}
-                    echo "{{ imagebuilder_env_ansible_user }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
+                    usermod -aG wheel {{ imagebuilder_config.credentials.ansible.username }}
+                    echo "{{ imagebuilder_config.credentials.ansible.username }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
                     chmod 0440 /etc/sudoers.d/ansible
 
                     # Check if SELinux is enabled before running restorecon to avoid unnecessary errors
                     if [ "$(getenforce)" != "Disabled" ]; then
-                      restorecon -R /home/{{ imagebuilder_env_ansible_user }}/.ssh/
+                      restorecon -R /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/
                     fi
 
                     # Configure password quality settings

@@ -1,0 +1,197 @@
+# ansible-lint: ignore=line-length
+
+# RedHat-Based Systems
+- name: (BUILDPROFILE, redhat)
+  tags:
+      - always
+  block:
+      - name: (BUILDAUX, redhat) use default ks if none provided
+        ansible.builtin.set_fact:
+            ks: # noqa: var-naming
+                |
+                  #default kickstart for redhat based systems {{ version_major }} {{ version_minor }} - will be used if no ks is provided for the build
+                  {% if (version_major | default('') | int) == 8 %}
+                  repo --name=epel --baseurl=https://dl.fedoraproject.org/pub/epel/8/Everything/x86_64/
+                  {% endif %}
+                  cdrom
+                  text
+                  eula --agreed
+                  lang en_US.UTF-8
+                  keyboard us
+                  rootpw {{ imagebuilder_config.credentials.linux_admin.password }}
+                  selinux --enforcing
+                  firstboot --disable
+                  firewall --enabled --ssh --port=22/tcp
+                  authselect --enableshadow --passalgo=sha512
+                  skipx
+                  poweroff
+                  services --disabled="kdump" --enabled="auditd,chronyd,rsyslog,sshd"
+                  timezone {{ os.config.timezone }} {{ ('--isUtc') if (version_major | default('') | int) == 8 else ('--utc') if (version_major | default('') | int) >= 9 else '' }}
+                  #network --hostname={{ imagebuilder_id_base }}  --noipv6 --bootproto=dhcp
+                  network --hostname={{ imagebuilder_id_base }} --bootproto=dhcp --activate --onboot=on --noipv6
+                  clearpart --all --disklabel gpt --drives=sda
+                  bootloader --location mbr
+                  ignoredisk --only-use=sda
+                  part biosboot --fstype=biosboot --size=1 --ondisk=sda
+                  partition /boot/efi --fstype=efi --label EFI  --size=200 --ondisk=sda
+                  part /boot --size=1024 --ondisk sda --fstype xfs
+                  part pv.1 --size 1 --grow --asprimary --ondisk sda
+                  volgroup {{ os_variant | lower }} pv.1
+                  # UPDATE filesystem config/sizing - Most of these are recommended for CIS
+                  logvol / --fstype xfs --name lvroot --vgname {{ os_variant | lower }} --size 1024
+                  logvol /home --fstype xfs --name lvhome --vgname {{ os_variant | lower }} --size 512
+                  logvol /opt --fstype xfs --name lvopt --vgname {{ os_variant | lower }} --size 512
+                  logvol /tmp --fstype xfs --name lvtmp --vgname {{ os_variant | lower }} --size 512
+                  logvol /usr --fstype xfs --name lvusr --vgname {{ os_variant | lower }} --size 4096
+                  logvol /var --fstype xfs --name lvvar --vgname {{ os_variant | lower }} --size 3172
+                  logvol /var/log --fstype xfs --name=lvvarlog --vgname {{ os_variant | lower }} --size 1024
+                  logvol /var/log/audit --fstype xfs --name lvvarlogaud --vgname {{ os_variant | lower }} --size 512
+                  logvol swap --fstype swap --recommended --name swap --vgname {{ os_variant | lower }}
+
+                  user --name={{ imagebuilder_config.credentials.ansible.username }} --groups=wheel --plaintext --password={{ imagebuilder_config.credentials.ansible.password }}
+
+                  %packages --ignoremissing --excludedocs {{ ('--instLangs') if (version_major | default('') | int) == 8 else ('--inst-langs') if (version_major | default('') | int) >= 9 else '' }}=en_US.utf8
+                  {% if os_variant is defined and (os_variant | lower) == 'fedora' %}
+                  # Fedora-specific packages
+                  {% if (version_major | default('') | int) >= 43 %}
+                  # Fedora 43 and later
+                  @Base
+                  rsyslog
+                            {% else %}
+                  # Fedora versions prior to 43
+                  # None Added
+                            {% endif %}
+                          {% elif os_variant is defined and (os_variant | lower) == 'centos' %}
+                            {% if (version_major | default('') | int) == 8 %}
+                  # CentOS 8-specific packages
+                  @^minimal-environment
+                            {% elif (version_major | default('') | int) >= 9 %}
+                  # CentOS 9 and later-specific packages
+                  @core
+                            {% endif %}
+                  # CentOS-common specific packages
+                  # None Added
+                          {% elif os_variant is defined and (os_variant | lower) == 'rhel' %}
+                            {% if (version_major | default('') | int) == 8 %}
+                              # RHEL 8-specific packages
+                              @^minimal-environment
+                              python39
+                            {% elif (version_major | default('') | int) == 9 %}
+                              # RHEL 9 and later-specific packages
+                              @core
+                            {% elif (version_major | default('') | int) >= 10 %}
+                              # RHEL 10 and later-specific packages
+                              @core
+                              subscription-manager
+                              subscription-manager-rhsm-certificates
+                              python3-subscription-manager-rhsm
+                            {% endif %}
+                            # RHEL-specific packages
+                            # None Added
+                          {% elif os_variant is defined and (os_variant | lower) == 'almalinux' %}
+                            {% if (version_major | default('') | int) == 8 %}
+                              # AlmaLinux 8-specific packages
+                              @^minimal-environment
+                              python39
+                            {% elif (version_major | default('') | int) >= 9 %}
+                              # AlmaLinux 9 and later-specific packages
+                              @core
+                            {% endif %}
+                            # AlmaLinux-specific packages
+                            # None Added
+                          {% elif os_variant is defined and (os_variant | lower) == 'rockylinux' %}
+                            {% if (version_major | default('') | int) == 8 %}
+                              # Rocky Linux 8-specific packages
+                              @^minimal-environment
+                              python39
+                            {% elif (version_major | default('') | int) >= 9 %}
+                              # Rocky Linux 9 and later-specific packages
+                              @core
+                            {% endif %}
+                            # Rocky Linux-specific packages
+                            # None Added
+                        {% elif os_variant is defined and (os_variant | lower) == 'oraclelinux' %}
+                            {% if (version_major | default('') | int) == 8 %}
+                              # Oracle Linux 8-specific packages
+                              @^minimal-environment
+                              python39
+                            {% elif (version_major | default('') | int) >= 9 %}
+                              # Oracle Linux 9 and later-specific packages
+                              @core
+                            {% endif %}
+                            # Oracle Linux-specific packages
+                            # None Added
+                          {% endif %}
+                            # Common packages for all RHEL-based systems
+                            audit
+                            bzip2
+                            chrony
+                            deltarpm
+                            dnf-utils
+                            net-tools
+                            wget
+                            cloud-init
+                            cloud-utils-growpart
+                            rsync
+                            tar
+                            patch
+                            vim
+                            yum-utils
+                            # Remove ALSA firmware
+                            -a*-firmware
+                            # Remove Intel wireless firmware
+                            -i*-firmware
+                            -open-vm-tools
+                            -qemu-guest-agent
+
+                  %end
+                  # disable kdump service
+                  %addon com_redhat_kdump --disable
+                  %end
+
+                  %post
+                    # Disable unused filesystems
+                    echo "install cramfs /bin/true" > /etc/modprobe.d/cramfs.conf
+                    echo "install freevxfs /bin/true" > /etc/modprobe.d/freevxfs.conf
+                    echo "install jffs2 /bin/true" > /etc/modprobe.d/jffs2.conf
+                    # Set Python alternatives
+                    alternatives --set python $(command -v python3)
+
+                    #---- Install our SSH key ----
+                    id -u {{ imagebuilder_config.credentials.ansible.username }} &>/dev/null || useradd -m -s /bin/bash {{ imagebuilder_config.credentials.ansible.username }}
+                    mkdir -m0700 /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/
+                    echo "{{ imagebuilder_config.credentials.ansible.public_key }}" > /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/authorized_keys
+                    chown -R {{ imagebuilder_config.credentials.ansible.username }}:wheel /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh
+                    chmod 0600 /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/authorized_keys
+                    # Ensure ansible user is in the wheel group
+                    usermod -aG wheel {{ imagebuilder_config.credentials.ansible.username }}
+                    echo "{{ imagebuilder_config.credentials.ansible.username }} ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/ansible
+                    chmod 0440 /etc/sudoers.d/ansible
+
+                    # Check if SELinux is enabled before running restorecon to avoid unnecessary errors
+                    if [ "$(getenforce)" != "Disabled" ]; then
+                      restorecon -R /home/{{ imagebuilder_config.credentials.ansible.username }}/.ssh/
+                    fi
+
+                    # Configure password quality settings
+                    sed -i '/^minlen/d' /etc/security/pwquality.conf
+                    echo "minlen = 14" >> /etc/security/pwquality.conf
+                    sed -i '/^dcredit/d' /etc/security/pwquality.conf
+                    sed -i '/^ucredit/d' /etc/security/pwquality.conf
+                    sed -i '/^ocredit/d' /etc/security/pwquality.conf
+                    sed -i '/^lcredit/d' /etc/security/pwquality.conf
+                    echo "dcredit = -1" >> /etc/security/pwquality.conf
+                    echo "ucredit = -1" >> /etc/security/pwquality.conf
+                    echo "ocredit = -1" >> /etc/security/pwquality.conf
+                    echo "lcredit = -1" >> /etc/security/pwquality.conf
+                  %end
+        when: ks is not defined or ks | length == 0
+
+      - name: (BUILDPROFILE, redhat) build profile fact
+        ansible.builtin.set_fact:
+            imagebuilder_build_profile:
+                os: "{{ os | to_json }}"  # noqa: var-naming
+                ks: "{{ ks }}"            # noqa: var-naming
+      - name: (BUILDPROFILE, redhat) create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"

@@ -8,25 +8,32 @@ imagebuilder_env_qemu_psrp_port: "{{ 5986 + (imagebuilder_port_offset | default(
 imagebuilder_env_qemu_monport: "{{ 4445 + (imagebuilder_port_offset | default(0) | int) }}"
 version_major: "{{ id | regex_replace('^.*-(\\d+)\\..*$', '\\1') | int }}" # noqa: var-naming
 version_minor: "{{ id | regex_replace('^.*-\\d+\\.(\\d+).*$', '\\1') | int }}" # noqa: var-naming
-imagebuilder_build_basedir: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}"
-imagebuilder_build_savedir: "{{ imagebuilder_env_build_path }}/images"
+
+imagebuilder_path_basedir: "{{ imagebuilder_config.builder.build_path }}/{{ imagebuilder_id_base }}"
+imagebuilder_path_httpdir: "{{ imagebuilder_path_basedir }}/http"
+imagebuilder_path_auxdir: "{{ imagebuilder_path_httpdir }}/aux"
+imagebuilder_path_imagedir: "{{ imagebuilder_path_basedir }}/build"
+imagebuilder_path_downloadsdir: "{{ imagebuilder_path_basedir }}/downloads"
+imagebuilder_path_mntdir: "{{ imagebuilder_path_imagedir }}/mnt"
+imagebuilder_path_savedir: "{{ imagebuilder_path_basedir }}/images"
+
 imagebuilder_build_id: "{{ imagebuilder_id_base }}"
-imagebuilder_build_iso: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}/downloads/{{ os.iso | basename }}"
-imagebuilder_build_aux: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}/build/{{ imagebuilder_id_prefix }}.img"
+imagebuilder_build_format: qcow2
+
+imagebuilder_build_iso: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+imagebuilder_build_aux: "{{ imagebuilder_path_auxdir }}/{{ imagebuilder_build_id }}.iso"
+
+
 imagebuilder_build_disks: "{{ os.config.disks }}"
 imagebuilder_build_kickstart: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}/ks.cfg"
 imagebuilder_build_ram: "{{ imagebuilder_env_build_memory | default(2048) }}"
 imagebuilder_build_vcpus: "{{ imagebuilder_env_build_cpu | default(2) }}"
-imagebuilder_build_output: "{{ imagebuilder_build_basedir }}/build/{{ imagebuilder_id_base }}.qcow2"
-imagebuilder_build_httpdir: "http"
-imagebuilder_build_auxdir: "http/aux"
-imagebuilder_build_format: qcow2
-imagebuilder_build_imagedir: "build"
-imagebuilder_build_downloadsdir: "downloads"
+# imagebuilder_build_output: "build/{{ imagebuilder_id_base }}.qcow2"
+
 # imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
 # imagebuilder_iso_file: "{{ imagebuilder_build_basedir }}/build/{{ imagebuilder_id_base }}.iso"
 wait_host: "{{ imagebuilder_env_qemu_ip }}" # noqa: var-naming
-wait_port: "{{ (os_type | lower == 'linux') | ternary(22, 5985) }}" # noqa: var-naming
+wait_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
 wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
 imagebuilder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
 imagebuilder_restored_from_image: false

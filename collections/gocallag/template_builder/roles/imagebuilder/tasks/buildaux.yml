@@ -1,0 +1,24 @@
+---
+- name: (BUILDAUX) create build AUX directories
+  ansible.builtin.file:
+    path: "{{ file }}"
+    state: directory
+    mode: "755"
+  loop_control:
+    loop_var: file
+  loop:
+    - "{{ imagebuilder_path_mntdir }}"
+    - "{{ imagebuilder_path_mntdir }}/drivers"
+    - "{{ imagebuilder_path_mntdir }}/tools"
+    - "{{ imagebuilder_path_mntdir }}/patches"
+# - name: (BUILDAUX) include variant-specific tasks
+#   ansible.builtin.include_tasks:
+#     file: buildaux/{{ os_variant | lower }}.yml
+#   when: os_variant is defined
+
+- name: (BUILDAUX) Load OS-specific build auxiliary tasks
+  ansible.builtin.include_role:
+    name: "{{ os.plugin }}"
+    tasks_from: buildaux
+  vars:
+    imagebuilder_os: "{{ os }}"

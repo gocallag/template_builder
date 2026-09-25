@@ -1,13 +1,16 @@
 ---
-- hosts: "{{ run_on | default('localhost') }}"
+- name: OL-10.1 Build
+  hosts: "{{ run_on | default('localhost') }}"
   gather_facts: false
   become: false
 
   vars_files:
-    - "images/oracle/ol-10.1.yml"
+    - images/oracle/ol-10.1.yml
 
-  collections:
-    - gocallag.template_builder
+  vars:
+    imagebuilder_targets:
+      - plugin: gocallag.template_builder.imagebuilder.target.proxmox
+      - plugin: gocallag.template_builder.imagebuilder.target.vsphere
 
   roles:
-    - imagebuilder
+    - gocallag.template_builder.imagebuilder

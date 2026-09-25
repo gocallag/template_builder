@@ -1,0 +1,64 @@
+---
+- name: (DOWNLOAD) check if the status file exists for the ISO download
+  ansible.builtin.stat:
+     path: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
+  register: imagebuilder_download_status_file
+  tags:
+     - always
+- name: (DOWNLOAD) load download status file
+  ansible.builtin.include_vars:
+     file: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
+     name: imagebuilder_download_status
+  when: imagebuilder_download_status_file.stat.exists
+  tags:
+     - always
+- name: (DOWNLOAD) Download ISO file with checksum validation
+  ansible.builtin.get_url:
+     url: "{{ os.iso }}"
+     dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+     checksum: "sha256:{{ os.checksum }}"
+     mode: "0644"
+  retries: 5
+  delay: 10
+  register: imagebuilder_download_result
+  until: >-
+    imagebuilder_download_result is succeeded or
+    (imagebuilder_download_result is failed and
+    imagebuilder_download_result.msg is defined and
+    'checksum' in (imagebuilder_download_result.msg | lower) and
+    'mismatch' in (imagebuilder_download_result.msg | lower))
+  ignore_errors: true
+  when: imagebuilder_download_status.downloaded is not defined or not imagebuilder_download_status.downloaded
+  tags:
+     - always
+- name: (DOWNLOAD) Fail on checksum mismatch
+  ansible.builtin.fail:
+     msg: "{{ imagebuilder_download_result.msg }}"
+  when:
+     - imagebuilder_download_result is failed
+     - imagebuilder_download_result.msg is defined
+     - (imagebuilder_download_result.msg | lower is search('checksum'))
+     - (imagebuilder_download_result.msg | lower is search('mismatch'))
+  tags:
+     - always
+- name: (DOWNLOAD) Fail after download retries are exhausted
+  ansible.builtin.fail:
+     msg: "{{ imagebuilder_download_result.msg }}"
+  when:
+     - imagebuilder_download_result is failed
+     - imagebuilder_download_result.msg is defined
+     - ((imagebuilder_download_result.msg | lower is search('checksum')) is false or (imagebuilder_download_result.msg | lower is search('mismatch')) is false)
+  tags:
+     - always
+- name: (DOWNLOAD) Save download status
+  ansible.builtin.copy:
+     dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
+     content: |
+      downloaded: true
+      url: "{{ os.iso }}"
+      checksum: "{{ os.checksum }}"
+      dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+     mode: "0644"
+  when: imagebuilder_download_result is succeeded
+  tags:
+     - always

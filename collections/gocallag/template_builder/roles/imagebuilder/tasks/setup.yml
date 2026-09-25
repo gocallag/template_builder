@@ -8,22 +8,22 @@
         when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
       - name: (SETUP) get os_type
         ansible.builtin.set_fact:
-            os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}" # noqa: var-naming
+            os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}"
         when: imagebuilder_id_prefix in imagebuilder_prefix_ostype_map
         failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_ostype_map
       - name: (SETUP) get os_variant
         ansible.builtin.set_fact:
-            os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}" # noqa: var-naming
+            os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}"
         when: imagebuilder_id_prefix in imagebuilder_prefix_variant_map
         failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_variant_map
       - name: (SETUP) Add new system to in-memory inventory
         ansible.builtin.add_host:
             name: 'bob_build'
             ansible_host: "{{ imagebuilder_localip }}"
-            ansible_user: "{{ imagebuilder_env_ansible_user }}"
-            ansible_password: "{{ imagebuilder_env_ansible_password }}"
+            ansible_user: "{{ imagebuilder_config.credentials.ansible.username }}"
+            ansible_password: "{{ imagebuilder_config.credentials.ansible.password }}"
             ansible_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
-            ansible_connection: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}"
+            ansible_connection: "{{ (os_type | lower == 'linux') | ternary('ssh', 'psrp') }}"
             ansible_psrp_auth: "negotiate"
             ansible_winrm_server_cert_validation: ignore
             ansible_psrp_cert_validation: ignore
@@ -37,7 +37,7 @@
 
       - name: (SETUP) cleanup build directories
         ansible.builtin.file:
-            path: "{{ build_loop }}"
+            path: "{{ imagebuilder_config.builder.build_path }}/{{ imagebuilder_id_base }}/{{ build_loop }}"
             state: absent
         loop_control:
             loop_var: build_loop
@@ -57,22 +57,22 @@
         loop_control:
             loop_var: file
         loop:
-            - "{{ imagebuilder_env_build_path }}"
-            - "{{ imagebuilder_build_httpdir }}"
-            - "{{ imagebuilder_build_httpdir }}/aux/drivers"
-            - "{{ imagebuilder_build_httpdir }}/aux/tools"
-            - "{{ imagebuilder_build_httpdir }}/aux/patches"
-            - "{{ imagebuilder_build_httpdir }}/aux/tools"
-            - "{{ imagebuilder_build_downloadsdir }}"
-            - "{{ imagebuilder_build_imagedir }}"
-            - "{{ imagebuilder_build_savedir }}"
-            - "{{ imagebuilder_build_output | dirname }}"
-            - "{{ imagebuilder_build_output | dirname }}/mnt"
+            # - "{{ imagebuilder_config.builder.build_path }}"
+            - "{{ imagebuilder_path_httpdir }}"
+            - "{{ imagebuilder_path_httpdir }}/aux/drivers"
+            - "{{ imagebuilder_path_httpdir }}/aux/tools"
+            - "{{ imagebuilder_path_httpdir }}/aux/patches"
+            - "{{ imagebuilder_path_downloadsdir }}"
+            - "{{ imagebuilder_path_imagedir }}"
+            - "{{ imagebuilder_path_savedir }}"
+            - "{{ imagebuilder_path_mntdir }}"
+            # - "{{ imagebuilder_build_output | dirname }}"
+            # - "{{ imagebuilder_build_output | dirname }}/mnt"
 
       - name: (SETUP) copy qemu monitor script
         ansible.builtin.template:
             src: "files/qemu/sendkeys.py"
-            dest: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}/sendkeys.py"
+            dest: "{{ imagebuilder_path_basedir }}/sendkeys.py"
             mode: '0755'
         delegate_to: "{{ run_on | default('localhost') }}"
 
