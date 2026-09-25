@@ -87,6 +87,10 @@
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
     tasks_from: download.yml
+- name: (MAIN) use inbuilt download role if OS plugin does not have a download task
+  ansible.builtin.include_tasks: download.yml
+  when: imagebuilder_download_result is false
+
 
 - name: (MAIN) Perform the defined build
   when: not imagebuilder_restored_from_custom_image | default(false)
