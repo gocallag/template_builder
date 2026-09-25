@@ -25,7 +25,7 @@
           changed_when: true
         - name: (BUILDIMAGE) Wait for QEMU VM to be accessible
           ansible.builtin.wait_for:
-            host: "{{ imagebuilder_localip  }}"
+            host: "{{ imagebuilder_localip }}"
             port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
             delay: 10
             timeout: 900
