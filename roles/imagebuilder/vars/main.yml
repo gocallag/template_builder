@@ -18,15 +18,15 @@ imagebuilder_build_kickstart: "{{ imagebuilder_env_build_path }}/{{ imagebuilder
 imagebuilder_build_ram: "{{ imagebuilder_env_build_memory | default(2048) }}"
 imagebuilder_build_vcpus: "{{ imagebuilder_env_build_cpu | default(2) }}"
 imagebuilder_build_output: "{{ imagebuilder_build_basedir }}/build/{{ imagebuilder_id_base }}.qcow2"
-imagebuilder_build_httpdir: "{{ imagebuilder_build_basedir }}/http"
-imagebuilder_build_auxdir: "{{ imagebuilder_build_basedir }}/http/aux"
+imagebuilder_build_httpdir: "http"
+imagebuilder_build_auxdir: "http/aux"
 imagebuilder_build_format: qcow2
 imagebuilder_build_imagedir: "{{ imagebuilder_build_basedir }}/build"
 imagebuilder_build_downloadsdir: "{{ imagebuilder_build_basedir }}/downloads"
-imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
-imagebuilder_iso_file: "{{ imagebuilder_build_basedir }}/build/{{ imagebuilder_id_base }}.iso"
+# imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
+# imagebuilder_iso_file: "{{ imagebuilder_build_basedir }}/build/{{ imagebuilder_id_base }}.iso"
 wait_host: "{{ imagebuilder_env_qemu_ip }}" # noqa: var-naming
-wait_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
+wait_port: "{{ (os_type | lower == 'linux') | ternary(22, 5985) }}" # noqa: var-naming
 wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
 imagebuilder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
 imagebuilder_restored_from_image: false
