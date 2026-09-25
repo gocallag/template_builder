@@ -68,14 +68,22 @@ RUN set -eux; \
     rm -f /tmp/govc.tar.gz && \
     govc version
 
-# Copy repository and build the collection tarball using the venv ansible-galaxy
-COPY . /tmp/build/
-WORKDIR /tmp/build
-RUN ${VENV_PATH}/bin/ansible-galaxy collection build -f . && \
-    mv gocallag-template_builder-*.tar.gz /tmp/gocallag-collection.tar.gz
+# # Copy repository and build the collection tarball using the venv ansible-galaxy
+# COPY . /tmp/build/
+# WORKDIR /tmp/build
+# RUN ${VENV_PATH}/bin/ansible-galaxy collection build -f . && \
+#     mv gocallag-template_builder-*.tar.gz /tmp/gocallag-collection.tar.gz
 
-# Install the built collection into the venv-managed ansible environment
-RUN ${VENV_PATH}/bin/ansible-galaxy collection install /tmp/gocallag-collection.tar.gz
+# # Install the built collection into the venv-managed ansible environment
+# RUN ${VENV_PATH}/bin/ansible-galaxy collection install /tmp/gocallag-collection.tar.gz
+# Copy monorepo
+COPY . /tmp/build/
+
+# Install every gocallag collection from this repository
+RUN ${VENV_PATH}/bin/ansible-galaxy collection install \
+      /tmp/build/collections/gocallag \
+      --force && \
+    ${VENV_PATH}/bin/ansible-galaxy collection list
 
 # Validate libguestfs appliances early, best-effort
 RUN if command -v libguestfs-test-tool >/dev/null 2>&1; then \
@@ -93,6 +101,7 @@ RUN groupadd -g 1001 runner || true && \
     useradd -m -u 1001 -g 1001 -s /bin/bash runner || true
 
 RUN mv /usr/bin/passt /usr/bin/passt.disabled
+COPY ansible.cfg /etc/ansible/ansible.cfg
 
 # Working directory and default entrypoint
 WORKDIR /root
