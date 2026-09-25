@@ -1,5 +1,5 @@
 ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" # noqa: var-naming
-imagebuilder_envfile_path: "{{ '~/.template_builder/env.sh' | expanduser }}"
+imagebuilder_config_path: "{{ '~/.template_builder/config.yml' | expanduser }}"
 imagebuilder_useauxiso: false
 imagebuilder_prefix_port_offset_map:
     alma: 0
