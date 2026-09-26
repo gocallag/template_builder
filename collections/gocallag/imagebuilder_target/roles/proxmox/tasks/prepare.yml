@@ -1,4 +1,23 @@
 ---
+- name: (PROXMOX) Define working image
+  ansible.builtin.set_fact:
+    imagebuilder_proxmox_working_image: >-
+      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_artifact.id }}.proxmox.qcow2
+
+- name: (PROXMOX) Create target working image
+  ansible.builtin.copy:
+    src: "{{ imagebuilder_artifact.path }}"
+    dest: "{{ imagebuilder_proxmox_working_image }}"
+    remote_src: true
+    mode: "0600"
+
+- name: (PROXMOX) Define working artifact
+  ansible.builtin.set_fact:
+    imagebuilder_target_artifact:
+      target: proxmox
+      source: "{{ imagebuilder_artifact.path }}"
+      path: "{{ imagebuilder_proxmox_working_image }}"
+      format: qcow2
 - name: (PROXMOX) Create target working image
   ansible.builtin.copy:
     src: "{{ imagebuilder_artifact.path }}"

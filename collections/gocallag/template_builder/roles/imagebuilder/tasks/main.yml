@@ -175,8 +175,6 @@
 - name: (MAIN) Execute target plugins
   ansible.builtin.include_role:
     name: "{{ imagebuilder_target.plugin }}"
-  vars:
-    imagebuilder_target_config: "{{ imagebuilder_target.config | default({}) }}"
   loop: "{{ imagebuilder_targets | default([]) }}"
   loop_control:
     loop_var: imagebuilder_target
