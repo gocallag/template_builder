@@ -13,43 +13,6 @@
     name: imagebuilder_config
   no_log: true
 
-# - name: (MAIN) Load env file and map imagebuilder env variables
-#   ansible.builtin.set_fact:
-#     imagebuilder_env: "{{ env_data }}"
-#     imagebuilder_env_qemu_ip: "{{ env_data.IMAGEBUILDER_ENV_QEMU_IP | default('') }}"
-#     imagebuilder_env_build_path: "{{ env_data.IMAGEBUILDER_ENV_BUILD_PATH | default('') }}"
-#     imagebuilder_env_ansible_user: "{{ env_data.IMAGEBUILDER_ENV_ANSIBLE_USER | default('') }}"
-#     imagebuilder_env_ansible_password: "{{ env_data.IMAGEBUILDER_ENV_ANSIBLE_PASSWORD | default('') }}"
-#     imagebuilder_env_linux_admin_user: "{{ env_data.IMAGEBUILDER_ENV_LINUX_ADMIN_USER | default('') }}"
-#     imagebuilder_env_linux_admin_password: "{{ env_data.IMAGEBUILDER_ENV_LINUX_ADMIN_PASSWORD | default('') }}"
-#     imagebuilder_env_win_admin_user: "{{ env_data.IMAGEBUILDER_ENV_WIN_ADMIN_USER | default('') }}"
-#     imagebuilder_env_win_admin_password: "{{ env_data.IMAGEBUILDER_ENV_WIN_ADMIN_PASSWORD | default('') }}"
-#     imagebuilder_env_ansible_key: "{{ env_data.IMAGEBUILDER_ENV_ANSIBLE_KEY | default('') }}"
-#     imagebuilder_env_proxmox_server: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_SERVER | default('') }}"
-#     imagebuilder_env_proxmox_user: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_USER | default('') }}"
-#     imagebuilder_env_proxmox_password: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_PASSWORD | default('') }}"
-#     imagebuilder_env_proxmox_storage: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_STORAGE | default('') }}"
-#     imagebuilder_env_proxmox_node: "{{ env_data.IMAGEBUILDER_ENV_PROXMOX_NODE | default('') }}"
-#     imagebuilder_env_build_memory: "{{ env_data.IMAGEBUILDER_ENV_BUILD_MEMORY | default(8192) }}"
-#     imagebuilder_env_build_cpu: "{{ env_data.IMAGEBUILDER_ENV_BUILD_CPU | default(4) }}"
-#     imagebuilder_env_vsphere_password: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_PASSWORD | default('') }}"
-#     imagebuilder_env_vsphere_username: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_USERNAME | default('') }}"
-#     imagebuilder_env_vsphere_vcenter: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_VCENTER | default('') }}"
-#     imagebuilder_env_vsphere_datacenter: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_DATACENTER | default('') }}"
-#     imagebuilder_env_vsphere_datastore: "{{ env_data.IMAGEBUILDER_ENV_VSPHERE_DATASTORE | default('') }}"
-#     imagebuilder_env_rhsm_userid: "{{ env_data.IMAGEBUILDER_ENV_RHSM_USERID | default('') }}"
-#     imagebuilder_env_rhsm_password: "{{ env_data.IMAGEBUILDER_ENV_RHSM_PASSWORD | default('') }}"
-#   no_log: true
-#   vars:
-#     env_data: >-
-#       {{
-#         lookup('file', imagebuilder_envfile_path)
-#         | regex_replace('^\\s*#.*$', '', multiline=True)
-#         | regex_replace('^\\s*$', '', multiline=True)
-#         | regex_replace('=', ': ', multiline=True)
-#         | from_yaml
-#       }}
-
 - name: (MAIN) Assert core build variables
   ansible.builtin.assert:
     that:
@@ -67,8 +30,6 @@
   ansible.builtin.set_fact:
     imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
 
-# - name: (MAIN) Build the image profile based on our configuration
-#   ansible.builtin.include_tasks: buildprofile.yml
 - name: (MAIN) Build OS-specific profile
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
@@ -82,7 +43,6 @@
     name: "{{ os.plugin }}"
     tasks_from: asserts.yml
 
-
 - name: (MAIN) OS-specific downloads
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
@@ -90,7 +50,6 @@
 - name: (MAIN) use inbuilt download role if OS plugin does not have a download task
   ansible.builtin.include_tasks: download.yml
   when: imagebuilder_download_result is false
-
 
 - name: (MAIN) Perform the defined build
   when: not imagebuilder_restored_from_custom_image | default(false)
@@ -138,20 +97,13 @@
         - name: (QEMU) write custom artifact metadata
           ansible.builtin.copy:
             dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+            mode: "0644"
             content: |
               profile_hash: "{{ imagebuilder_profile_hash }}"
               id: "{{ imagebuilder_id_base }}"
               created_at: "{{ ansible_date_time.iso8601 }}"
               stage: custom
               ttl_days: 7
-
-    # - name: (MAIN) cleanup build path
-    #   ansible.builtin.file:
-    #     path: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}"
-    #     state: absent
-    #   become: true
-    #   tags:
-    #     - build_cleanup
 
   rescue:
 
@@ -160,6 +112,7 @@
         msg: >-
           (MAIN) Task '{{ ansible_failed_task }}' failed.
           {{ ansible_failed_result.msg | default('no additional message') }}
+
   always:
 
     - name: (MAIN) Display Webserver job_id
@@ -182,6 +135,7 @@
       path: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
       format: qcow2
       architecture: "{{ os.architecture }}"
+
 - name: (MAIN) Execute target plugins
   ansible.builtin.include_role:
     name: "{{ imagebuilder_target.plugin }}"
