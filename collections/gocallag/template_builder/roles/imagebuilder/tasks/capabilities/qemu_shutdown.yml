@@ -9,14 +9,23 @@
     fail_msg: "(CAP-QEMU) Invalid shutdown capability state"
 
 - name: (CAP-QEMU) Shutdown Linux guest
-  ansible.builtin.shell: "shutdown -h -t now && sleep 120"
-  become: true
-  ignore_errors: true # noqa: ignore-errors
-  ignore_unreachable: true
-  changed_when: true
-  delegate_to: bob_build
   when:
     - os_type | lower == "linux"
+  block:
+    - name: (CAP-QEMU) Request guest shutdown
+      ansible.builtin.shell: "shutdown -h -t now && sleep 120"
+      become: true
+      changed_when: true
+      delegate_to: bob_build
+      register: imagebuilder_shutdown_request
+      failed_when: false
+      ignore_unreachable: true
+
+  rescue:
+    - name: (CAP-QEMU) Guest already shut down or unreachable
+      ansible.builtin.debug:
+        msg: "(CAP-QEMU) Guest is already shut down or unreachable; continuing without failure."
+      changed_when: false
 
 - name: (CAP-QEMU) Wait for QEMU job
   ansible.builtin.async_status:

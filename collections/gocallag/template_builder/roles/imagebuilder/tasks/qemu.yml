@@ -134,6 +134,15 @@
               ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
               changed_when: true
 
+            - name: (QEMU) write base artifact metadata
+              ansible.builtin.copy:
+                dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+                content: |
+                  profile_hash: "{{ imagebuilder_profile_hash }}"
+                  id: "{{ imagebuilder_id_base }}"
+                  created_at: "{{ ansible_date_time.iso8601 }}"
+                  stage: base
+
 
   rescue:
     - name: "(QEMU) Show error on failure"

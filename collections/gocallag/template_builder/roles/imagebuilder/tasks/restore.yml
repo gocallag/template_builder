@@ -7,23 +7,106 @@
   loop:
     - "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
 
+- name: (RESTORE) set artifact paths
+  ansible.builtin.set_fact:
+    imagebuilder_custom_artifact: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+    imagebuilder_custom_metadata_artifact: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+    imagebuilder_base_artifact: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+    imagebuilder_base_metadata_artifact: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+
 - name: (RESTORE) stat any saved custom image
   ansible.builtin.stat:
-    path: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+    path: "{{ imagebuilder_custom_artifact }}"
   register: imagebuilder_qemu_disk_custom_stat
 
 - name: (RESTORE) stat any saved base image
   ansible.builtin.stat:
-    path: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+    path: "{{ imagebuilder_base_artifact }}"
   register: imagebuilder_qemu_disk_base_stat
 
-- name: (RESTORE) restore custom image if it exists and is newer than base image
-  ansible.builtin.command: cp "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
+- name: (RESTORE) load custom artifact metadata when it exists
+  ansible.builtin.slurp:
+    src: "{{ imagebuilder_custom_metadata_artifact }}"
+  register: imagebuilder_custom_metadata_raw
+  failed_when: false
+  when: imagebuilder_qemu_disk_custom_stat.stat.exists
+
+- name: (RESTORE) load base artifact metadata when it exists
+  ansible.builtin.slurp:
+    src: "{{ imagebuilder_base_metadata_artifact }}"
+  register: imagebuilder_base_metadata_raw
+  failed_when: false
+  when: imagebuilder_qemu_disk_base_stat.stat.exists
+
+- name: (RESTORE) decode custom artifact metadata
+  ansible.builtin.set_fact:
+    imagebuilder_custom_metadata: >-
+      {{
+        (imagebuilder_custom_metadata_raw.content | b64decode | from_yaml)
+        if imagebuilder_custom_metadata_raw.content is defined
+        else {}
+      }}
+  when: imagebuilder_qemu_disk_custom_stat.stat.exists
+
+- name: (RESTORE) decode base artifact metadata
+  ansible.builtin.set_fact:
+    imagebuilder_base_metadata: >-
+      {{
+        (imagebuilder_base_metadata_raw.content | b64decode | from_yaml)
+        if imagebuilder_base_metadata_raw.content is defined
+        else {}
+      }}
+  when: imagebuilder_qemu_disk_base_stat.stat.exists
+
+- name: (RESTORE) invalidate stale custom artifact after 7 days or if metadata hash does not match the current profile
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ imagebuilder_custom_artifact }}"
+    - "{{ imagebuilder_custom_metadata_artifact }}"
+  when:
+    - imagebuilder_qemu_disk_custom_stat.stat.exists
+    - >-
+      imagebuilder_custom_metadata.profile_hash | default('') != imagebuilder_profile_hash
+      or (
+        ((ansible_date_time.epoch | int) - (imagebuilder_qemu_disk_custom_stat.stat.mtime | int)) > 604800
+      )
+
+- name: (RESTORE) invalidate stale base artifact if it does not match the current profile hash
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ imagebuilder_base_artifact }}"
+    - "{{ imagebuilder_base_metadata_artifact }}"
+  when:
+    - imagebuilder_qemu_disk_base_stat.stat.exists
+    - imagebuilder_base_metadata.profile_hash | default('') != imagebuilder_profile_hash
+
+- name: (RESTORE) refresh custom restoration state after invalidation
+  ansible.builtin.stat:
+    path: "{{ imagebuilder_custom_artifact }}"
+  register: imagebuilder_qemu_disk_custom_stat
+  when:
+    - imagebuilder_qemu_disk_custom_stat.stat.exists
+
+- name: (RESTORE) refresh base restoration state after invalidation
+  ansible.builtin.stat:
+    path: "{{ imagebuilder_base_artifact }}"
+  register: imagebuilder_qemu_disk_base_stat
+  when:
+    - imagebuilder_qemu_disk_base_stat.stat.exists
+
+- name: (RESTORE) restore custom image if it exists and is valid for this profile and under the 7-day TTL
+  ansible.builtin.command: cp "{{ imagebuilder_custom_artifact }}" "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
   changed_when: imagebuilder_qemu_disk_restore.rc == 0
   failed_when: imagebuilder_qemu_disk_restore.rc != 0
   when:
     - imagebuilder_qemu_disk_custom_stat.stat.exists
     - imagebuilder_qemu_disk_custom_stat.stat.size > 0
+    - imagebuilder_custom_metadata.profile_hash | default('') == imagebuilder_profile_hash
+    - ((ansible_date_time.epoch | int) - (imagebuilder_qemu_disk_custom_stat.stat.mtime | int)) <= 604800
     - not imagebuilder_qemu_disk_base_stat.stat.exists or imagebuilder_qemu_disk_custom_stat.stat.mtime > imagebuilder_qemu_disk_base_stat.stat.mtime
   register: imagebuilder_qemu_disk_restore
 
@@ -33,18 +116,19 @@
     imagebuilder_restored_from_image: true
     imagebuilder_restored_from_custom_image: true
     imagebuilder_restored_from_base_image: false
-    imagebuilder_banner_message: "Restored custom image from {{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+    imagebuilder_banner_message: "Restored custom image from {{ imagebuilder_custom_artifact }}"
 
 - name: (RESTORE) Base Image Exists?
   when: not imagebuilder_restored_from_image
   block:
-    - name: (RESTORE) restore base image if it exists
-      ansible.builtin.command: cp "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2" "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
+    - name: (RESTORE) restore base image if it exists and matches current profile hash
+      ansible.builtin.command: cp "{{ imagebuilder_base_artifact }}" "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
       changed_when: imagebuilder_qemu_disk_restore is defined and imagebuilder_qemu_disk_restore.rc == 0
       failed_when: imagebuilder_qemu_disk_restore.rc != 0
       when:
         - imagebuilder_qemu_disk_base_stat.stat.exists
         - imagebuilder_qemu_disk_base_stat.stat.size > 0
+        - imagebuilder_base_metadata.profile_hash | default('') == imagebuilder_profile_hash
       register: imagebuilder_qemu_disk_restore
 
     - name: (RESTORE) record we restored from a base image
@@ -53,7 +137,7 @@
         imagebuilder_restored_from_image: true
         imagebuilder_restored_from_custom_image: false
         imagebuilder_restored_from_base_image: true
-        imagebuilder_banner_message: "Restored base image from {{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+        imagebuilder_banner_message: "Restored base image from {{ imagebuilder_base_artifact }}"
 
 - name: (RESTORE) Show restored base result
   when: imagebuilder_restored_from_image | default(false) | bool
