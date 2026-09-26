@@ -66,6 +66,8 @@
     - "{{ imagebuilder_custom_artifact }}"
     - "{{ imagebuilder_custom_metadata_artifact }}"
   when:
+    - imagebuilder_qemu_disk_custom_stat is defined
+    - imagebuilder_qemu_disk_custom_stat.stat is defined
     - imagebuilder_qemu_disk_custom_stat.stat.exists
     - >-
       imagebuilder_custom_metadata.profile_hash | default('') != imagebuilder_profile_hash
@@ -81,6 +83,8 @@
     - "{{ imagebuilder_base_artifact }}"
     - "{{ imagebuilder_base_metadata_artifact }}"
   when:
+    - imagebuilder_qemu_disk_base_stat is defined
+    - imagebuilder_qemu_disk_base_stat.stat is defined
     - imagebuilder_qemu_disk_base_stat.stat.exists
     - imagebuilder_base_metadata.profile_hash | default('') != imagebuilder_profile_hash
 
@@ -88,21 +92,19 @@
   ansible.builtin.stat:
     path: "{{ imagebuilder_custom_artifact }}"
   register: imagebuilder_qemu_disk_custom_stat
-  when:
-    - imagebuilder_qemu_disk_custom_stat.stat.exists
 
 - name: (RESTORE) refresh base restoration state after invalidation
   ansible.builtin.stat:
     path: "{{ imagebuilder_base_artifact }}"
   register: imagebuilder_qemu_disk_base_stat
-  when:
-    - imagebuilder_qemu_disk_base_stat.stat.exists
 
 - name: (RESTORE) restore custom image if it exists and is valid for this profile and under the 7-day TTL
   ansible.builtin.command: cp "{{ imagebuilder_custom_artifact }}" "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
   changed_when: imagebuilder_qemu_disk_restore.rc == 0
   failed_when: imagebuilder_qemu_disk_restore.rc != 0
   when:
+    - imagebuilder_qemu_disk_custom_stat is defined
+    - imagebuilder_qemu_disk_custom_stat.stat is defined
     - imagebuilder_qemu_disk_custom_stat.stat.exists
     - imagebuilder_qemu_disk_custom_stat.stat.size > 0
     - imagebuilder_custom_metadata.profile_hash | default('') == imagebuilder_profile_hash
