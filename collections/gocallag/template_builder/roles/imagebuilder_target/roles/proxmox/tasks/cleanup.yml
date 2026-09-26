@@ -1,0 +1,21 @@
+---
+- name: (PROXMOX) Remove remote staging directory
+  ansible.builtin.file:
+    path: "{{ imagebuilder_proxmox_remote_dir }}"
+    state: absent
+  delegate_to: imagebuilder_proxmox_server
+  become: true
+  when:
+    - imagebuilder_proxmox_remote_dir is defined
+
+- name: (PROXMOX) Remove target working image
+  ansible.builtin.file:
+    path: "{{ imagebuilder_proxmox_working_image }}"
+    state: absent
+
+- name: (PROXMOX) Remove final converted image
+  ansible.builtin.file:
+    path: "{{ imagebuilder_proxmox_output }}"
+    state: absent
+  when:
+    - imagebuilder_proxmox_output is defined

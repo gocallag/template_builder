@@ -1,0 +1,28 @@
+---
+- name: (PROXMOX) Define converted artifact
+  ansible.builtin.set_fact:
+    imagebuilder_proxmox_output: >-
+      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_artifact.id }}.proxmox-final.qcow2
+
+- name: (PROXMOX) Convert artifact
+  ansible.builtin.command:
+    argv:
+      - qemu-img
+      - convert
+      - -S
+      - "0"
+      - -f
+      - qcow2
+      - -O
+      - qcow2
+      - "{{ imagebuilder_target_artifact.path }}"
+      - "{{ imagebuilder_proxmox_output }}"
+  changed_when: true
+
+- name: (PROXMOX) Update target artifact
+  ansible.builtin.set_fact:
+    imagebuilder_target_artifact:
+      target: proxmox
+      source: "{{ imagebuilder_artifact.path }}"
+      path: "{{ imagebuilder_proxmox_output }}"
+      format: qcow2

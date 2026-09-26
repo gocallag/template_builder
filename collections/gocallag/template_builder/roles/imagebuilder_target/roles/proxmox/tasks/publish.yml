@@ -1,0 +1,109 @@
+---
+- name: (PROXMOX) Register Proxmox SSH host
+  ansible.builtin.add_host:
+    name: imagebuilder_proxmox_server
+    ansible_host: "{{ imagebuilder_proxmox.server }}"
+    ansible_port: 22
+    ansible_user: "{{ imagebuilder_proxmox.username }}"
+    ansible_password: "{{ imagebuilder_proxmox.password }}"
+    ansible_connection: ssh
+
+- name: (PROXMOX) Define remote paths
+  ansible.builtin.set_fact:
+    imagebuilder_proxmox_remote_dir: >-
+      /mnt/pve/{{ imagebuilder_proxmox.storage }}/tmp/{{ imagebuilder_artifact.id }}
+
+    imagebuilder_proxmox_remote_image: >-
+      /mnt/pve/{{ imagebuilder_proxmox.storage }}/tmp/{{ imagebuilder_artifact.id }}/{{ imagebuilder_artifact.id }}.qcow2
+
+- name: (PROXMOX) Create staging directory
+  ansible.builtin.file:
+    path: "{{ imagebuilder_proxmox_remote_dir }}"
+    state: directory
+    mode: "0755"
+  delegate_to: imagebuilder_proxmox_server
+  become: true
+
+- name: (PROXMOX) Copy artifact
+  ansible.builtin.command:
+    argv:
+      - sshpass
+      - -p
+      - "{{ imagebuilder_proxmox.password }}"
+      - scp
+      - -q
+      - -C
+      - -o
+      - StrictHostKeyChecking=no
+      - -o
+      - UserKnownHostsFile=/dev/null
+      - "{{ imagebuilder_target_artifact.path }}"
+      - "{{ imagebuilder_proxmox.username }}@{{ imagebuilder_proxmox.server }}:{{ imagebuilder_proxmox_remote_image }}"
+  no_log: true
+  changed_when: true
+
+- name: (PROXMOX) Remove previous template
+  community.proxmox.proxmox_kvm:
+    api_user: "{{ imagebuilder_proxmox.username }}@pam"
+    api_password: "{{ imagebuilder_proxmox.password }}"
+    api_host: "{{ imagebuilder_proxmox.server }}"
+    node: "{{ imagebuilder_proxmox.node }}"
+    name: "{{ imagebuilder_proxmox_vm_name }}"
+    state: absent
+  delegate_to: localhost
+  failed_when: false
+
+- name: (PROXMOX) Create VM
+  community.proxmox.proxmox_kvm:
+    api_user: "{{ imagebuilder_proxmox.username }}@pam"
+    api_password: "{{ imagebuilder_proxmox.password }}"
+    api_host: "{{ imagebuilder_proxmox.server }}"
+    node: "{{ imagebuilder_proxmox.node }}"
+    name: "{{ imagebuilder_proxmox_vm_name }}"
+    cores: "{{ imagebuilder_proxmox_cores }}"
+    vcpus: "{{ imagebuilder_proxmox_cores }}"
+    cpu: "{{ imagebuilder_proxmox_cpu }}"
+    memory: "{{ imagebuilder_config.builder.qemu.memory }}"
+    agent: true
+    net:
+      net0: "virtio,bridge={{ imagebuilder_proxmox_bridge }}"
+    description: |
+      Imagebuilder template
+      Build ID: {{ imagebuilder_artifact.id }}
+  delegate_to: localhost
+  register: imagebuilder_proxmox_vm
+
+- name: (PROXMOX) Import disk
+  community.proxmox.proxmox_disk:
+    api_user: "{{ imagebuilder_proxmox.username }}@pam"
+    api_password: "{{ imagebuilder_proxmox.password }}"
+    api_host: "{{ imagebuilder_proxmox.server }}"
+    node: "{{ imagebuilder_proxmox.node }}"
+    vmid: "{{ imagebuilder_proxmox_vm.vmid }}"
+    disk: virtio0
+    storage: "{{ imagebuilder_proxmox.storage }}"
+    import_from: "{{ imagebuilder_proxmox_remote_image }}"
+    state: present
+  delegate_to: localhost
+
+- name: (PROXMOX) Configure boot disk
+  community.proxmox.proxmox_kvm:
+    api_user: "{{ imagebuilder_proxmox.username }}@pam"
+    api_password: "{{ imagebuilder_proxmox.password }}"
+    api_host: "{{ imagebuilder_proxmox.server }}"
+    node: "{{ imagebuilder_proxmox.node }}"
+    name: "{{ imagebuilder_proxmox_vm_name }}"
+    boot: order=virtio0
+    update: true
+  delegate_to: localhost
+
+- name: (PROXMOX) Convert VM to template
+  community.proxmox.proxmox_kvm:
+    api_user: "{{ imagebuilder_proxmox.username }}@pam"
+    api_password: "{{ imagebuilder_proxmox.password }}"
+    api_host: "{{ imagebuilder_proxmox.server }}"
+    node: "{{ imagebuilder_proxmox.node }}"
+    name: "{{ imagebuilder_proxmox_vm_name }}"
+    state: template
+    update: true
+  delegate_to: localhost

@@ -1,0 +1,23 @@
+---
+- name: (PROXMOX) Validate
+  ansible.builtin.include_tasks: assert.yml
+
+- name: (PROXMOX) Prepare working artifact
+  ansible.builtin.include_tasks: prepare.yml
+
+- name: (PROXMOX) Apply target uplift
+  ansible.builtin.include_tasks: uplift.yml
+
+- name: (PROXMOX) Convert target artifact
+  ansible.builtin.include_tasks: convert.yml
+
+- name: (PROXMOX) Publish
+  block:
+
+    - name: (PROXMOX) Publish artifact
+      ansible.builtin.include_tasks: publish.yml
+
+  always:
+
+    - name: (PROXMOX) Cleanup
+      ansible.builtin.include_tasks: cleanup.yml

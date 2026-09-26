@@ -1,0 +1,35 @@
+---
+- name: (PROXMOX) Validate configuration
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_artifact.path is defined
+      - imagebuilder_artifact.path | length > 0
+
+      - imagebuilder_config.targets.proxmox is defined
+
+      - imagebuilder_config.targets.proxmox.server is defined
+      - imagebuilder_config.targets.proxmox.server | length > 0
+
+      - imagebuilder_config.targets.proxmox.username is defined
+      - imagebuilder_config.targets.proxmox.username | length > 0
+
+      - imagebuilder_config.targets.proxmox.password is defined
+      - imagebuilder_config.targets.proxmox.password | length > 0
+
+      - imagebuilder_config.targets.proxmox.storage is defined
+      - imagebuilder_config.targets.proxmox.storage | length > 0
+
+      - imagebuilder_config.targets.proxmox.node is defined
+      - imagebuilder_config.targets.proxmox.node | length > 0
+
+    fail_msg: "Missing required Proxmox target configuration"
+
+- name: (PROXMOX) Resolve configuration
+  ansible.builtin.set_fact:
+    imagebuilder_proxmox:
+      server: "{{ imagebuilder_config.targets.proxmox.server }}"
+      username: "{{ imagebuilder_config.targets.proxmox.username }}"
+      password: "{{ imagebuilder_config.targets.proxmox.password }}"
+      storage: "{{ imagebuilder_config.targets.proxmox.storage }}"
+      node: "{{ imagebuilder_config.targets.proxmox.node }}"
+  no_log: true

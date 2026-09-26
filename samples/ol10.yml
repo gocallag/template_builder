@@ -9,8 +9,8 @@
 
   vars:
     imagebuilder_targets:
-      - plugin: gocallag.template_builder.imagebuilder.target.proxmox
-      - plugin: gocallag.template_builder.imagebuilder.target.vsphere
+      - plugin: gocallag.template_builder.imagebuilder_target.proxmox
+      - plugin: gocallag.template_builder.imagebuilder_target.vsphere
 
   roles:
     - gocallag.template_builder.imagebuilder
