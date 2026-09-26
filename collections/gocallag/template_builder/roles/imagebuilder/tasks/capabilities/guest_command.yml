@@ -1,0 +1,26 @@
+---
+- name: (CAP-GUEST) Validate command
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_guest_command is defined
+      - imagebuilder_guest_command | trim | length > 0
+      - imagebuilder_env_qemu_ssh_port is defined
+
+- name: (CAP-GUEST) Execute command over SSH
+  ansible.builtin.command:
+    argv:
+      - sshpass
+      - -p
+      - "{{ imagebuilder_config.credentials.linux_admin.password }}"
+      - ssh
+      - -p
+      - "{{ imagebuilder_env_qemu_ssh_port | string }}"
+      - -o
+      - StrictHostKeyChecking=no
+      - -o
+      - UserKnownHostsFile=/dev/null
+      - "{{ imagebuilder_config.credentials.linux_admin.username }}@{{ imagebuilder_config.builder.qemu.host }}"
+      - "{{ imagebuilder_guest_command }}"
+  register: imagebuilder_guest_command_result
+  changed_when: true
+  no_log: true

@@ -1,0 +1,13 @@
+---
+argument_specs:
+  main:
+    short_description: Oracle Linux imagebuilder OS plugin
+
+    options:
+      os:
+        type: dict
+        required: true
+
+      imagebuilder_config:
+        type: dict
+        required: true

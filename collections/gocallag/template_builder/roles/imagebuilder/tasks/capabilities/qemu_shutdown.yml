@@ -1,0 +1,49 @@
+---
+- name: (CAP-QEMU) Shutdown Linux guest
+  ansible.builtin.command:
+    argv:
+      - sshpass
+      - -p
+      - "{{ imagebuilder_config.credentials.linux_admin.password }}"
+      - ssh
+      - -p
+      - "{{ imagebuilder_cap_qemu_guest_port | string }}"
+      - -o
+      - StrictHostKeyChecking=no
+      - -o
+      - UserKnownHostsFile=/dev/null
+      - "{{ imagebuilder_config.credentials.linux_admin.username }}@{{ imagebuilder_config.builder.qemu.host }}"
+      - "sudo shutdown -h now"
+  no_log: true
+  failed_when: false
+  changed_when: true
+  when:
+    - os_type | lower == "linux"
+
+- name: (CAP-QEMU) Wait for QEMU job
+  ansible.builtin.async_status:
+    jid: "{{ imagebuilder_cap_qemu_job.ansible_job_id }}"
+  register: imagebuilder_cap_qemu_wait
+  until: imagebuilder_cap_qemu_wait.finished
+  retries: 60
+  delay: 5
+  failed_when: false
+
+- name: (CAP-QEMU) Wait for image release
+  ansible.builtin.shell: |
+    set -o pipefail
+    lsof "{{ imagebuilder_qemu_image }}" 2>/dev/null \
+      | tail -n +2 \
+      | wc -l
+  register: imagebuilder_cap_qemu_lsof
+  changed_when: false
+  retries: 30
+  delay: 2
+  until: imagebuilder_cap_qemu_lsof.stdout | int == 0
+
+- name: (CAP-QEMU) Verify image released
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_cap_qemu_lsof.stdout | int == 0
+    fail_msg: >-
+      QEMU still holds {{ imagebuilder_qemu_image }}

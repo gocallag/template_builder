@@ -1,0 +1,53 @@
+---
+- name: (CAP-QEMU) Validate existing image
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_qemu_image is defined
+      - imagebuilder_qemu_image | length > 0
+
+- name: (CAP-QEMU) Check image exists
+  ansible.builtin.stat:
+    path: "{{ imagebuilder_qemu_image }}"
+  register: imagebuilder_cap_qemu_image_stat
+
+- name: (CAP-QEMU) Assert image exists
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_cap_qemu_image_stat.stat.exists
+    fail_msg: "QEMU image '{{ imagebuilder_qemu_image }}' does not exist"
+
+- name: (CAP-QEMU) Determine guest port
+  ansible.builtin.set_fact:
+    imagebuilder_cap_qemu_guest_port: >-
+      {{
+        (os_type | lower == 'linux')
+        | ternary(imagebuilder_env_qemu_ssh_port,
+                  imagebuilder_env_qemu_psrp_port)
+      }}
+
+    imagebuilder_cap_qemu_remote_port: >-
+      {{
+        (os_type | lower == 'windows')
+        | ternary(5986, 22)
+      }}
+
+- name: (CAP-QEMU) Build QEMU arguments
+  ansible.builtin.set_fact:
+    imagebuilder_cap_qemu_args:
+      - "-name {{ imagebuilder_id_base }}-uplift"
+      - "-enable-kvm"
+      - "-cpu host"
+      - "-smp {{ imagebuilder_build_vcpus }}"
+      - "-m {{ imagebuilder_build_ram }}"
+      - "-netdev user,id=net0,hostfwd=tcp:0.0.0.0:{{ imagebuilder_cap_qemu_guest_port }}-:{{ imagebuilder_cap_qemu_remote_port }}"
+      - "-device {{ os.config.nicdriver | default('e1000') }},netdev=net0"
+      - "-device ich9-ahci,id=ahci"
+      - "-drive file={{ imagebuilder_qemu_image }},media=disk,if=none,format=qcow2,id=disk0"
+      - "-device ide-hd,drive=disk0,bus=ahci.0"
+      - "-vnc 0.0.0.0:{{ imagebuilder_port_offset }}"
+
+- name: (CAP-QEMU) Build command
+  ansible.builtin.set_fact:
+    imagebuilder_cap_qemu_command: >-
+      {{ imagebuilder_base_qemu_command }}
+      {{ imagebuilder_cap_qemu_args | join(' ') }}

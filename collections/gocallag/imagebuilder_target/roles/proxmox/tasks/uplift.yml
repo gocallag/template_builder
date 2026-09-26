@@ -1,16 +1,12 @@
 ---
-- name: (PROXMOX) Request OS-specific Proxmox uplift
+- name: (PROXMOX) Request OS-specific uplift
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
     tasks_from: target_uplift.yml
   vars:
-    imagebuilder_target_name: proxmox
-
-    imagebuilder_target_features:
-      - qemu_guest_agent
-      - virtio_storage
-      - virtio_network
-
     imagebuilder_uplift_artifact:
       path: "{{ imagebuilder_target_artifact.path }}"
       format: "{{ imagebuilder_target_artifact.format }}"
+
+    imagebuilder_target_features:
+      - qemu_guest_agent
