@@ -1,23 +1,16 @@
 ---
-- hosts: "{{ run_on | default('localhost') }}"
+- name: OL-9.8 Build
+  hosts: "{{ run_on | default('localhost') }}"
   gather_facts: false
   become: false
 
-  vars:
-    id: ol-9.8
-    os:
-      config:
-        disks:
-          - 30
-        timezone: Australia/Melbourne
-      iso: http://192.168.1.161:8180/Oracle/OL-9/OracleLinux-R9-U8-x86_64-dvd.iso
-      checksum: 91bb95cb8e4d1ad1c496c9a87efcba3bf9d5ec976474910e9950a3fa8576428b.
-      console_boot: |
-          <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
+  vars_files:
+    - images/oracle/ol-9.8.yml
 
-  collections:
-    - gocallag.template_builder
+  vars:
+    imagebuilder_targets:
+      - plugin: gocallag.imagebuilder_target.proxmox
+      # - plugin: gocallag.imagebuilder_target.vsphere
+
   roles:
-    - imagebuilder
-    - target_proxmox
-    # - target_vsphere
+    - gocallag.template_builder.imagebuilder
