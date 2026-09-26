@@ -135,6 +135,16 @@
           ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
           changed_when: true
 
+        - name: (QEMU) write custom artifact metadata
+          ansible.builtin.copy:
+            dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+            content: |
+              profile_hash: "{{ imagebuilder_profile_hash }}"
+              id: "{{ imagebuilder_id_base }}"
+              created_at: "{{ ansible_date_time.iso8601 }}"
+              stage: custom
+              ttl_days: 7
+
     # - name: (MAIN) cleanup build path
     #   ansible.builtin.file:
     #     path: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}"
