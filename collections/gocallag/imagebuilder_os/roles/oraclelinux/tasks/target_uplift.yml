@@ -10,28 +10,30 @@
   ansible.builtin.assert:
     that:
       - item in ['qemu_guest_agent']
-    fail_msg: "Unsupported Oracle Linux uplift feature '{{ item }}'"
+    fail_msg: >-
+      Unsupported Oracle Linux uplift feature '{{ item }}'
   loop: "{{ imagebuilder_target_features }}"
 
 - name: (ORACLE-UPLIFT) Boot target image
   ansible.builtin.include_role:
     name: gocallag.template_builder.imagebuilder
-    tasks_from: capabilities/qemu_boot_existing.yml
+    tasks_from: capabilities/qemu_boot_existing
   vars:
-    imagebuilder_qemu_image: "{{ imagebuilder_uplift_artifact.path }}"
+    imagebuilder_capability_artifact:
+      path: "{{ imagebuilder_uplift_artifact.path }}"
 
 - name: (ORACLE-UPLIFT) Configure guest
   block:
 
-    - name: (ORACLE-UPLIFT) Wait for Oracle Linux
+    - name: (ORACLE-UPLIFT) Wait for guest
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/wait_guest.yml
+        tasks_from: capabilities/wait_guest
 
     - name: (ORACLE-UPLIFT) Install QEMU guest agent
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/guest_command.yml
+        tasks_from: capabilities/guest_command
       vars:
         imagebuilder_guest_command: >-
           sudo dnf install -y qemu-guest-agent &&
@@ -44,4 +46,7 @@
     - name: (ORACLE-UPLIFT) Shutdown target image
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/qemu_shutdown.yml
+        tasks_from: capabilities/qemu_shutdown
+      vars:
+        imagebuilder_capability_artifact:
+          path: "{{ imagebuilder_uplift_artifact.path }}"

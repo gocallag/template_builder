@@ -1,6 +1,7 @@
 ---
 - name: (CAP-QEMU) Prepare existing image
-  ansible.builtin.include_tasks: capabilities/qemu_prepare_existing.yml
+  ansible.builtin.include_tasks:
+    file: capabilities/qemu_prepare_existing.yml
 
 - name: (CAP-QEMU) Boot existing image
   ansible.builtin.command: >-
@@ -13,7 +14,7 @@
   register: imagebuilder_cap_qemu_job
   changed_when: true
 
-- name: (CAP-QEMU) Wait for monitor
+- name: (CAP-QEMU) Wait for QEMU monitor
   ansible.builtin.wait_for:
     host: localhost
     port: "{{ imagebuilder_env_qemu_monport }}"

@@ -1,16 +1,28 @@
 ---
+- name: (CAP-GUEST) Validate QEMU state
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_cap_qemu_host_port is defined
+      - imagebuilder_localip is defined
+
+- name: (CAP-GUEST) Show connection details
+  ansible.builtin.debug:
+    msg: >-
+      Waiting for {{ os_type }} guest at
+      {{ imagebuilder_localip }}:{{ imagebuilder_cap_qemu_host_port }}
+
 - name: (CAP-GUEST) Wait for forwarded guest port
   ansible.builtin.wait_for:
-    host: "{{ imagebuilder_config.builder.qemu.host }}"
-    port: "{{ imagebuilder_cap_qemu_guest_port }}"
+    host: "{{ imagebuilder_localip }}"
+    port: "{{ imagebuilder_cap_qemu_host_port }}"
     delay: 5
     timeout: 900
 
-- name: (CAP-GUEST) Wait for guest protocol
-  ansible.builtin.include_tasks: ../waitfor.yml
+- name: (CAP-GUEST) Wait for SSH/PSRP readiness
+  ansible.builtin.include_tasks:
+    file: waitfor.yml
   vars:
     wait_host_ip: "{{ imagebuilder_config.builder.qemu.host }}"
-    wait_port: "{{ imagebuilder_cap_qemu_guest_port }}"
-    wait_proto: >-
-      {{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}
+    wait_port: "{{ imagebuilder_cap_qemu_host_port }}"
+    wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}"
     ponder: true

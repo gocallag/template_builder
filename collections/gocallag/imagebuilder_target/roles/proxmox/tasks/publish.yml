@@ -78,13 +78,13 @@
     api_user: "{{ imagebuilder_proxmox.username }}@pam"
     api_password: "{{ imagebuilder_proxmox.password }}"
     api_host: "{{ imagebuilder_proxmox.server }}"
-    node: "{{ imagebuilder_proxmox.node }}"
     vmid: "{{ imagebuilder_proxmox_vm.vmid }}"
     disk: virtio0
     storage: "{{ imagebuilder_proxmox.storage }}"
     import_from: "{{ imagebuilder_proxmox_remote_image }}"
     state: present
   delegate_to: localhost
+
 
 - name: (PROXMOX) Configure boot disk
   community.proxmox.proxmox_kvm:

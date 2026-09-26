@@ -1,5 +1,0 @@
----
-imagebuilder_proxmox_vm_name: "template-{{ imagebuilder_artifact.id }}"
-imagebuilder_proxmox_bridge: vmbr0
-imagebuilder_proxmox_cpu: host
-imagebuilder_proxmox_cores: 1
