@@ -18,7 +18,7 @@
      dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
      checksum: "sha256:{{ os.checksum }}"
      mode: "0644"
-  retries: 5
+  retries: 1
   delay: 10
   register: imagebuilder_download_result
   until: >-
