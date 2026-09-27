@@ -1,4 +1,4 @@
-id: al-8.10
+id: alma-8.10
 
 os:
   plugin: gocallag.imagebuilder_os.almalinux
