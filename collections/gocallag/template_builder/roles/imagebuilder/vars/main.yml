@@ -32,8 +32,8 @@ imagebuilder_build_vcpus: "{{ imagebuilder_env_build_cpu | default(2) }}"
 
 # imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
 # imagebuilder_iso_file: "{{ imagebuilder_build_basedir }}/build/{{ imagebuilder_id_base }}.iso"
-wait_host: "{{ imagebuilder_env_qemu_ip }}" # noqa: var-naming
+wait_host: "{{ imagebuilder_env_qemu_ip | default('localhost') }}" # noqa: var-naming
 wait_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
 wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
-imagebuilder_localip: "{{ ansible_facts['default_ipv4']['address'] | default('localhost') }}"
+imagebuilder_localip: "{{ imagebuilder_env_qemu_ip | default('localhost') }}"
 imagebuilder_restored_from_image: false
