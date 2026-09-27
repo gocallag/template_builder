@@ -11,10 +11,13 @@
 - name: (PROXMOX) Define remote paths
   ansible.builtin.set_fact:
     imagebuilder_proxmox_remote_dir: >-
-      /mnt/pve/{{ imagebuilder_proxmox.storage }}/tmp/{{ imagebuilder_artifact.id }}
+      /mnt/pve/{{ imagebuilder_proxmox.storage }}/import
 
     imagebuilder_proxmox_remote_image: >-
-      /mnt/pve/{{ imagebuilder_proxmox.storage }}/tmp/{{ imagebuilder_artifact.id }}/{{ imagebuilder_artifact.id }}.qcow2
+      /mnt/pve/{{ imagebuilder_proxmox.storage }}/import/{{ imagebuilder_artifact.id }}.qcow2
+
+    imagebuilder_proxmox_import_source: >-
+      {{ imagebuilder_proxmox.storage }}:import/{{ imagebuilder_artifact.id }}.qcow2
 
 - name: (PROXMOX) Create staging directory
   ansible.builtin.file:
@@ -81,7 +84,8 @@
     vmid: "{{ imagebuilder_proxmox_vm.vmid }}"
     disk: virtio0
     storage: "{{ imagebuilder_proxmox.storage }}"
-    import_from: "{{ imagebuilder_proxmox_remote_image }}"
+    import_from: "{{ imagebuilder_proxmox_import_source }}"
+    timeout: 1800
     state: present
   delegate_to: localhost
 
