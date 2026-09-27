@@ -13,7 +13,7 @@
       iso: http://192.168.1.161:8180/debian/13/debian-13.1.0-amd64-DVD-1.iso
       checksum: fd941eefaff97349e81f82090c0b32eef7b96518e1361666052e11f39b02711d
       console_boot: |
-             <esc><wait>auto auto=true priority=critical noaptdetect preseed/url=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/preseed.cfg<enter>
+             <esc><wait>auto auto=true priority=critical noaptdetect preseed/url=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/preseed.cfg<enter>
   collections:
     - gocallag.template_builder
   roles:

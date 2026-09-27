@@ -21,6 +21,7 @@ Note: The env.sh file has a bunch of configuration settings, some examples below
 
 ```
 IMAGEBUILDER_ENV_QEMU_IP=localhost
+IMAGEBUILDER_ENV_HTTP_IP=10.0.2.2
 IMAGEBUILDER_ENV_BUILD_PATH=/tmp/build
 IMAGEBUILDER_ENV_BUILD_MEMORY=8192
 IMAGEBUILDER_ENV_BUILD_CPU=4

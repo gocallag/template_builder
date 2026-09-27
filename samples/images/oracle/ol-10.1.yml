@@ -17,4 +17,4 @@ os:
   checksum: 82fa2b70a18fb268c5ef013e298f85bba0d0e6c7ae882c49a3f67c02ee6d68de
 
   console_boot: |
-    <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
+    <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>

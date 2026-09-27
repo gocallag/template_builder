@@ -12,7 +12,7 @@
       iso: http://192.168.1.161:8180/suse/Leap-16.0-offline-installer-x86_64.install.iso
       checksum: d780a228058fb4688a31b5bde22d7b97c86e04a2ced33f3d7c8e88a710d96d24
       console_boot: |
-             <down>e<down><down><down><down><end> ifcfg=enp0s3 netsetup=dhcp inst.auto=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/profile.jsonnet inst.finish=poweroff <leftCtrlOn>x<leftCtrlOff>
+             <down>e<down><down><down><down><end> ifcfg=enp0s3 netsetup=dhcp inst.auto=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/profile.jsonnet inst.finish=poweroff <leftCtrlOn>x<leftCtrlOff>
 
     autoinst: |
         {

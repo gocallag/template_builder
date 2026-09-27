@@ -36,4 +36,5 @@ wait_host: "{{ imagebuilder_env_qemu_ip | default('localhost') }}" # noqa: var-n
 wait_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}" # noqa: var-naming
 wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}" # noqa: var-naming
 imagebuilder_localip: "{{ imagebuilder_env_qemu_ip | default('localhost') }}"
+imagebuilder_httpip: "{{ imagebuilder_env_http_ip | default('10.0.2.2') }}"
 imagebuilder_restored_from_image: false

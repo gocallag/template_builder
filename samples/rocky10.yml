@@ -15,7 +15,7 @@
       # iso: https://download.rockylinux.org/pub/rocky/10.0/isos/x86_64/Rocky-10.0-x86_64-dvd
       checksum: 16ca9c96cdb221ba6e1f68579f21bd69fd8da81c6a921d9068949796f91c8feb
       console_boot: |
-           <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
+           <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
 
   collections:
     - gocallag.template_builder

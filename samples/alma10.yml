@@ -15,7 +15,7 @@
       iso: http://192.168.1.161:8180/almalinux/10/AlmaLinux-10.2-x86_64-dvd.iso
       checksum: 90244ac532f67c978831a381b420da8bda363729e1f4cf8fb8991daca70ee287
       console_boot: |
-       <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
+       <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
   collections:
     - gocallag.template_builder
   roles:
