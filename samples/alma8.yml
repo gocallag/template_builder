@@ -1,24 +1,16 @@
 ---
-- name: ALMA_8    # noqa: fqcn[keyword]
+- name: ALMA-8.10 Build
   hosts: "{{ run_on | default('localhost') }}"
   gather_facts: false
   become: false
 
+  vars_files:
+    - images/almalinux/alma-8.10.yml
+
   vars:
-    id: alma-8.10
-    os:
-      config:
-        disks:
-          - 20
-        timezone: Australia/Melbourne
-        nicdriver: e1000
-      iso: http://192.168.1.161:8180/almalinux/8/AlmaLinux-8.10-x86_64-dvd.iso
-      checksum: 463fa92155b886e31627f6713e1c2824343762245a914715ffd6f2efc300b7a1
-      console_boot: |
-        <up><wait><tab><wait> inst.text inst.ks=http://{{ imagebuilder_localip }}:{{ imagebuilder_localport }}/ks.cfg<enter>
-  collections:
-    - gocallag.template_builder
+    imagebuilder_targets:
+      - plugin: gocallag.imagebuilder_target.proxmox
+      # - plugin: gocallag.imagebuilder_target.vsphere
+
   roles:
-    - imagebuilder
-    - target_proxmox
-    # - target_vsphere
+    - gocallag.template_builder.imagebuilder
