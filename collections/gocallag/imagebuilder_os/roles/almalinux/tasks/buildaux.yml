@@ -42,7 +42,7 @@
             dest: "{{ imagebuilder_path_httpdir }}/ks.cfg"
             mode: "0644"
         become: true
-  
+
       - name: (BUILDAUX, AlmaLinux) Build aux ISO from contents (label OEMDRV)
         ansible.builtin.command: >
           genisoimage -output aux.iso -volid OEMDRV -joliet -rock .
