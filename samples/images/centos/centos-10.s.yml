@@ -1,0 +1,18 @@
+id: centos-10.s
+
+os:
+  plugin: gocallag.imagebuilder_os.centos
+  family: linux
+  distribution: centos
+  version: "10.s"
+  architecture: x86_64
+
+  config:
+    disks:
+      - 40
+    timezone: Australia/Melbourne
+
+  iso: http://192.168.1.161:8180/centos/CentOS-10/CentOS-Stream-10-20251201.0-x86_64-dvd1.iso
+  checksum: 8548643552a939c189b88cc8bf7100846ffad240ed11b438561f118b2bed49d3
+  console_boot: |
+        <up>e<down><down><end> inst.text inst.ks=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff>
