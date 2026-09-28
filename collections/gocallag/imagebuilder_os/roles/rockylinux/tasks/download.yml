@@ -1,0 +1,4 @@
+---
+- name: (RockyLinux, Download) stub
+  ansible.builtin.set_fact:
+    imagebuilder_download_result: false
