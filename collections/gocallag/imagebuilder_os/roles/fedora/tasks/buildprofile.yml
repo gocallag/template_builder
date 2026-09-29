@@ -50,7 +50,7 @@
 
                   user --name={{ imagebuilder_config.credentials.ansible.username }} --groups=wheel --plaintext --password={{ imagebuilder_config.credentials.ansible.password }}
 
-                  %packages --ignoremissing --excludedocs {{ ('--instLangs') if (version_major | default('') | int) == 8 else ('--inst-langs') if (version_major | default('') | int) >= 9 else '' }}=en_US.utf8
+                  %packages --ignoremissing --excludedocs --inst-langs=en_US.utf8
                   {% if os_variant is defined and (os_variant | lower) == 'fedora' %}
                   # Fedora-specific packages
                   {% if (version_major | default('') | int) >= 43 %}
