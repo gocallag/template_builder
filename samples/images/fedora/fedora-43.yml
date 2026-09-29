@@ -1,7 +1,7 @@
 id: fedora-43
 
 os:
-  plugin: gocallag.imagebuilder_os.almalinux
+  plugin: gocallag.imagebuilder_os.fedora
   family: linux
   distribution: fedora
   version: "43"
