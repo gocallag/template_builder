@@ -1,0 +1,16 @@
+---
+- name: (FEDORA) Validate OS configuration
+  ansible.builtin.assert:
+    that:
+      - os is defined
+      - os.family | lower == "linux"
+      - os.variant | default("fedora") | lower == "fedora"
+      - os.version is defined
+      - os.version | string | length > 0
+      - os.architecture is defined
+      - os.architecture | length > 0
+      - os.iso is defined
+      - os.iso | length > 0
+      - os.checksum is defined
+      - os.checksum | length > 0
+    fail_msg: "(FEDORA) Invalid Fedora configuration"

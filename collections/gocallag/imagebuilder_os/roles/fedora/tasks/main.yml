@@ -1,0 +1,6 @@
+---
+- name: (Fedora) Reject direct invocation
+  ansible.builtin.fail:
+    msg: >-
+      gocallag.imagebuilder_os.fedora is an imagebuilder OS plugin.
+      Invoke it through gocallag.template_builder.imagebuilder.
