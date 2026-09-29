@@ -1,0 +1,18 @@
+id: fedora-43
+
+os:
+  plugin: gocallag.imagebuilder_os.almalinux
+  family: linux
+  distribution: fedora
+  version: "43"
+  architecture: x86_64
+
+  config:
+    disks:
+      - 40
+    timezone: Australia/Melbourne
+
+  iso: http://192.168.1.161:8180/fedora/Fedora-Server-dvd-x86_64-43-1.6.iso
+  checksum: aca06983bef83da9b43144c1a2ff4c8483e4745167c17f53725c16a16742e643
+  console_boot: |
+      <up>e<wait><down><down><end> inst.text inst.ks=http://{{ imagebuilder_httpip }}:{{ imagebuilder_localport }}/ks.cfg<leftCtrlOn>x<leftCtrlOff><enter>
