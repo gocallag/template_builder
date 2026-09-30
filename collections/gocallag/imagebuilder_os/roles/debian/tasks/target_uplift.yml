@@ -36,7 +36,7 @@
         tasks_from: capabilities/guest_command
       vars:
         imagebuilder_guest_command: >-
-          sudo apt update && apt install -y qemu-guest-agent &&
+          sudo apt update && sudo apt install -y qemu-guest-agent &&
           sudo systemctl enable qemu-guest-agent
       when:
         - "'qemu_guest_agent' in imagebuilder_target_features"
