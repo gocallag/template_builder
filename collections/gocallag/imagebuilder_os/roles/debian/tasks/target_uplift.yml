@@ -1,0 +1,52 @@
+---
+- name: (Debian-UPLIFT) Validate inputs
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_uplift_artifact is defined
+      - imagebuilder_uplift_artifact.path is defined
+      - imagebuilder_target_features is defined
+
+- name: (Debian-UPLIFT) Validate features
+  ansible.builtin.assert:
+    that:
+      - item in ['qemu_guest_agent']
+    fail_msg: >-
+      Unsupported Debian uplift feature '{{ item }}'
+  loop: "{{ imagebuilder_target_features }}"
+
+- name: (Debian-UPLIFT) Boot target image
+  ansible.builtin.include_role:
+    name: gocallag.template_builder.imagebuilder
+    tasks_from: capabilities/qemu_boot_existing
+  vars:
+    imagebuilder_capability_artifact:
+      path: "{{ imagebuilder_uplift_artifact.path }}"
+
+- name: (Debian-UPLIFT) Configure guest
+  block:
+
+    - name: (Debian-UPLIFT) Wait for guest
+      ansible.builtin.include_role:
+        name: gocallag.template_builder.imagebuilder
+        tasks_from: capabilities/wait_guest
+
+    - name: (Debian-UPLIFT) Install QEMU guest agent
+      ansible.builtin.include_role:
+        name: gocallag.template_builder.imagebuilder
+        tasks_from: capabilities/guest_command
+      vars:
+        imagebuilder_guest_command: >-
+          sudo apt update && sudo apt install -y qemu-guest-agent &&
+          sudo systemctl enable qemu-guest-agent
+      when:
+        - "'qemu_guest_agent' in imagebuilder_target_features"
+
+  always:
+
+    - name: (Debian-UPLIFT) Shutdown target image
+      ansible.builtin.include_role:
+        name: gocallag.template_builder.imagebuilder
+        tasks_from: capabilities/qemu_shutdown
+      vars:
+        imagebuilder_capability_artifact:
+          path: "{{ imagebuilder_uplift_artifact.path }}"

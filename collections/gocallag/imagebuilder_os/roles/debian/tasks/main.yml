@@ -1,0 +1,6 @@
+---
+- name: (Debian) Reject direct invocation
+  ansible.builtin.fail:
+    msg: >-
+      gocallag.imagebuilder_os.debian is an imagebuilder OS plugin.
+      Invoke it through gocallag.template_builder.imagebuilder.

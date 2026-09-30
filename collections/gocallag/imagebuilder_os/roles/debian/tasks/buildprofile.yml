@@ -1,0 +1,111 @@
+# ansible-lint: ignore=line-length
+
+# RedHat-Based Systems
+- name: (BUILDPROFILE, debian)
+  tags:
+      - always
+  block:
+      - name: (BUILDAUX, debian) Generate hashed password (Debian)
+        ansible.builtin.shell: "set -o pipefail; printf '{{ imagebuilder_config.credentials.ansible.password }}' | openssl passwd -6 -stdin"
+        register: builder_hashed_password # noqa: var-naming
+        changed_when: false
+      - name: (BUILDAUX, debian) Set hashed password fact (Debian)
+        ansible.builtin.set_fact:
+            builder_hashed_password: "{{ builder_hashed_password.stdout }}" # noqa: var-naming
+      - name: (BUILDAUX, debian) use default preseed if none provided
+        ansible.builtin.set_fact:
+            preseed: # noqa: var-naming
+                |
+                  ### Localization
+                  d-i debian-installer/locale string en_US.UTF-8
+                  d-i keyboard-configuration/xkb-keymap select us
+
+                  ### Network configuration
+                  d-i netcfg/choose_interface select auto
+                  d-i netcfg/get_hostname string ansible
+                  d-i netcfg/disable_autoconfig boolean false
+                  d-i netcfg/wireless_wep string
+
+                  # Force HTTP mirror and suppress CDROM completely
+                  d-i apt-setup/disable-cdrom-entries boolean true
+                  d-i apt-setup/cdrom/set-first boolean false
+                  d-i apt-setup/use_mirror boolean true
+                  d-i apt-setup/no_mirror boolean false
+                  d-i apt-setup/local0/repository string http://deb.debian.org/debian
+                  d-i apt-setup/local0/comment string HTTP mirror
+                  d-i apt-setup/local0/source boolean false
+
+                  # Mirror configuration
+                  d-i mirror/country string manual
+                  d-i mirror/http/hostname string deb.debian.org
+                  d-i mirror/http/directory string /debian
+                  d-i mirror/http/proxy string
+                  d-i mirror/suite string trixie
+
+
+                  ### Account setup
+                  d-i passwd/root-login boolean false
+                  d-i passwd/user-fullname string Ansible User
+                  d-i passwd/username string {{ imagebuilder_config.credentials.ansible.username }}
+                  d-i passwd/user-password password {{ imagebuilder_config.credentials.ansible.password }}
+                  d-i passwd/user-password-again password {{ imagebuilder_config.credentials.ansible.password }}
+                  d-i passwd/user-default-groups string audio cdrom video sudo
+
+                  ### Clock and time zone setup
+                  d-i clock-setup/utc boolean true
+                  d-i time/zone string Australia/Melbourne
+                  d-i clock-setup/ntp boolean true
+
+                  ### Partitioning
+                  d-i partman-auto/method string lvm
+                  d-i partman-auto-lvm/guided_size string max
+                  d-i partman-lvm/device_remove_lvm boolean true
+                  d-i partman-md/device_remove_md boolean true
+                  d-i partman-lvm/confirm boolean true
+                  d-i partman-lvm/confirm_nooverwrite boolean true
+                  d-i partman-auto/choose_recipe select atomic
+                  d-i partman-partitioning/confirm_write_new_label boolean true
+                  d-i partman/choose_partition select finish
+                  d-i partman/confirm boolean true
+                  d-i partman/confirm_nooverwrite boolean true
+                  d-i partman-efi/non_efi_system boolean true
+                  d-i partman-md/confirm boolean true
+                  d-i partman-partitioning/confirm_write_new_label boolean true
+                  d-i partman/choose_partition select finish
+                  d-i partman/confirm boolean true
+                  d-i partman/confirm_nooverwrite boolean true
+
+                  ### Apt setup
+                  d-i apt-setup/cdrom/set-first boolean false
+
+                  ### Package selection
+                  tasksel tasksel/first multiselect standard, ssh-server
+                  d-i pkgsel/upgrade select safe-upgrade
+
+                  ### Boot loader installation
+                  d-i grub-installer/only_debian boolean true
+                  d-i grub-installer/with_other_os boolean true
+                  d-i grub-installer/bootdev string default
+
+                  ### Finishing up the installation
+                  d-i finish-install/reboot_in_progress note
+
+                  ### Running custom commands during the installation
+                  d-i preseed/late_command string \
+                  sed -i '/^deb cdrom:/d' /target/etc/apt/sources.list && \
+                  echo "deb http://deb.debian.org/debian trixie main contrib non-free-firmware" > /target/etc/apt/sources.list && \
+                  echo "deb http://deb.debian.org/debian-security trixie-security main contrib non-free-firmware" >> /target/etc/apt/sources.list && \
+                  echo "{{ imagebuilder_config.credentials.ansible.username }} ALL=(ALL:ALL) NOPASSWD:ALL" > /target/etc/sudoers.d/{{ imagebuilder_config.credentials.ansible.username }} ; \
+                  chmod 0440 /target/etc/sudoers.d/{{ imagebuilder_config.credentials.ansible.username }}
+
+
+                  ### Exit
+                  d-i debian-installer/exit/poweroff boolean true
+      - name: (BUILDPROFILE, debian) build profile fact
+        ansible.builtin.set_fact:
+            imagebuilder_build_profile:
+                os: "{{ os | to_json }}"  # noqa: var-naming
+                preseed: "{{ preseed }}"            # noqa: var-naming
+      - name: (BUILDPROFILE, debian) create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"
