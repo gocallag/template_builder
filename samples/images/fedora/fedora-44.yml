@@ -1,10 +1,10 @@
-id: fedora-43
+id: fedora-44
 
 os:
   plugin: gocallag.imagebuilder_os.fedora
   family: linux
   distribution: fedora
-  version: "43"
+  version: "44"
   architecture: x86_64
 
   config:
