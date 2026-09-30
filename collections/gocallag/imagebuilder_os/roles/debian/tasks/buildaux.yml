@@ -1,0 +1,69 @@
+# ansible-lint: ignore=line-length
+
+---
+# Debian-Based Systems
+- name: (BUILDAUX, debian)
+  tags:
+      - build_aux
+  block:
+      # - name: (BUILDAUX, debian) create build directories
+      #   ansible.builtin.file:
+      #       path: "{{ file }}"
+      #       state: directory
+      #       mode: "0755"
+      #   loop_control:
+      #       loop_var: file
+      #   loop:
+      #       - "{{ imagebuilder_build_basedir }}/build"
+      #       - "{{ imagebuilder_build_basedir }}/build/mnt"
+
+      - name: (BUILDAUX, debian) remove existing aux ISO (if it exists)
+        ansible.builtin.file:
+            path: "{{ imagebuilder_path_auxdir }}/aux.iso"
+            state: absent
+
+      # - name: (BUILDAUX, debian) create temporary iso contents dir
+      #   ansible.builtin.file:
+      #       path: "{{ imagebuilder_build_basedir }}/build/iso_contents"
+      #       state: directory
+      #       mode: "0755"
+
+      # - name: (BUILDAUX, debian) use default preseed if none provided
+      #   ansible.builtin.include_tasks:
+      #       file: buildprofile/debian.yml
+
+      - name: (BUILDAUX, debian) Copy preseed to ISO contents
+        ansible.builtin.copy:
+            content: "{{ preseed }}"
+            dest: "{{ imagebuilder_path_httpdir }}/preseed.cfg"
+            mode: "0644"
+        become: true
+      - name: (BUILDAUX, debian) Copy preseed to mnt
+        ansible.builtin.copy:
+            content: "{{ preseed }}"
+            dest: "{{ imagebuilder_path_mntdir }}/preseed.cfg"
+            mode: "0644"
+
+      - name: (BUILDAUX, debian) Build aux ISO from contents (label PRESEED)
+        ansible.builtin.command: >
+          genisoimage -output {{ imagebuilder_path_auxdir }}/aux.iso -volid PRESEED -joliet -rock .
+        args:
+            chdir: "{{ imagebuilder_path_mntdir }}"
+            creates: "{{ imagebuilder_path_auxdir }}/aux.iso"
+        register: mkiso # noqa: var-naming
+        failed_when: mkiso.rc != 0
+
+      # - name: (BUILDAUX, debian) Move aux ISO to build directory
+      #   ansible.builtin.command: >
+      #     mv "{{ imagebuilder_path_isodir }}/aux.iso" "{{ imagebuilder_build_basedir }}/build/aux.iso"
+      #   args:
+      #       creates: "{{ imagebuilder_build_basedir }}/build/aux.iso"
+
+      - name: (BUILDAUX, debian) create sha256 of build profile
+        ansible.builtin.set_fact:
+            build_profile: # noqa: var-naming
+                os_iso: "{{ os.iso }}" # noqa: var-naming
+                os_preseed: "{{ preseed }}" # noqa: var-naming
+      - name: (BUILDAUX, debian) create sha256 of build profile
+        ansible.builtin.set_fact:
+            profile_hash: "{{ build_profile | to_json | hash('sha256') }}" # noqa: var-naming
