@@ -194,7 +194,8 @@
 
       # Final Cleanup
       - name: (TEMPLATE-CLEANUP, common Linux) Remove SSH host keys and shutdown
-        ansible.builtin.shell: rm -f /etc/ssh/*host*key* && shutdown -h -t now && sleep 120
+        # ansible.builtin.shell: rm -f /etc/ssh/*host*key* && shutdown -h -t now && sleep 120
+        ansible.builtin.shell: shutdown -h -t now && sleep 120
         become: true
         ignore_errors: true # noqa: ignore-errors
         ignore_unreachable: true
