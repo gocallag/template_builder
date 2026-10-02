@@ -33,7 +33,6 @@
         loop:
             - pre-ansible.ps1
             - Install-patches.ps1
-            - windows-update.ps1
             - ConfigureRemotingForAnsible.ps1
 
       - name: (BUILDAUX, windows) Build aux ISO from contents (label OEMDRV)
