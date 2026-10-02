@@ -1,0 +1,16 @@
+---
+- name: WINDOWS-2025 Build
+  hosts: "{{ run_on | default('localhost') }}"
+  gather_facts: false
+  become: false
+
+  vars_files:
+    - images/windows/windows-2025.yml
+
+  vars:
+    imagebuilder_targets:
+      - plugin: gocallag.imagebuilder_target.proxmox
+      # - plugin: gocallag.imagebuilder_target.vsphere
+
+  roles:
+    - gocallag.template_builder.imagebuilder

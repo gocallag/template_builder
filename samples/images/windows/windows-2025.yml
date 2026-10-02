@@ -1,0 +1,36 @@
+id: windows-2025
+
+os:
+  plugin: gocallag.imagebuilder_os.windows
+  family: windows
+  distribution: windows
+  version: "2025"
+  architecture: x86_64
+  useauxiso: true
+
+  config:
+    disks:
+      - 100
+    timezone: Australia/Melbourne
+    locale: en-AU
+    key:
+      fullname: Lab
+      organization: Lab
+      type: trial
+      id: VDYBN-27WPP-V4HQT-9VMD4-VMK7H
+    imageselect: 2
+    first_logon_commands:
+    - cmd: "cmd.exe /c powershell -Command dism /online /quiet /set-edition:ServerDatacenter /productkey:{{ os.config.key.id }} /accepteula"
+      order: 1
+    - cmd: "cmd.exe /c powershell -File E:\\pre-ansible.ps1 -Verbose"
+      order: 8
+    - cmd: "cmd.exe /c shutdown /s /t 0"
+      order: 99
+      description: "Restart computer to apply changes"
+    - cmd: "%SystemRoot%\\system32\\WindowsPowerShell\\v1.0\\powershell.exe -Command Set-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\' -Name 'fDenyTSConnections' -Value 0"
+      order: 9
+      description: "Enable Remote Desktop Connections"
+
+  iso: http://192.168.1.161:8180/Microsoft/W2025/26100.1742.240906-0331.ge_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso
+  checksum: d0ef4502e350e3c6c53c15b1b3020d38a5ded011bf04998e950720ac8579b23d
+
