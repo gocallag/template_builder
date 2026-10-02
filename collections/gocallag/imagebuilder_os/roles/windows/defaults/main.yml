@@ -1,0 +1,3 @@
+imagebuilder_windows_patch_max_passes: 10
+imagebuilder_windows_patch_settle_seconds: 30
+imagebuilder_windows_patch_timeout: 3600
