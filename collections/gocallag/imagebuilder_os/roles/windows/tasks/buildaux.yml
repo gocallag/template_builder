@@ -1,0 +1,52 @@
+---
+
+# Windows Systems
+- name: (BUILDAUX, windows)
+  tags:
+      - build_aux
+  block:
+    #   - name: (BUILDAUX, windows) create build directories
+    #     ansible.builtin.file:
+    #         path: "{{ file }}"
+    #         state: directory
+    #         mode: "0755"
+    #     loop_control:
+    #         loop_var: file
+    #     loop:
+    #         - "{{ build_basedir }}/build"
+      - name: (BUILDAUX, windows) remove existing aux ISO (if it exists)
+        ansible.builtin.file:
+            path: "{{ imagebuilder_path_auxdir }}/aux.iso"
+            state: absent
+
+      - name: (BUILDAUX, windows) Copy unattend/boot config (Windows)
+        ansible.builtin.copy:
+            content: "{{ unattend }}"
+            dest: "{{ imagebuilder_path_mntdir }}/Autounattend.xml"
+            mode: "0644"
+
+      - name: (BUILDAUX, windows) Copy support scripts (Windows)
+        ansible.builtin.template:
+            src: "files/{{ os_type }}/{{ item }}"
+            dest: "{{ imagebuilder_path_mntdir }}/{{ item }}"
+            mode: "0755"
+        loop:
+            - pre-ansible.ps1
+            - Install-patches.ps1
+            - windows-update.ps1
+            - ConfigureRemotingForAnsible.ps1
+
+      - name: (BUILDAUX, windows) Build aux ISO from contents (label OEMDRV)
+        ansible.builtin.command: >
+            genisoimage -output {{ imagebuilder_path_httpdir }}/aux.iso -volid OEMDRV -joliet -rock .
+        args:
+            chdir: "{{ imagebuilder_path_mntdir }}"
+            creates: "{{ imagebuilder_path_httpdir }}/aux.iso"
+        register: mkiso # noqa: var-naming
+        failed_when: mkiso.rc != 0
+
+    #   - name: (BUILDAUX, windows) Move aux ISO to build directory
+    #     ansible.builtin.command: >
+    #         mv {{ build_basedir }}/build/iso_contents/aux.iso {{ build_basedir }}/build/aux.iso
+    #     args:
+    #         creates: "{{ build_basedir }}/build/aux.iso"
