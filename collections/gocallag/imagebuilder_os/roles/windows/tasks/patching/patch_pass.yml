@@ -1,0 +1,100 @@
+---
+- name: Windows | Run PowerShell update pass
+  ansible.windows.win_shell: |
+    $ErrorActionPreference = "Stop"
+    $timeoutSeconds = 3600
+
+    $job = Start-Job -ScriptBlock {
+        C:\Windows\Temp\windows-update.ps1
+    }
+
+    $completed = Wait-Job $job -Timeout $timeoutSeconds
+
+    if ($null -eq $completed) {
+        Stop-Job $job
+        Remove-Job $job -Force
+        throw "windows-update.ps1 timed out after ${timeoutSeconds}s"
+    }
+
+    Receive-Job $job
+
+    if ($job.State -ne "Completed") {
+        $state = $job.State
+        Remove-Job $job -Force
+        throw "windows-update.ps1 completed in state $state"
+    }
+
+    Remove-Job $job -Force
+  register: imagebuilder_windows_script_updates
+  become: true
+  become_user: SYSTEM
+  become_method: runas
+
+- name: Windows | Search for remaining updates
+  ansible.windows.win_updates:
+    category_names: "*"
+    state: searched
+  register: imagebuilder_windows_available_updates
+  become: true
+  become_user: SYSTEM
+  become_method: runas
+
+- name: Windows | Install remaining updates
+  ansible.windows.win_updates:
+    category_names: "*"
+    state: installed
+    reboot: false
+  register: imagebuilder_windows_installed_updates
+  become: true
+  become_user: SYSTEM
+  become_method: runas
+  when:
+    - imagebuilder_windows_available_updates.found_update_count | int > 0
+
+- name: Windows | Determine whether reboot is required
+  ansible.builtin.set_fact:
+    imagebuilder_windows_reboot_required: >-
+      {{
+        imagebuilder_windows_installed_updates.reboot_required
+        | default(false)
+        | bool
+      }}
+
+- name: Windows | Reboot after updates
+  ansible.windows.win_reboot:
+    reboot_timeout: 2400
+  become: true
+  become_user: SYSTEM
+  become_method: runas
+  when:
+    - imagebuilder_windows_reboot_required | bool
+
+- name: Windows | Allow Windows to settle after reboot
+  ansible.builtin.pause:
+    seconds: "{{ imagebuilder_windows_patch_settle_seconds | default(30) }}"
+  when:
+    - imagebuilder_windows_reboot_required | bool
+
+- name: Windows | Search after patch pass
+  ansible.windows.win_updates:
+    category_names: "*"
+    state: searched
+  register: imagebuilder_windows_remaining_updates
+  become: true
+  become_user: SYSTEM
+  become_method: runas
+
+- name: Windows | Set convergence state
+  ansible.builtin.set_fact:
+    imagebuilder_windows_patching_complete: >-
+      {{
+        imagebuilder_windows_remaining_updates.found_update_count
+        | int == 0
+      }}
+
+- name: Windows | Report patch pass
+  ansible.builtin.debug:
+    msg: >-
+      Pass {{ imagebuilder_windows_patch_pass }}:
+      {{ imagebuilder_windows_remaining_updates.found_update_count }}
+      updates remaining.

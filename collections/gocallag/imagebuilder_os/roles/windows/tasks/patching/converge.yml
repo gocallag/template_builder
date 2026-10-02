@@ -1,0 +1,29 @@
+---
+- name: Windows | Initialise patch convergence
+  ansible.builtin.set_fact:
+    imagebuilder_windows_patching_complete: false
+
+- name: Windows | Run patch convergence passes
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml
+  loop: >-
+    {{
+      range(
+        1,
+        (imagebuilder_windows_patch_max_passes | default(10) | int) + 1
+      ) | list
+    }}
+  loop_control:
+    loop_var: imagebuilder_windows_patch_pass
+    label: "Windows patch pass {{ imagebuilder_windows_patch_pass }}"
+  when:
+    - not imagebuilder_windows_patching_complete | bool
+
+- name: Windows | Assert patching converged
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_windows_patching_complete | bool
+    fail_msg: >-
+      Windows patching did not converge after
+      {{ imagebuilder_windows_patch_max_passes | default(10) }}
+      passes.
