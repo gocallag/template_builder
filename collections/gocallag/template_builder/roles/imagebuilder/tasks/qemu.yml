@@ -22,8 +22,8 @@
 
     - name: (QEMU) Set QEMU command with aux ISO if needed
       ansible.builtin.set_fact:
-        imagebuilder_qemu_command: "{{ imagebuilder_qemu_command }} -drive file={{ imagebuilder_path_auxdir }}/aux.iso,media=cdrom,if=ide,index=2"
-      when: useauxiso | default(false) | bool
+        imagebuilder_qemu_command: "{{ imagebuilder_qemu_command }} -drive file={{ imagebuilder_path_httpdir }}/aux.iso,media=cdrom,if=ide,index=2"
+      when: os.useauxiso | default(false) | bool
 
     - name: (QEMU) Start temporary web server
       ansible.builtin.shell: |
