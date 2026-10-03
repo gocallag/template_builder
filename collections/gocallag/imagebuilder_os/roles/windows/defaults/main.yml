@@ -4,3 +4,7 @@ imagebuilder_windows_patch_timeout: 3600
 imagebuilder_windows_settle_timeout: 900
 imagebuilder_windows_settle_debounce: 15
 imagebuilder_windows_settle_poll_interval: 1
+imagebuilder_windows_update_categories:
+  - CriticalUpdates
+  - SecurityUpdates
+  - UpdateRollups
