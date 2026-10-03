@@ -30,7 +30,7 @@
 
 - name: Windows | Wait for guest to settle after bootstrap reboot
   ansible.builtin.include_tasks:
-    name: wait_settled.yml
+    file: wait_settled.yml
   when:
     - imagebuilder_windows_update_bootstrap.rc == 101
 
