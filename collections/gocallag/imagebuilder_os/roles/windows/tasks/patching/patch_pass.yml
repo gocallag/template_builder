@@ -20,18 +20,14 @@
   delegate_to: bob_build
 
 - name: Windows | Wait for guest to settle after reboot
-  ansible.builtin.include_role:
-    name: gocallag.template_builder.imagebuilder
-    tasks_from: capabilities/guest/wait_settled.yml
-  vars:
-    imagebuilder_guest_host: "{{ imagebuilder_host_ip }}"
-    imagebuilder_guest_port: "{{ imagebuilder_env_qemu_psrp_port }}"
+  ansible.builtin.include_tasks:
+    name: wait_settled.yml
   when:
     - imagebuilder_windows_reboot_required | bool
 
 - name: Windows | Search for remaining updates
   ansible.windows.win_updates:
-    category_names: "*"
+    category_names: "{{ imagebuilder_windows_update_categories }}"
     state: searched
   register: imagebuilder_windows_remaining_updates
   become: true
@@ -45,9 +41,16 @@
   when:
     - imagebuilder_windows_remaining_updates.found_update_count | int > 0
 
+- name: Windows | Install available updates
+  ansible.windows.win_updates:
+    category_names: "{{ imagebuilder_windows_update_categories }}"
+    state: installed
+    reboot: false
+  register: imagebuilder_windows_updates
+
 - name: Windows | Search for remaining updates
   ansible.windows.win_updates:
-    category_names: "*"
+    category_names: "{{ imagebuilder_windows_update_categories }}"
     state: searched
   register: imagebuilder_windows_remaining_updates
   become: true
