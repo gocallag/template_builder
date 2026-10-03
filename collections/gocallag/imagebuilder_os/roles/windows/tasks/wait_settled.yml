@@ -1,0 +1,85 @@
+---
+- name: Windows | Wait for Windows servicing to settle
+  ansible.windows.win_shell: |
+    Add-Type @'
+      using System;
+      using System.Runtime.InteropServices;
+
+      public static class Windows
+      {
+          [DllImport("kernel32", SetLastError=true)]
+          public static extern UInt64 GetTickCount64();
+
+          public static TimeSpan GetUptime()
+          {
+              return TimeSpan.FromMilliseconds(GetTickCount64());
+          }
+      }
+    '@
+
+    function Wait-Condition {
+        param(
+            [scriptblock]$Condition,
+            [int]$DebounceSeconds,
+            [int]$TimeoutSeconds,
+            [int]$PollInterval
+        )
+
+        $started = [Windows]::GetUptime()
+        $stableSince = $null
+
+        do {
+            $now = [Windows]::GetUptime()
+
+            if (($now - $started).TotalSeconds -ge $TimeoutSeconds) {
+                throw "Timed out waiting for Windows servicing to settle after $TimeoutSeconds seconds"
+            }
+
+            try {
+                $result = &$Condition
+            }
+            catch {
+                $result = $false
+            }
+
+            if ($result) {
+                if ($null -eq $stableSince) {
+                    $stableSince = $now
+                }
+
+                if (($now - $stableSince).TotalSeconds -ge $DebounceSeconds) {
+                    exit 0
+                }
+            }
+            else {
+                $stableSince = $null
+            }
+
+            Start-Sleep -Seconds $PollInterval
+
+        } while ($true)
+
+    }
+
+    Write-Output "Waiting for Windows Modules Installer to settle..."
+
+    Wait-Condition `
+      -Condition {
+          (Get-Process -ErrorAction SilentlyContinue TiWorker |
+              Measure-Object).Count -eq 0
+      } `
+      -DebounceSeconds {{ imagebuilder_windows_settle_debounce | int }} `
+      -TimeoutSeconds {{ imagebuilder_windows_settle_timeout | int }} `
+      -PollInterval {{ imagebuilder_windows_settle_poll_interval | int }}
+
+    Write-Output "Windows servicing settled."
+  changed_when: false
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
+  delegate_to: bob_build
+
+- name: Windows | Verify Ansible connection after settling
+  ansible.windows.setup:
+  changed_when: false
+  delegate_to: bob_build

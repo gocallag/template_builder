@@ -1,0 +1,16 @@
+---
+- name: (CAP-GUEST-WAIT) Validate inputs
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_guest_host is defined
+      - imagebuilder_guest_host | string | trim | length > 0
+      - imagebuilder_guest_port is defined
+      - imagebuilder_guest_port | int > 0
+
+- name: (CAP-GUEST-WAIT) Wait for guest port
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_guest_host }}"
+    port: "{{ imagebuilder_guest_port }}"
+    delay: "{{ imagebuilder_guest_wait_delay | default(5) | int }}"
+    timeout: "{{ imagebuilder_guest_wait_timeout | default(900) | int }}"
+  delegate_to: localhost

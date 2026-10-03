@@ -1,0 +1,9 @@
+---
+- name: (CAP-GUEST-WAIT-SETTLED) Wait for connectivity
+  ansible.builtin.include_tasks:
+    file: wait.yml
+
+- name: (CAP-GUEST-WAIT-SETTLED) Wait for OS readiness
+  ansible.builtin.include_role:
+    name: "{{ os.plugin }}"
+    tasks_from: wait_settled.yml

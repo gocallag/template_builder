@@ -1,3 +1,6 @@
 imagebuilder_windows_patch_max_passes: 10
 imagebuilder_windows_patch_settle_seconds: 30
 imagebuilder_windows_patch_timeout: 3600
+imagebuilder_windows_settle_timeout: 900
+imagebuilder_windows_settle_debounce: 15
+imagebuilder_windows_settle_poll_interval: 1
