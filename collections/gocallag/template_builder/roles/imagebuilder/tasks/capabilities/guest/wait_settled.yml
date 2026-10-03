@@ -1,7 +1,7 @@
 ---
 - name: (CAP-GUEST-WAIT-SETTLED) Wait for connectivity
   ansible.builtin.include_tasks:
-    file: wait.yml
+    file: "{{ role_path }}/tasks/capabilities/guest/wait.yml"
 
 - name: (CAP-GUEST-WAIT-SETTLED) Wait for OS readiness
   ansible.builtin.include_role:
