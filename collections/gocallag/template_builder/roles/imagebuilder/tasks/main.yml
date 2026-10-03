@@ -2,10 +2,10 @@
 - name: (MAIN) setup to get facts for the build system
   ansible.builtin.setup:
 
-- name: (MAIN) Display build banner
-  ansible.builtin.include_tasks: banner.yml
-  vars:
-    imagebuilder_banner_message: "Starting build: {{ imagebuilder_id_base }}"
+# - name: (MAIN) Display build banner
+#   ansible.builtin.include_tasks: banner.yml
+#   vars:
+#     imagebuilder_banner_message: "Starting build: {{ imagebuilder_id_base }}"
 
 - name: Load imagebuilder configuration
   ansible.builtin.include_vars:
@@ -20,6 +20,9 @@
       - os.plugin is defined
       - os.iso is defined
       - os.iso | trim | length > 0
+      - imagebuilder_config.builder is defined
+      - imagebuilder_config.builder.build_path is defined
+      - imagebuilder_config.builder.qemu.host is defined
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
 
@@ -30,6 +33,11 @@
   ansible.builtin.set_fact:
     imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
 
+- name: (MAIN) Validate OS plugin
+  ansible.builtin.include_role:
+    name: "{{ os.plugin }}"
+    tasks_from: asserts.yml
+
 - name: (MAIN) Build OS-specific profile
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
@@ -37,11 +45,6 @@
 
 - name: (MAIN) Restore Image(s) if they exist
   ansible.builtin.include_tasks: restore.yml
-
-- name: (MAIN) Validate OS plugin
-  ansible.builtin.include_role:
-    name: "{{ os.plugin }}"
-    tasks_from: asserts.yml
 
 - name: (MAIN) OS-specific downloads
   ansible.builtin.include_role:
