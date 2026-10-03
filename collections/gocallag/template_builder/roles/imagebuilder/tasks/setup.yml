@@ -25,10 +25,12 @@
             ansible_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
             ansible_connection: "{{ (os_type | lower == 'linux') | ternary('ssh', 'psrp') }}"
             ansible_psrp_auth: "negotiate"
-            ansible_winrm_server_cert_validation: ignore
             ansible_psrp_cert_validation: ignore
-            ansible_winrm_read_timeout_sec: 1800
-            ansible_psrp_read_timeout_sec: 1800
+            ansible_psrp_operation_timeout: 120
+            ansible_psrp_connection_timeout: 180
+            ansible_psrp_read_timeout: 1800
+            ansible_psrp_reconnection_retries: 3
+            ansible_psrp_reconnection_backoff: 5
 
       - name: (SETUP) get current user info
         ansible.builtin.command: whoami
