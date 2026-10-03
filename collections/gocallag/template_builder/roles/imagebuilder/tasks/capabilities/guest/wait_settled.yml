@@ -1,7 +1,12 @@
 ---
-- name: (CAP-GUEST-WAIT-SETTLED) Wait for connectivity
-  ansible.builtin.include_tasks:
-    file: "{{ role_path }}/tasks/capabilities/guest/wait.yml"
+- name: (CAP-GUEST-WAIT) Wait for guest port to be available
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_host_ip }}"
+    port: "{{ imagebuilder_env_qemu_psrp_port }}"
+    delay: "{{ imagebuilder_guest_wait_delay | default(60) | int }}"
+    timeout: "{{ imagebuilder_guest_wait_timeout | default(900) | int }}"
+  delegate_to: localhost
+
 
 - name: (CAP-GUEST-WAIT-SETTLED) Wait for OS readiness
   ansible.builtin.include_role:
