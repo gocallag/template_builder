@@ -8,3 +8,4 @@
       {{ imagebuilder_glue_task_vars.location | default('internet') }}
   tags:
     - build_customise
+  
