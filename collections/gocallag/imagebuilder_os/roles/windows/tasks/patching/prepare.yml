@@ -3,11 +3,16 @@
   ansible.windows.win_file:
     path: C:\Windows\Temp
     state: directory
+  delegate_to: bob_build
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
 
 - name: Windows | Copy Windows Update script
   ansible.windows.win_copy:
     src: windows-update.ps1
     dest: C:\Windows\Temp\windows-update.ps1
+  delegate_to: bob_build
 
 - name: Windows | Configure WSUS
   when:
@@ -20,11 +25,19 @@
       register: imagebuilder_windows_proxy_reset
       failed_when: false
       changed_when: imagebuilder_windows_proxy_reset.rc == 0
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
 
     - name: Windows | Stop Windows Update service
       ansible.windows.win_service:
         name: wuauserv
         state: stopped
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
 
     - name: Windows | Configure WSUS servers
       ansible.windows.win_regedit:
@@ -36,6 +49,10 @@
       loop:
         - WUServer
         - WUStatusServer
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
 
     - name: Windows | Configure automatic update options
       ansible.windows.win_regedit:
@@ -51,11 +68,19 @@
           data: 0
         - name: UseWUServer
           data: 1
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
 
     - name: Windows | Start Windows Update service
       ansible.windows.win_service:
         name: wuauserv
         state: started
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
 
     - name: Windows | Trigger WSUS detection
       ansible.windows.win_command:
@@ -63,3 +88,7 @@
       register: imagebuilder_windows_wsus_registration
       failed_when: false
       changed_when: true
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas

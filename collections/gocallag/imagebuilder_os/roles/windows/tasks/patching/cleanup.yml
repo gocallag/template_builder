@@ -8,6 +8,7 @@
       ansible.windows.win_service:
         name: wuauserv
         state: stopped
+      delegate_to: bob_build
 
     - name: Windows | Remove WSUS server values
       ansible.windows.win_regedit:
@@ -17,6 +18,7 @@
       loop:
         - WUServer
         - WUStatusServer
+      delegate_to: bob_build
 
     - name: Windows | Disable WSUS
       ansible.windows.win_regedit:
@@ -25,12 +27,15 @@
         data: 0
         type: dword
         state: present
+      delegate_to: bob_build
 
     - name: Windows | Start Windows Update service
       ansible.windows.win_service:
         name: wuauserv
         state: started
+      delegate_to: bob_build
 - name: Windows | Remove temporary update script
   ansible.windows.win_file:
     path: C:\Windows\Temp\windows-update.ps1
     state: absent
+  delegate_to: bob_build
