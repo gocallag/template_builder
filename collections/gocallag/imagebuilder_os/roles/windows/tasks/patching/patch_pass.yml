@@ -9,37 +9,51 @@
       {{
         (imagebuilder_windows_updates.reboot_required | default(false) | bool)
         or
-        ((imagebuilder_windows_patch_pass | int) % 5 == 0)
+        ((imagebuilder_windows_patch_pass | int) % 10 == 0)
       }}
 
-- name: Windows | Reboot if required
+- name: Windows | Bootstrap Windows Update
+  ansible.windows.win_command:
+    cmd: >-
+      powershell.exe
+      -NoProfile
+      -NonInteractive
+      -ExecutionPolicy Bypass
+      -File C:\Windows\Temp\windows-update.ps1
+  register: imagebuilder_windows_update_bootstrap
+  delegate_to: bob_build
+  failed_when:
+    - imagebuilder_windows_update_bootstrap.rc not in [0, 101]
+  changed_when:
+    - imagebuilder_windows_update_bootstrap.rc in [0, 101]
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
+  
+
+- name: Windows | Reboot after bootstrap update pass
   ansible.windows.win_reboot:
     reboot_timeout: 2400
   when:
-    - imagebuilder_windows_reboot_required | bool
+    - imagebuilder_windows_update_bootstrap.rc == 101
   delegate_to: bob_build
 
-- name: Windows | Wait for guest to settle after reboot
+- name: Windows | Wait for guest to settle after bootstrap reboot
   ansible.builtin.include_tasks:
     file: wait_settled.yml
   when:
-    - imagebuilder_windows_reboot_required | bool
+    - imagebuilder_windows_update_bootstrap.rc == 101
 
 - name: Windows | Search for remaining updates
   ansible.windows.win_updates:
     category_names: "{{ imagebuilder_windows_update_categories }}"
     state: searched
   register: imagebuilder_windows_remaining_updates
+  delegate_to: bob_build
   become: true
   become_user: SYSTEM
   become_method: ansible.builtin.runas
-  delegate_to: bob_build
-
-- name: Windows | Continue patching
-  ansible.builtin.include_tasks:
-    file: patch_pass.yml
-  when:
-    - imagebuilder_windows_remaining_updates.found_update_count | int > 0
+  
 
 - name: Windows | Install available updates
   ansible.windows.win_updates:
@@ -47,6 +61,10 @@
     state: installed
     reboot: false
   register: imagebuilder_windows_updates
+  delegate_to: bob_build
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
 
 - name: Windows | Search for remaining updates
   ansible.windows.win_updates:
