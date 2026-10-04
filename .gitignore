@@ -1,2 +1,5 @@
 .ansible/**
 *.log
+repo-dump.md.sh
+repo-source-dump.md
+roadmap.md
