@@ -26,8 +26,8 @@ imagebuilder_build_aux: "{{ imagebuilder_path_auxdir }}/{{ imagebuilder_build_id
 
 imagebuilder_build_disks: "{{ os.config.disks }}"
 imagebuilder_build_kickstart: "{{ imagebuilder_env_build_path }}/{{ imagebuilder_id_base }}/ks.cfg"
-imagebuilder_build_ram: "{{ imagebuilder_env_build_memory | default(2048) }}"
-imagebuilder_build_vcpus: "{{ imagebuilder_env_build_cpu | default(2) }}"
+imagebuilder_build_ram: "{{ imagebuilder_config.builder.qemu.memory | default(2048) }}"
+imagebuilder_build_vcpus: "{{ imagebuilder_config.builder.qemu.cpus | default(2) }}"
 # imagebuilder_build_output: "build/{{ imagebuilder_id_base }}.qcow2"
 
 # imagebuilder_aux_dir: "{{ imagebuilder_build_basedir }}/aux"
