@@ -1,10 +1,10 @@
 ---
 - name: Windows | Wait for guest port to be available
   ansible.builtin.wait_for:
-    host: "{{ imagebuilder_host_ip }}"
-    port: "{{ imagebuilder_env_qemu_psrp_port }}"
-    delay: "{{ imagebuilder_guest_wait_delay | default(60) | int }}"
-    timeout: "{{ imagebuilder_guest_wait_timeout | default(900) | int }}"
+    host: "{{ imagebuilder_localip }}"
+    port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
+    delay: 10
+    timeout: 900
   delegate_to: localhost
 
 - name: Windows | Wait for Windows servicing to settle
