@@ -12,7 +12,42 @@
   become: true
   become_user: SYSTEM
   become_method: ansible.builtin.runas
-  
+
+- name: Windows | Build | Disable Defender real-time monitoring
+  ansible.windows.win_powershell:
+    script: |
+      Set-MpPreference -DisableRealtimeMonitoring $true
+  delegate_to: bob_build
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
+
 - name: Windows | Converge Windows updates
   ansible.builtin.include_tasks:
     file: patch_pass.yml
+
+- name: Windows | Finalize | Enable Defender real-time monitoring
+  ansible.windows.win_powershell:
+    script: |
+      Set-MpPreference -DisableRealtimeMonitoring $false
+  delegate_to: bob_build
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
+
+- name: Windows | Finalize | Read Defender state
+  ansible.windows.win_powershell:
+    script: |
+      $status = Get-MpComputerStatus
+
+      [PSCustomObject]@{
+          AntivirusEnabled          = $status.AntivirusEnabled
+          RealTimeProtectionEnabled = $status.RealTimeProtectionEnabled
+      }
+  register: imagebuilder_windows_defender_status
+  delegate_to: bob_build
+- name: Windows | Finalize | Assert Defender state
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_windows_defender_status.stdout | from_json | json_query('AntivirusEnabled') == true
+      - imagebuilder_windows_defender_status.stdout | from_json | json_query('RealTimeProtectionEnabled') == true
