@@ -18,21 +18,22 @@
   tags:
     - always
   block:
-    - name: (UTILS-WAITFOR) Set the ponder fact
-      ansible.builtin.set_fact:
-        ponder: "{{ ponder | default(false) }}" # noqa: var-naming
-      delegate_to: localhost
+    # - name: (UTILS-WAITFOR) Set the ponder fact
+    #   ansible.builtin.set_fact:
+    #     ponder: "{{ ponder | default(false) }}" # noqa: var-naming
+    #   delegate_to: localhost
 
-    - name: (UTILS-WAITFOR) Set the retry count for connection
-      ansible.builtin.set_fact:
-        retry_count: "{{ 1 if retry_count is undefined else retry_count | int + 1 }}" # noqa: var-naming
-      delegate_to: localhost
+    # - name: (UTILS-WAITFOR) Set the retry count for connection
+    #   ansible.builtin.set_fact:
+    #     retry_count: "{{ 1 if retry_count is undefined else retry_count | int + 1 }}" # noqa: var-naming
+    #   delegate_to: localhost
 
-    - name: (UTILS-WAITFOR) Wait for admin port to be available (after 60 seconds)
+    - name: (UTILS-WAITFOR) Wait for admin port to be available
       ansible.builtin.wait_for:
         port: "{{ wait_port }}"
         host: "{{ wait_host_ip }}"
-        delay: 60
+        connect_timeout: 5
+        sleep: 2
         timeout: 900
       delegate_to: localhost
 
@@ -59,7 +60,7 @@
 
     - name: (UTILS-WAITFOR, common Linux) Ponder
       when:
-        - ponder
+        # - ponder
         - wait_proto | lower == "ssh"
       tags:
         - always
@@ -118,7 +119,7 @@
 
     - name: (UTILS-WAITFOR, Windows) Ponder
       when:
-        - ponder
+        # - ponder
         - wait_proto == "psrp"
       tags:
         - always
@@ -169,57 +170,57 @@
             Write-Output 'Waiting for the Windows Modules Installer to exit...'
             Wait-Condition {(Get-Process -ErrorAction SilentlyContinue TiWorker | Measure-Object).Count -eq 0}
             ExitWithCode 0
-          ignore_unreachable: true
+          # ignore_unreachable: true
           delegate_to: bob_build
           register: mysetup # noqa: var-naming
 
-        - name: (UTILS-WAITFOR) do a setup again after pondering
-          ansible.builtin.setup:
-          ignore_unreachable: true
-          register: mysetup # noqa: var-naming
-          delegate_to: bob_build
-          when: ponder
+        # - name: (UTILS-WAITFOR) do a setup again after pondering
+        #   ansible.builtin.setup:
+        #   ignore_unreachable: true
+        #   register: mysetup # noqa: var-naming
+        #   delegate_to: bob_build
+        #   when: ponder
 
-        - name: (UTILS-WAITFOR) force failure if setup failed
-          ansible.builtin.command: /bin/false
-          changed_when: false
-          delegate_to: localhost
-          when:
-            - ponder
-            - mysetup.unreachable is defined
+        # - name: (UTILS-WAITFOR) force failure if setup failed
+        #   ansible.builtin.command: /bin/false
+        #   changed_when: false
+        #   delegate_to: localhost
+        #   when:
+        #     - ponder
+        #     - mysetup.unreachable is defined
 
-  rescue:
+  # rescue:
 
-    - name: (UTILS-WAITFOR) debug failure
-      ansible.builtin.debug:
-        msg: "fail count = {{ retry_count }}"
-      tags:
-        - always
+  #   - name: (UTILS-WAITFOR) debug failure
+  #     ansible.builtin.debug:
+  #       msg: "fail count = {{ retry_count }}"
+  #     tags:
+  #       - always
 
-    - name: (UTILS-WAITFOR) fail
-      ansible.builtin.fail:
-        msg: Ended after 15 tries
-      when: retry_count|int >=  15
-      tags:
-        - always
-
-
-    - name: (UTILS-WAITFOR) hold on for 2 minutes to give the target system a chance to sort itself out.
-      ansible.builtin.wait_for:
-        timeout: 120
-      delegate_to: localhost
-      tags:
-        - always
+  #   - name: (UTILS-WAITFOR) fail
+  #     ansible.builtin.fail:
+  #       msg: Ended after 15 tries
+  #     when: retry_count|int >=  15
+  #     tags:
+  #       - always
 
 
-    - name: (UTILS-WAITFOR) debug failure
-      ansible.builtin.debug:
-        msg: "Failed to connect - Retrying..."
-      tags:
-        - always
+  #   - name: (UTILS-WAITFOR) hold on for 2 minutes to give the target system a chance to sort itself out.
+  #     ansible.builtin.wait_for:
+  #       timeout: 120
+  #     delegate_to: localhost
+  #     tags:
+  #       - always
 
 
-    - name: (UTILS-WAITFOR) include the task again
-      ansible.builtin.include_tasks: "waitfor.yml"
-      tags:
-        - always
+  #   - name: (UTILS-WAITFOR) debug failure
+  #     ansible.builtin.debug:
+  #       msg: "Failed to connect - Retrying..."
+  #     tags:
+  #       - always
+
+
+  #   - name: (UTILS-WAITFOR) include the task again
+  #     ansible.builtin.include_tasks: "waitfor.yml"
+  #     tags:
+  #       - always
