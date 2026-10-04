@@ -36,20 +36,26 @@
         timeout: 900
       delegate_to: localhost
 
-    - name: (UTILS-WAITFOR) do a setup on the target host
-      ansible.builtin.setup:
-      ignore_unreachable: true
-      register: mysetup # noqa: var-naming
-      when: ponder
+    # - name: (UTILS-WAITFOR) do a setup on the target host
+    #   ansible.builtin.setup:
+    #   ignore_unreachable: true
+    #   register: mysetup # noqa: var-naming
+    #   when: ponder
+    #   delegate_to: bob_build
+    - name: Utils-Waitfor | Wait for connection
+      ansible.builtin.wait_for_connection:
+        connect_timeout: 10
+        sleep: 5
+        timeout: 1200
       delegate_to: bob_build
 
-    - name: (UTILS-WAITFOR) force error if setup failed on the target host
-      ansible.builtin.command: /bin/false
-      changed_when: false
-      delegate_to: localhost
-      when:
-        - ponder
-        - mysetup.unreachable is defined
+    # - name: (UTILS-WAITFOR) force error if setup failed on the target host
+    #   ansible.builtin.command: /bin/false
+    #   changed_when: false
+    #   delegate_to: localhost
+    #   when:
+    #     - ponder
+    #     - mysetup.unreachable is defined
 
     - name: (UTILS-WAITFOR, common Linux) Ponder
       when:
