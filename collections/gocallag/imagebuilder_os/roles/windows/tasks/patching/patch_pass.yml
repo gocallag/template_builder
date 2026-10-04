@@ -29,7 +29,7 @@
   become: true
   become_user: SYSTEM
   become_method: ansible.builtin.runas
-  
+
 
 - name: Windows | Reboot after bootstrap update pass
   ansible.windows.win_reboot:
@@ -44,16 +44,16 @@
   when:
     - imagebuilder_windows_update_bootstrap.rc == 101
 
-- name: Windows | Search for remaining updates
-  ansible.windows.win_updates:
-    category_names: "{{ imagebuilder_windows_update_categories }}"
-    state: searched
-  register: imagebuilder_windows_remaining_updates
-  delegate_to: bob_build
-  become: true
-  become_user: SYSTEM
-  become_method: ansible.builtin.runas
-  
+# - name: Windows | Search for remaining updates
+#   ansible.windows.win_updates:
+#     category_names: "{{ imagebuilder_windows_update_categories }}"
+#     state: searched
+#   register: imagebuilder_windows_remaining_updates
+#   delegate_to: bob_build
+#   become: true
+#   become_user: SYSTEM
+#   become_method: ansible.builtin.runas
+  # 
 
 - name: Windows | Install available updates
   ansible.windows.win_updates:
@@ -66,15 +66,31 @@
   become_user: SYSTEM
   become_method: ansible.builtin.runas
 
+
+- name: Windows | Reboot after update installation
+  ansible.windows.win_reboot:
+    reboot_timeout: 2400
+  when:
+    - imagebuilder_windows_updates.reboot_required | bool
+  delegate_to: bob_build
+
+
+- name: Windows | Wait for guest to settle after reboot
+  ansible.builtin.include_tasks:
+    file: wait_settled.yml
+  when:
+    - imagebuilder_windows_updates.reboot_required | bool
+
+
 - name: Windows | Search for remaining updates
   ansible.windows.win_updates:
     category_names: "{{ imagebuilder_windows_update_categories }}"
     state: searched
   register: imagebuilder_windows_remaining_updates
+  delegate_to: bob_build
   become: true
   become_user: SYSTEM
   become_method: ansible.builtin.runas
-  delegate_to: bob_build
 
 - name: Windows | Continue patching
   ansible.builtin.include_tasks:
