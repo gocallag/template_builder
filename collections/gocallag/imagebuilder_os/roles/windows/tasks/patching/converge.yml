@@ -3,37 +3,6 @@
   ansible.builtin.set_fact:
     imagebuilder_windows_patch_pass: 0
 
-- name: Windows | Bootstrap Windows Update
-  ansible.windows.win_command:
-    cmd: >-
-      powershell.exe
-      -NoProfile
-      -NonInteractive
-      -ExecutionPolicy Bypass
-      -File C:\Windows\Temp\windows-update.ps1
-  register: imagebuilder_windows_update_bootstrap
-  failed_when:
-    - imagebuilder_windows_update_bootstrap.rc not in [0, 101]
-  changed_when:
-    - imagebuilder_windows_update_bootstrap.rc in [0, 101]
-  become: true
-  become_user: SYSTEM
-  become_method: ansible.builtin.runas
-  delegate_to: bob_build
-
-- name: Windows | Reboot after bootstrap update pass
-  ansible.windows.win_reboot:
-    reboot_timeout: 2400
-  when:
-    - imagebuilder_windows_update_bootstrap.rc == 101
-  delegate_to: bob_build
-
-- name: Windows | Wait for guest to settle after bootstrap reboot
-  ansible.builtin.include_tasks:
-    file: wait_settled.yml
-  when:
-    - imagebuilder_windows_update_bootstrap.rc == 101
-
 - name: Windows | Converge Windows updates
   ansible.builtin.include_tasks:
     file: patch_pass.yml
