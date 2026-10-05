@@ -96,7 +96,7 @@
             jid: "{{ qemu_boot.ansible_job_id }}"
           register: qemu_wait # noqa: var-naming
           until: qemu_wait.finished
-          retries: 30
+          retries: 45
           delay: 60
           failed_when: qemu_wait.rc != 0
           changed_when: false
