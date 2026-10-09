@@ -1,59 +1,130 @@
+---
 - name: Windows | Increment patch pass counter
   ansible.builtin.set_fact:
     imagebuilder_windows_patch_pass: >-
       {{ (imagebuilder_windows_patch_pass | default(0) | int) + 1 }}
 
-- name: Windows | Determine whether reboot is required
-  ansible.builtin.set_fact:
-    imagebuilder_windows_reboot_required: >-
-      {{
-        (imagebuilder_windows_updates.reboot_required | default(false) | bool)
-        or
-        ((imagebuilder_windows_patch_pass | int) % 10 == 0)
-      }}
 
-- name: Windows | Bootstrap Windows Update
-  ansible.windows.win_command:
-    cmd: >-
-      powershell.exe
-      -NoProfile
-      -NonInteractive
-      -ExecutionPolicy Bypass
-      -File C:\Windows\Temp\windows-update.ps1
-  register: imagebuilder_windows_update_bootstrap
+#
+# Bootstrap Windows Update.
+#
+# windows-update.ps1 is rerunnable. If the connection is lost while it
+# is executing, recover the connection, reboot to establish a known
+# servicing boundary, settle the guest, then continue.
+#
+
+- name: Windows | Initialize bootstrap recovery state
+  ansible.builtin.set_fact:
+    imagebuilder_windows_bootstrap_recovery_required: false
+
+
+- name: Windows | Run Windows Update bootstrap
+  block:
+
+    - name: Windows | Bootstrap Windows Update
+      ansible.windows.win_command:
+        cmd: >-
+          powershell.exe
+          -NoProfile
+          -NonInteractive
+          -ExecutionPolicy Bypass
+          -File C:\Windows\Temp\windows-update.ps1
+      register: imagebuilder_windows_update_bootstrap
+      delegate_to: bob_build
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
+      failed_when:
+        - imagebuilder_windows_update_bootstrap.rc not in [0, 101]
+      changed_when:
+        - imagebuilder_windows_update_bootstrap.rc in [0, 101]
+
+  rescue:
+
+    - name: Windows | Mark bootstrap for recovery
+      ansible.builtin.set_fact:
+        imagebuilder_windows_bootstrap_recovery_required: true
+
+
+#
+# Normal bootstrap completion can still leave Windows in a pending
+# reboot state even when windows-update.ps1 returned rc=0.
+#
+
+- name: Windows | Check reboot state after bootstrap
+  ansible.windows.win_reboot_info:
+  register: imagebuilder_windows_bootstrap_reboot
   delegate_to: bob_build
-  failed_when:
-    - imagebuilder_windows_update_bootstrap.rc not in [0, 101]
-  changed_when:
-    - imagebuilder_windows_update_bootstrap.rc in [0, 101]
   become: true
   become_user: SYSTEM
   become_method: ansible.builtin.runas
+  when:
+    - not imagebuilder_windows_bootstrap_recovery_required
 
 
-- name: Windows | Reboot after bootstrap update pass
+- name: Windows | Determine whether bootstrap reboot is required
+  ansible.builtin.set_fact:
+    imagebuilder_windows_bootstrap_reboot_required: >-
+      {{
+        imagebuilder_windows_bootstrap_recovery_required
+        or
+        (
+          imagebuilder_windows_update_bootstrap.rc
+          | default(0)
+          | int
+          == 101
+        )
+        or
+        (
+          imagebuilder_windows_bootstrap_reboot.reboot_required
+          | default(false)
+          | bool
+        )
+      }}
+
+
+#
+# If bootstrap failed, first recover PSRP before asking Windows to reboot.
+#
+
+- name: Windows | Wait for connection after bootstrap failure
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 10
+    timeout: 1200
+  delegate_to: bob_build
+  when:
+    - imagebuilder_windows_bootstrap_recovery_required
+
+
+#
+# One reboot path covers:
+#
+#   * bootstrap rc=101
+#   * independently detected pending reboot
+#   * indeterminate bootstrap caused by transport/task failure
+#
+
+- name: Windows | Reboot after bootstrap
   ansible.windows.win_reboot:
     reboot_timeout: 2400
-  when:
-    - imagebuilder_windows_update_bootstrap.rc == 101
+    msg: >-
+      Image builder Windows Update bootstrap reboot
   delegate_to: bob_build
+  when:
+    - imagebuilder_windows_bootstrap_reboot_required | bool
+
 
 - name: Windows | Wait for guest to settle after bootstrap reboot
   ansible.builtin.include_tasks:
     file: wait_settled.yml
   when:
-    - imagebuilder_windows_update_bootstrap.rc == 101
+    - imagebuilder_windows_bootstrap_reboot_required | bool
 
-# - name: Windows | Search for remaining updates
-#   ansible.windows.win_updates:
-#     category_names: "{{ imagebuilder_windows_update_categories }}"
-#     state: searched
-#   register: imagebuilder_windows_remaining_updates
-#   delegate_to: bob_build
-#   become: true
-#   become_user: SYSTEM
-#   become_method: ansible.builtin.runas
-  # 
+
+#
+# Normal Ansible Windows Update pass.
+#
 
 - name: Windows | Install available updates
   ansible.windows.win_updates:
@@ -67,20 +138,53 @@
   become_method: ansible.builtin.runas
 
 
+#
+# Reboot when Windows explicitly requires it, or periodically as a
+# safety boundary for Windows versions that can become wedged during
+# large servicing cycles.
+#
+
+- name: Windows | Determine whether post-update reboot is required
+  ansible.builtin.set_fact:
+    imagebuilder_windows_reboot_required: >-
+      {{
+        (
+          imagebuilder_windows_updates.reboot_required
+          | default(false)
+          | bool
+        )
+        or
+        (
+          (imagebuilder_windows_patch_pass | int) % 10 == 0
+        )
+      }}
+
+
 - name: Windows | Reboot after update installation
   ansible.windows.win_reboot:
     reboot_timeout: 2400
-  when:
-    - imagebuilder_windows_updates.reboot_required | bool
+    msg: >-
+      Image builder Windows Update reboot after patch pass
+      {{ imagebuilder_windows_patch_pass }}
   delegate_to: bob_build
+  when:
+    - imagebuilder_windows_reboot_required | bool
 
 
-- name: Windows | Wait for guest to settle after reboot
+- name: Windows | Wait for guest to settle after update reboot
   ansible.builtin.include_tasks:
     file: wait_settled.yml
   when:
-    - imagebuilder_windows_updates.reboot_required | bool
+    - imagebuilder_windows_reboot_required | bool
 
+
+#
+# Convergence test.
+#
+# There is intentionally no pre-install search. state=installed already
+# searches for applicable updates. This search exists only to determine
+# whether another patch pass is required.
+#
 
 - name: Windows | Search for remaining updates
   ansible.windows.win_updates:
@@ -92,8 +196,13 @@
   become_user: SYSTEM
   become_method: ansible.builtin.runas
 
+
 - name: Windows | Continue patching
   ansible.builtin.include_tasks:
     file: patch_pass.yml
   when:
-    - imagebuilder_windows_remaining_updates.found_update_count | int > 0
+    - >-
+      imagebuilder_windows_remaining_updates.found_update_count
+      | default(0)
+      | int
+      > 0

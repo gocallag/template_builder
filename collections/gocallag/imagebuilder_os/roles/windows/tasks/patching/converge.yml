@@ -35,6 +35,7 @@
   become_user: SYSTEM
   become_method: ansible.builtin.runas
 
+
 - name: Windows | Finalize | Read Defender state
   ansible.windows.win_powershell:
     script: |
@@ -46,8 +47,17 @@
       }
   register: imagebuilder_windows_defender_status
   delegate_to: bob_build
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
+  changed_when: false
+
+
 - name: Windows | Finalize | Assert Defender state
   ansible.builtin.assert:
     that:
-      - imagebuilder_windows_defender_status.stdout | from_json | json_query('AntivirusEnabled') == true
-      - imagebuilder_windows_defender_status.stdout | from_json | json_query('RealTimeProtectionEnabled') == true
+      - imagebuilder_windows_defender_status.output | length == 1
+      - imagebuilder_windows_defender_status.output[0].AntivirusEnabled | bool
+      - imagebuilder_windows_defender_status.output[0].RealTimeProtectionEnabled | bool
+    fail_msg: >-
+      Microsoft Defender Antivirus was not fully restored after image patching.

@@ -28,14 +28,45 @@ param(
     [string]$SearchCriteria = 'BrowseOnly=0 and IsInstalled=0',
     [string[]]$Filters = @('include:$true'),
     [int]$UpdateLimit = 1000,
-    [switch]$OnlyCheckForRebootRequired = $false
+    [switch]$OnlyCheckForRebootRequired = $false,
+	[string]$LogPath = 'C:\Windows\Temp\windows-update.log'
 )
 
+$logDirectory = Split-Path -Parent $LogPath
+
+if ($logDirectory -and !(Test-Path -LiteralPath $logDirectory)) {
+    New-Item `
+        -ItemType Directory `
+        -Path $logDirectory `
+        -Force |
+        Out-Null
+}
+
+Start-Transcript `
+    -Path $LogPath `
+    -Append `
+    -Force |
+    Out-Null
+
+Write-Output ''
+Write-Output '============================================================'
+Write-Output "Windows Update pass started: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff K')"
+Write-Output "Computer: $env:COMPUTERNAME"
+Write-Output "PID: $PID"
+Write-Output "Search criteria: $SearchCriteria"
+Write-Output '============================================================'
 $mock = $false
 
 function ExitWithCode($exitCode) {
+    try {
+        Stop-Transcript | Out-Null
+    }
+    catch {
+        # Ignore if no transcript is active.
+    }
+
     $host.SetShouldExit($exitCode)
-    Exit
+    exit $exitCode
 }
 
 Set-StrictMode -Version Latest
@@ -81,23 +112,48 @@ public static class Windows
 
 function Wait-Condition {
     param(
-      [scriptblock]$Condition,
-      [int]$DebounceSeconds=15
+        [Parameter(Mandatory)]
+        [scriptblock]$Condition,
+
+        [int]$DebounceSeconds = 15,
+
+        [int]$TimeoutSeconds = 300
     )
-    process {
-        $begin = [Windows]::GetUptime()
-        do {
-            Start-Sleep -Seconds 1
-            try {
-              $result = &$Condition
-            } catch {
-              $result = $false
+
+    $started = [Windows]::GetUptime()
+    $satisfiedSince = $null
+
+    while ($true) {
+        $now = [Windows]::GetUptime()
+
+        if (($now - $started).TotalSeconds -ge $TimeoutSeconds) {
+            return $false
+        }
+
+        try {
+            $result = & $Condition
+        }
+        catch {
+            $result = $false
+        }
+
+        if ($result) {
+            if ($null -eq $satisfiedSince) {
+                $satisfiedSince = $now
             }
-            if (-not $result) {
-                $begin = [Windows]::GetUptime()
-                continue
+
+            if (
+                ($now - $satisfiedSince).TotalSeconds -ge
+                $DebounceSeconds
+            ) {
+                return $true
             }
-        } while ((([Windows]::GetUptime()) - $begin).TotalSeconds -lt $DebounceSeconds)
+        }
+        else {
+            $satisfiedSince = $null
+        }
+
+        Start-Sleep -Seconds 1
     }
 }
 
@@ -117,25 +173,123 @@ function LookupOperationResultCode($code) {
     return "Unknown Code $code"
 }
 
-function ExitWhenRebootRequired($rebootRequired = $false) {
-    # check for pending Windows Updates.
+function ExitWhenRebootRequired {
+    param(
+        [bool]$rebootRequired = $false
+    )
+
+    # Check for pending Windows Updates.
     if (!$rebootRequired) {
         $systemInformation = New-Object -ComObject 'Microsoft.Update.SystemInfo'
-        $rebootRequired = $systemInformation.RebootRequired
+        $rebootRequired = [bool]$systemInformation.RebootRequired
     }
 
-    # check for pending Windows Features.
+    # Check for pending Windows Features / CBS packages.
     if (!$rebootRequired) {
         $pendingPackagesKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\PackagesPending'
-        $pendingPackagesCount = (Get-ChildItem -ErrorAction SilentlyContinue $pendingPackagesKey | Measure-Object).Count
+
+        $pendingPackagesCount = (
+            Get-ChildItem `
+                -LiteralPath $pendingPackagesKey `
+                -ErrorAction SilentlyContinue |
+            Measure-Object
+        ).Count
+
         $rebootRequired = $pendingPackagesCount -gt 0
     }
 
-    if ($rebootRequired) {
-        Write-Output 'Waiting for the Windows Modules Installer to exit...'
-        Wait-Condition {(Get-Process -ErrorAction SilentlyContinue TiWorker | Measure-Object).Count -eq 0}
-        ExitWithCode 101
+    if (!$rebootRequired) {
+        return
     }
+
+    Write-Output 'Waiting for the Windows Modules Installer to exit...'
+
+	$cbsLogPath = Join-Path $env:SystemRoot 'Logs\CBS\CBS.log'
+	$cbsIdleSeconds = 120
+
+	$cbsLastLength = $null
+	$cbsLastWriteTimeUtc = $null
+	$cbsLastActivity = [Windows]::GetUptime()
+
+	if (Test-Path -LiteralPath $cbsLogPath) {
+		$cbsLog = Get-Item -LiteralPath $cbsLogPath
+
+		$cbsLastLength = $cbsLog.Length
+		$cbsLastWriteTimeUtc = $cbsLog.LastWriteTimeUtc
+	}
+
+	$settled = Wait-Condition `
+		-Condition {
+			#
+			# Normal case: TiWorker exited.
+			#
+			$tiWorker = Get-Process `
+				-Name TiWorker `
+				-ErrorAction SilentlyContinue
+
+			if (!$tiWorker) {
+				Write-Output 'TiWorker has exited.'
+				return $true
+			}
+
+			#
+			# TiWorker still exists. Check for observable CBS progress.
+			#
+			if (Test-Path -LiteralPath $cbsLogPath) {
+				$cbsLog = Get-Item -LiteralPath $cbsLogPath
+
+				if (
+					$cbsLog.Length -ne $cbsLastLength -or
+					$cbsLog.LastWriteTimeUtc -ne $cbsLastWriteTimeUtc
+				) {
+					$cbsLastLength = $cbsLog.Length
+					$cbsLastWriteTimeUtc = $cbsLog.LastWriteTimeUtc
+					$cbsLastActivity = [Windows]::GetUptime()
+
+					return $false
+				}
+
+				$cbsIdleFor = (
+					[Windows]::GetUptime() - $cbsLastActivity
+				).TotalSeconds
+
+				if ($cbsIdleFor -ge $cbsIdleSeconds) {
+					Write-Output (
+						"TiWorker is still running but CBS.log has not " +
+						"changed for $([int]$cbsIdleFor) seconds."
+					)
+
+					return $true
+				}
+			}
+
+			return $false
+		} `
+		-DebounceSeconds 15 `
+		-TimeoutSeconds 1800
+		# $settled = Wait-Condition `
+		# 	-Condition {
+		# 		(
+		# 			Get-Process `
+		# 				-Name TiWorker `
+		# 				-ErrorAction SilentlyContinue |
+		# 			Measure-Object
+		# 		).Count -eq 0
+		# 	} `
+		# 	-DebounceSeconds 15 `
+		# 	-TimeoutSeconds 1800
+
+    if ($settled) {
+        Write-Output 'Windows Modules Installer has exited.'
+    }
+    else {
+        Write-Output (
+            'Windows Modules Installer did not exit within 1800 seconds. ' +
+            'Proceeding with the required reboot.'
+        )
+    }
+
+    ExitWithCode 101
 }
 
 ExitWhenRebootRequired
@@ -163,40 +317,6 @@ function Test-IncludeUpdate($filters, $update) {
 }
 
 
-# #Stop all before the magic can happen
-# stop-service wuauserv -Force
-# stop-service bits -Force
-# stop-service usosvc -Force
-# stop-service cryptsvc -Force
-
-# #Removing all old
-# Remove-item -Path 'C:\windows\SoftwareDistribution' -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-# Remove-item -Path 'C:\windows\SoftwareDistribution\Datastore' -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-# Remove-item -Path 'C:\windows\SoftwareDistribution\Download' -Recurse -Force -Confirm:$false -ErrorAction SilentlyContinue
-
-# #Force set WU client settings
-# New-Item –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" -ErrorAction SilentlyContinue
-# New-ItemProperty –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" –Name WUServer -Value $Wup -PropertyType "String" -Force -ErrorAction SilentlyContinue
-# New-ItemProperty –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" –Name WUStatusServer -Value $Wup -PropertyType "String" -Force -ErrorAction SilentlyContinue
-# New-ItemProperty –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" –Name UpdateServiceUrlAlternate -Value $Wur -PropertyType "String" -Force -ErrorAction SilentlyContinue
-
-# New-ItemProperty –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate" –Name DoNotConnectToWindowsUpdateInternetLocations -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue
-
-# New-Item –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" -ErrorAction SilentlyContinue
-# New-ItemProperty –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" –Name UseWUServer -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue
-# New-ItemProperty –Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" –Name NoAutoUpdate -Value 1 -PropertyType DWord -Force -ErrorAction SilentlyContinue
-
-
-# #Start all necessary services
-# start-service wuauserv
-# start-service bits
-# start-service usosvc
-# start-service cryptsvc
-
-# #Detect and reset auth
-# start-sleep -s 60
-# cmd /c "wuauclt /resetauthorization /detectnow"
-
 $updatesession =  [activator]::CreateInstance([type]::GetTypeFromProgID("Microsoft.Update.Session",$env:COMPUTERNAME))
 $updatesearcher = $updatesession.CreateUpdateSearcher()
 try{
@@ -213,8 +333,6 @@ if(!$searchresult){
 
 }
 
-start-sleep -s 60
-cmd /c "wuauclt /reportnow"
 
 $windowsOsVersion = [System.Environment]::OSVersion.Version
 

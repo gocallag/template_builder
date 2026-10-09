@@ -1,20 +1,23 @@
 ---
-- name: (AlmaLinux-UPLIFT) Validate inputs
+- name: (Windows-UPLIFT) Validate inputs
   ansible.builtin.assert:
     that:
       - imagebuilder_uplift_artifact is defined
       - imagebuilder_uplift_artifact.path is defined
       - imagebuilder_target_features is defined
 
-- name: (AlmaLinux-UPLIFT) Validate features
+- name: (Windows-UPLIFT) Validate features
   ansible.builtin.assert:
     that:
-      - item in ['qemu_guest_agent']
+      - item in
+        [
+          'qemu_guest_agent'
+        ]
     fail_msg: >-
-      Unsupported AlmaLinux uplift feature '{{ item }}'
+      Unsupported Windows uplift feature '{{ item }}'
   loop: "{{ imagebuilder_target_features }}"
 
-- name: (AlmaLinux-UPLIFT) Boot target image
+- name: (Windows-UPLIFT) Boot target image
   ansible.builtin.include_role:
     name: gocallag.template_builder.imagebuilder
     tasks_from: capabilities/qemu_boot_existing
@@ -22,28 +25,27 @@
     imagebuilder_capability_artifact:
       path: "{{ imagebuilder_uplift_artifact.path }}"
 
-- name: (AlmaLinux-UPLIFT) Configure guest
+- name: (Windows-UPLIFT) Configure guest
   block:
 
-    - name: (AlmaLinux-UPLIFT) Wait for guest
+    - name: (Windows-UPLIFT) Wait for guest
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
         tasks_from: capabilities/wait_guest
 
-    - name: (AlmaLinux-UPLIFT) Install QEMU guest agent
+    - name: (Windows-UPLIFT) Apply feature
+      ansible.builtin.include_tasks:
+        file: "features/{{ item }}.yml"
+      loop: "{{ imagebuilder_target_features }}"
+
+    - name: (Windows-UPLIFT) Wait for Windows servicing to settle
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/guest_command
-      vars:
-        imagebuilder_guest_command: >-
-          sudo dnf install -y qemu-guest-agent &&
-          sudo systemctl enable qemu-guest-agent
-      when:
-        - "'qemu_guest_agent' in imagebuilder_target_features"
+        tasks_from: capabilities/wait_settled
 
   always:
 
-    - name: (AlmaLinux-UPLIFT) Shutdown target image
+    - name: (Windows-UPLIFT) Shutdown target image
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
         tasks_from: capabilities/qemu_shutdown
