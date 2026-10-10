@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -euo pipefail
 
@@ -20,14 +20,24 @@ usage() {
 Usage:
 
   ib build <image>
+  ib clean <image>
+
+  ib stage <stage> <image>
+
   ib validate <image>
   ib inspect <image>
 
 Examples:
 
   ib build win2025
-  ib build almalinux10
-  ib build win2025 --verbose
+
+  ib clean win2025
+
+  ib stage clean win2025
+  ib stage uplift win2025
+  ib stage patch win2025
+
+  ib validate win2025
 
 Environment:
 
@@ -98,9 +108,41 @@ docker_run() {
         "$@"
 }
 
+run_stage() {
+
+    local stage="$1"
+    local image="$2"
+    local verbosity="$3"
+
+    reserve_vnc_port
+
+    trap release_vnc_port EXIT
+
+    echo
+    echo "=================================================="
+    echo "Image Builder"
+    echo "=================================================="
+    echo "Image    : ${image}"
+    echo "Stage    : ${stage}"
+    echo "VNC Port : ${RESERVED_VNC_PORT}"
+    echo "=================================================="
+    echo
+
+    local logfile="${image}.${stage}.log"
+
+    docker_run \
+        "${RESERVED_VNC_PORT}" \
+        ansible-playbook \
+        "${verbosity}" \
+        -e "imagebuilder_stage=${stage}" \
+        -e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
+        "${image}.yml" \
+        | tee "${logfile}"
+}
+
 cmd="${1:-}"
 
-case "$cmd" in
+case "${cmd}" in
 
 build)
 
@@ -119,34 +161,50 @@ build)
         verbosity="-vv"
     fi
 
-    reserve_vnc_port
+    run_stage "build" "${image}" "${verbosity}"
 
-    trap release_vnc_port EXIT
+    ;;
 
-    echo
-    echo "=================================================="
-    echo "Image Builder"
-    echo "=================================================="
-    echo "Image    : ${image}"
-    echo "VNC Port : ${RESERVED_VNC_PORT}"
-    echo "=================================================="
-    echo
+clean)
 
-    logfile="${image}.log"
+    image="${2:-}"
 
-    docker_run \
-        "${RESERVED_VNC_PORT}" \
-        ansible-playbook \
-        "${verbosity}" \
-        -e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
-        "${image}.yml" \
-        | tee "${logfile}"
+    if [[ -z "${image}" ]]; then
+        echo "Missing image name"
+        exit 1
+    fi
+
+    run_stage "clean" "${image}" "-v"
+
+    ;;
+
+stage)
+
+    stage="${2:-}"
+    image="${3:-}"
+
+    if [[ -z "${stage}" ]]; then
+        echo "Missing stage name"
+        exit 1
+    fi
+
+    if [[ -z "${image}" ]]; then
+        echo "Missing image name"
+        exit 1
+    fi
+
+    run_stage "${stage}" "${image}" "-v"
 
     ;;
 
 validate)
 
     image="${2:-}"
+
+    if [[ -z "${image}" ]]; then
+        echo "Missing image name"
+        exit 1
+    fi
 
     docker_run \
         5900 \
@@ -159,6 +217,11 @@ validate)
 inspect)
 
     image="${2:-}"
+
+    if [[ -z "${image}" ]]; then
+        echo "Missing image name"
+        exit 1
+    fi
 
     echo "Playbook:"
     echo "  ${image}.yml"
