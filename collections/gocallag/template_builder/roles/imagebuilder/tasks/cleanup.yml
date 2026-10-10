@@ -1,0 +1,9 @@
+- name: Cleanup | cleanup build directories
+  ansible.builtin.file:
+      path: "{{ file }}"
+      state: absent
+  become: true
+  loop_control:
+      loop_var: file
+  loop:
+      - "{{ imagebuilder_path_basedir }}"
