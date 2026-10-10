@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 
 set -euo pipefail
 
@@ -8,6 +8,12 @@ CONFIG="${HOME}/.template_builder/config.yml"
 PLUGINS="${HOME}/.template_builder/plugins"
 BUILD_DIR="${HOME}/build"
 SAMPLES_DIR="$(pwd)/samples"
+
+VNC_PORT_START="${IB_VNC_PORT_START:-5900}"
+VNC_PORT_END="${IB_VNC_PORT_END:-5999}"
+
+LOCK_DIR="/tmp/imagebuilder"
+mkdir -p "${LOCK_DIR}"
 
 usage() {
     cat <<EOF
@@ -22,21 +28,72 @@ Examples:
   ib build win2025
   ib build almalinux10
   ib build win2025 --verbose
+
+Environment:
+
+  IMAGEBUILDER_IMAGE
+  IB_VNC_PORT_START
+  IB_VNC_PORT_END
 EOF
 }
 
+is_port_available() {
+    local port="$1"
+
+    if command -v ss >/dev/null 2>&1; then
+        ! ss -ltnH | awk '{print $4}' | grep -qE "[:.]${port}$"
+    else
+        ! netstat -ltn 2>/dev/null | awk '{print $4}' | grep -qE "[:.]${port}$"
+    fi
+}
+
+reserve_vnc_port() {
+    local port
+    local lockfile
+
+    for ((port=VNC_PORT_START; port<=VNC_PORT_END; port++)); do
+
+        lockfile="${LOCK_DIR}/vnc-${port}.lock"
+
+        exec {fd}>"${lockfile}"
+
+        if flock -n "${fd}"; then
+
+            if is_port_available "${port}"; then
+                RESERVED_VNC_PORT="${port}"
+                RESERVED_VNC_FD="${fd}"
+                return 0
+            fi
+
+            eval "exec ${fd}>&-"
+        fi
+    done
+
+    echo "No free VNC ports available in range ${VNC_PORT_START}-${VNC_PORT_END}" >&2
+    return 1
+}
+
+release_vnc_port() {
+    if [[ -n "${RESERVED_VNC_FD:-}" ]]; then
+        eval "exec ${RESERVED_VNC_FD}>&-"
+    fi
+}
+
 docker_run() {
+    local vnc_port="$1"
+    shift
+
     docker run \
         --rm \
         --privileged \
         -e LIBGUESTFS_BACKEND=direct \
-		-e ANSIBLE_LOCAL_TEMP=/tmp/build/.ansible/tmp \
+        -e ANSIBLE_LOCAL_TEMP=/tmp/build/.ansible/tmp \
         -v "${CONFIG}:/root/.template_builder/config.yml" \
-		-v "/tmp:/tmp" \
+        -v "/tmp:/tmp" \
         -v "${BUILD_DIR}:/tmp/build" \
         -v "${SAMPLES_DIR}:/root/samples" \
         -v "${PLUGINS}:/plugins" \
-        -p 5900:5905 \
+        -p "${vnc_port}:5900" \
         "${IMAGEBUILDER_IMAGE}" \
         "$@"
 }
@@ -62,11 +119,26 @@ build)
         verbosity="-vv"
     fi
 
+    reserve_vnc_port
+
+    trap release_vnc_port EXIT
+
+    echo
+    echo "=================================================="
+    echo "Image Builder"
+    echo "=================================================="
+    echo "Image    : ${image}"
+    echo "VNC Port : ${RESERVED_VNC_PORT}"
+    echo "=================================================="
+    echo
+
     logfile="${image}.log"
 
     docker_run \
+        "${RESERVED_VNC_PORT}" \
         ansible-playbook \
         "${verbosity}" \
+        -e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
         "${image}.yml" \
         | tee "${logfile}"
 
@@ -77,6 +149,7 @@ validate)
     image="${2:-}"
 
     docker_run \
+        5900 \
         ansible-playbook \
         --syntax-check \
         "${image}.yml"
