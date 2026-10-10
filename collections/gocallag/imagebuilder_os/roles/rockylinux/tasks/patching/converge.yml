@@ -1,0 +1,8 @@
+---
+- name: rockylinux | Initialise patch state
+  ansible.builtin.set_fact:
+    imagebuilder_rockylinux_patch_pass: 0
+
+- name: rockylinux | Converge rockylinux updates
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml

@@ -1,0 +1,103 @@
+---
+- name: rockylinux | patch_pass| Increment patch pass counter
+  ansible.builtin.set_fact:
+    imagebuilder_rockylinux_patch_pass: >-
+      {{ (imagebuilder_rockylinux_patch_pass | default(0) | int) + 1 }}
+
+- name: rockylinux | patch_pass | Check if reboot is required
+  ansible.builtin.command: "/usr/bin/needs-restarting -r"
+  register: imagebuilder_nr
+  failed_when: imagebuilder_nr.rc not in [0,1,2]
+  changed_when: false
+  delegate_to: "{{ delegate | default(omit) }}"
+
+
+- name: rockylinux | patch_pass | Reboot if required
+  ansible.builtin.reboot:
+      reboot_timeout: 1200
+  when:
+    - imagebuilder_nr.rc == 1
+  become: true
+  delegate_to: "{{ delegate | default(omit) }}"
+
+- name: rockylinux | patch_pass | Wait for connection after reboot
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 10
+    timeout: 1200
+  delegate_to: bob_build
+
+
+- name: rockylinux | patch_pass | Wait for guest to settle after bootstrap reboot
+  ansible.builtin.include_tasks:
+    file: wait_settled.yml
+  when:
+    - imagebuilder_nr.rc == 1
+
+#
+# Normal Ansible rockylinux Update pass.
+#
+
+- name: rockylinux | patch_pass | Update the system
+  ansible.builtin.command: "dnf upgrade -y"
+  delegate_to: "{{ delegate | default(omit) }}"
+  register: imagebuilder_yum
+  become: true
+  changed_when: imagebuilder_yum.rc == 0 and 'Nothing to do' not in imagebuilder_yum.stdout
+  ignore_errors: true
+
+- name: rockylinux | patch_pass | Debug yum output
+  ansible.builtin.debug:
+      msg: >-
+          (PATCHING) Task '{{ imagebuilder_yum }}'.
+
+
+- name: rockylinux | patch_pass | Check if reboot is required post patching
+  ansible.builtin.command: "/usr/bin/needs-restarting -r"
+  register: imagebuilder_nr
+  changed_when: false
+  failed_when: imagebuilder_nr.rc not in [0,1,2]
+  delegate_to: "{{ delegate | default(omit) }}"
+
+
+- name: rockylinux | patch_pass | Reboot if required
+  ansible.builtin.reboot:
+      reboot_timeout: 1200
+  when:
+    - imagebuilder_nr.rc == 1
+  become: true
+  delegate_to: "{{ delegate | default(omit) }}"
+
+
+- name: rockylinux | patch_pass | Wait for guest to settle after update reboot
+  ansible.builtin.include_tasks:
+    file: wait_settled.yml
+  when:
+    - imagebuilder_nr.rc == 1
+
+
+#
+# Convergence test.
+#
+# There is intentionally no pre-install search. state=installed already
+# searches for applicable updates. This search exists only to determine
+# whether another patch pass is required.
+#
+
+- name: rockylinux | patch_pass | Update the system
+  ansible.builtin.command: "dnf check-update"
+  delegate_to: "{{ delegate | default(omit) }}"
+  register: imagebuilder_yum
+  become: true
+  changed_when: false
+  failed_when: imagebuilder_yum.rc not in [0,1,100]
+
+- name: rockylinux | patch_pass | Continue patching
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml
+  when:
+    - >-
+      imagebuilder_yum.rc
+      | default(0)
+      | int
+      == 100
