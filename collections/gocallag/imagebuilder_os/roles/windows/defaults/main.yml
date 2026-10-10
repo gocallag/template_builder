@@ -1,0 +1,16 @@
+imagebuilder_windows_patch_max_passes: 10
+imagebuilder_windows_patch_settle_seconds: 30
+imagebuilder_windows_patch_timeout: 3600
+imagebuilder_windows_settle_timeout: 900
+imagebuilder_windows_settle_debounce: 15
+imagebuilder_windows_settle_poll_interval: 1
+imagebuilder_windows_update_categories:
+  - CriticalUpdates
+  - SecurityUpdates
+  - UpdateRollups
+imagebuilder_windows_cbs_idle_timeout: 120
+imagebuilder_windows_qemu_guest_agent_url: >-
+  https://fedorapeople.org/groups/virt/virtio-win/direct-downloads/archive-qemu-ga/qemu-ga-x86_64.msi
+
+imagebuilder_windows_qemu_guest_agent_installer: >-
+  C:\Windows\Temp\qemu-ga-x86_64.msi

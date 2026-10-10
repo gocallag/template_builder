@@ -1,0 +1,8 @@
+---
+- name: (CAP-GUEST-WAIT) Wait for guest port
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_host_ip }}"
+    port: "{{ imagebuilder_env_qemu_psrp_port }}"
+    delay: "{{ imagebuilder_guest_wait_delay | default(5) | int }}"
+    timeout: "{{ imagebuilder_guest_wait_timeout | default(900) | int }}"
+  delegate_to: localhost

@@ -1,0 +1,147 @@
+---
+- name: Windows | Wait for guest port to be available
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_localip }}"
+    port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
+    delay: 10
+    timeout: 900
+  delegate_to: localhost
+
+- name: Windows | Wait for Windows servicing to settle
+  ansible.windows.win_shell: |
+    Add-Type @'
+      using System;
+      using System.Runtime.InteropServices;
+
+      public static class Windows
+      {
+          [DllImport("kernel32", SetLastError=true)]
+          public static extern UInt64 GetTickCount64();
+
+          public static TimeSpan GetUptime()
+          {
+              return TimeSpan.FromMilliseconds(GetTickCount64());
+          }
+      }
+    '@
+
+    $cbsLogPath = Join-Path $env:SystemRoot 'Logs\CBS\CBS.log'
+    $cbsIdleSeconds = {{ imagebuilder_windows_cbs_idle_timeout | int }}
+
+    function Wait-Condition {
+        param(
+            [scriptblock]$Condition,
+            [int]$DebounceSeconds,
+            [int]$TimeoutSeconds,
+            [int]$PollInterval
+        )
+
+        $started = [Windows]::GetUptime()
+        $stableSince = $null
+
+        do {
+            $now = [Windows]::GetUptime()
+
+            if (($now - $started).TotalSeconds -ge $TimeoutSeconds) {
+                throw "Timed out waiting for Windows servicing to settle after $TimeoutSeconds seconds"
+            }
+
+            try {
+                $result = & $Condition
+            }
+            catch {
+                $result = $false
+            }
+
+            if ($result) {
+                if ($null -eq $stableSince) {
+                    $stableSince = $now
+                }
+
+                if (($now - $stableSince).TotalSeconds -ge $DebounceSeconds) {
+                    return
+                }
+            }
+            else {
+                $stableSince = $null
+            }
+
+            Start-Sleep -Seconds $PollInterval
+
+        } while ($true)
+    }
+
+    $cbsLastLength = $null
+    $cbsLastWriteTimeUtc = $null
+    $cbsLastActivity = [Windows]::GetUptime()
+
+    if (Test-Path -LiteralPath $cbsLogPath) {
+        $cbs = Get-Item -LiteralPath $cbsLogPath
+
+        $cbsLastLength = $cbs.Length
+        $cbsLastWriteTimeUtc = $cbs.LastWriteTimeUtc
+    }
+
+    Write-Output "Waiting for Windows servicing to settle..."
+
+    Wait-Condition `
+      -Condition {
+          $now = [Windows]::GetUptime()
+
+          $tiWorker = Get-Process `
+              -Name TiWorker `
+              -ErrorAction SilentlyContinue
+
+          #
+          # Primary success condition:
+          # TiWorker is no longer running.
+          #
+          if (!$tiWorker) {
+              return $true
+          }
+
+          #
+          # TiWorker still exists. Determine whether CBS is still
+          # showing observable servicing activity.
+          #
+          if (Test-Path -LiteralPath $cbsLogPath) {
+              $cbs = Get-Item -LiteralPath $cbsLogPath
+
+              if (
+                  $cbs.Length -ne $cbsLastLength -or
+                  $cbs.LastWriteTimeUtc -ne $cbsLastWriteTimeUtc
+              ) {
+                  $cbsLastLength = $cbs.Length
+                  $cbsLastWriteTimeUtc = $cbs.LastWriteTimeUtc
+                  $cbsLastActivity = $now
+
+                  return $false
+              }
+
+              $cbsIdleFor = (
+                  $now - $cbsLastActivity
+              ).TotalSeconds
+
+              if ($cbsIdleFor -ge $cbsIdleSeconds) {
+                  return $true
+              }
+          }
+
+          return $false
+      } `
+      -DebounceSeconds {{ imagebuilder_windows_settle_debounce | int }} `
+      -TimeoutSeconds {{ imagebuilder_windows_settle_timeout | int }} `
+      -PollInterval {{ imagebuilder_windows_settle_poll_interval | int }}
+
+    Write-Output "Windows servicing settled."
+
+  changed_when: false
+  become: true
+  become_user: SYSTEM
+  become_method: ansible.builtin.runas
+  delegate_to: bob_build
+
+- name: Windows | Verify Ansible connection after settling
+  ansible.windows.setup:
+  changed_when: false
+  delegate_to: bob_build

@@ -1,0 +1,10 @@
+---
+
+- name: Windows | Prepare patching
+  ansible.builtin.include_tasks: patching/prepare.yml
+
+- name: Windows | Converge patching
+  ansible.builtin.include_tasks: patching/converge.yml
+
+- name: Windows | Cleanup patching
+  ansible.builtin.include_tasks: patching/cleanup.yml

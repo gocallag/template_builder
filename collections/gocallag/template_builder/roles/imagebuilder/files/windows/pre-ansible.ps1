@@ -86,8 +86,8 @@ If ($PSVersionTable.PSVersion.Major -lt 3)
  $cmdOutput = ( & $PSScriptRoot\Install-VMWareTools.ps1) | Out-String
  WriteLog $cmdOutput
 
- WriteLog "Make {{ env_ansible_user }} user non-expiring "
- $cmdOutput = ( & cmd /C wmic useraccount where "name='{{ env_ansible_user }}'" set PasswordExpires=FALSE) | Out-String
+ WriteLog "Make {{ imagebuilder_config.credentials.ansible.username }} user non-expiring "
+ $cmdOutput = ( & cmd /C wmic useraccount where "name='{{ imagebuilder_config.credentials.ansible.username }}'" set PasswordExpires=FALSE) | Out-String
  WriteLog $cmdOutput
 
  WriteLog "done"

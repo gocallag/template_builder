@@ -1,0 +1,41 @@
+---
+- name: (Windows-UPLIFT) Download QEMU Guest Agent
+  ansible.windows.win_get_url:
+    url: "{{ imagebuilder_windows_qemu_guest_agent_url }}"
+    dest: "{{ imagebuilder_windows_qemu_guest_agent_installer }}"
+    force: false
+  register: qga_download
+  delegate_to: bob_build
+- name: (Windows-UPLIFT) Install QEMU Guest Agent
+  ansible.windows.win_package:
+    path: "{{ imagebuilder_qemu_guest_agent_installer }}"
+    state: present
+  register: qga_install
+  delegate_to: bob_build
+
+- name: (Windows-UPLIFT) Install QEMU Guest Agent
+  ansible.windows.win_package:
+    path: "{{ imagebuilder_windows_qemu_guest_agent_installer }}"
+    state: present
+  become: true
+  become_user: SYSTEM
+  become_method: runas
+  delegate_to: bob_build
+
+- name: (Windows-UPLIFT) Check reboot state
+  ansible.windows.win_reboot_info:
+  register: reboot_info
+  delegate_to: bob_build
+
+- name: (Windows-UPLIFT) Reboot if required
+  ansible.windows.win_reboot:
+    reboot_timeout: 1800
+  when:
+    - reboot_info.reboot_required
+  delegate_to: bob_build
+
+- name: (Windows-UPLIFT) Wait for guest after reboot
+  ansible.builtin.include_tasks:
+    file: wait_settled.yml
+  when:
+    - reboot_info.reboot_required

@@ -8,7 +8,7 @@
           - "-cpu host"
           - "-smp {{ imagebuilder_build_vcpus }}"
           - "-m {{ imagebuilder_build_ram }}"
-          - "-netdev user,id=net0,hostfwd=tcp:0.0.0.0:{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}-:{{ (os_type | lower == 'windows') | ternary(5986, 22 ) }}"
+          - "-netdev user,id=net0,hostfwd=tcp:0.0.0.0:{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}-:{{ (os_type | lower == 'windows') | ternary(5986, 22) }}"
           - "-device {{ os.config.nicdriver | default('e1000') }},netdev=net0"
           - "-device ich9-ahci,id=ahci"
           - "-drive file={{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2,media=disk,if=none,format=qcow2,id=disk0"
@@ -22,8 +22,8 @@
 
     - name: (QEMU) Set QEMU command with aux ISO if needed
       ansible.builtin.set_fact:
-        imagebuilder_qemu_command: "{{ imagebuilder_qemu_command }} -drive file={{ imagebuilder_path_auxdir }}/aux.iso,media=cdrom,if=ide,index=2"
-      when: useauxiso | default(false) | bool
+        imagebuilder_qemu_command: "{{ imagebuilder_qemu_command }} -drive file={{ imagebuilder_path_httpdir }}/aux.iso,media=cdrom,if=ide,index=2"
+      when: os.useauxiso | default(false) | bool
 
     - name: (QEMU) Start temporary web server
       ansible.builtin.shell: |
@@ -96,7 +96,7 @@
             jid: "{{ qemu_boot.ansible_job_id }}"
           register: qemu_wait # noqa: var-naming
           until: qemu_wait.finished
-          retries: 30
+          retries: 45
           delay: 60
           failed_when: qemu_wait.rc != 0
           changed_when: false
@@ -137,6 +137,7 @@
             - name: (QEMU) write base artifact metadata
               ansible.builtin.copy:
                 dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+                mode: '0644'
                 content: |
                   profile_hash: "{{ imagebuilder_profile_hash }}"
                   id: "{{ imagebuilder_id_base }}"
