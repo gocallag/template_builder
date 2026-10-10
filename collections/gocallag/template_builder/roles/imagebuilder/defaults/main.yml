@@ -7,7 +7,7 @@ imagebuilder_prefix_port_offset_map:
     rocky: 0  # the client has to choose it's local port.
     debian: 3
     ubuntu: 4
-    windows: 5
+    windows: 0 # the client has to choose it's local port. This is being deprecated.
     suse: 6
     fedora: 7
     centos: 8
