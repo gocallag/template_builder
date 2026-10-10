@@ -1,0 +1,102 @@
+#!/bin/bash -x
+
+set -euo pipefail
+
+IMAGEBUILDER_IMAGE="${IMAGEBUILDER_IMAGE:-imagebuilder:latest}"
+
+CONFIG="${HOME}/.template_builder/config.yml"
+PLUGINS="${HOME}/.template_builder/plugins"
+BUILD_DIR="${HOME}/build"
+SAMPLES_DIR="$(pwd)/samples"
+
+usage() {
+    cat <<EOF
+Usage:
+
+  ib build <image>
+  ib validate <image>
+  ib inspect <image>
+
+Examples:
+
+  ib build win2025
+  ib build almalinux10
+  ib build win2025 --verbose
+EOF
+}
+
+docker_run() {
+    docker run \
+        --rm \
+        --privileged \
+        -e LIBGUESTFS_BACKEND=direct \
+		-e ANSIBLE_LOCAL_TEMP=/tmp/build/.ansible/tmp \
+        -v "${CONFIG}:/root/.template_builder/config.yml" \
+		-v "/tmp:/tmp" \
+        -v "${BUILD_DIR}:/tmp/build" \
+        -v "${SAMPLES_DIR}:/root/samples" \
+        -v "${PLUGINS}:/plugins" \
+        -p 5900:5905 \
+        "${IMAGEBUILDER_IMAGE}" \
+        "$@"
+}
+
+cmd="${1:-}"
+
+case "$cmd" in
+
+build)
+
+    image="${2:-}"
+
+    if [[ -z "${image}" ]]; then
+        echo "Missing image name"
+        exit 1
+    fi
+
+    shift 2
+
+    verbosity="-v"
+
+    if [[ "${1:-}" == "--verbose" ]]; then
+        verbosity="-vv"
+    fi
+
+    logfile="${image}.log"
+
+    docker_run \
+        ansible-playbook \
+        "${verbosity}" \
+        "${image}.yml" \
+        | tee "${logfile}"
+
+    ;;
+
+validate)
+
+    image="${2:-}"
+
+    docker_run \
+        ansible-playbook \
+        --syntax-check \
+        "${image}.yml"
+
+    ;;
+
+inspect)
+
+    image="${2:-}"
+
+    echo "Playbook:"
+    echo "  ${image}.yml"
+
+    ;;
+
+*)
+
+    usage
+    exit 1
+
+    ;;
+
+esac
