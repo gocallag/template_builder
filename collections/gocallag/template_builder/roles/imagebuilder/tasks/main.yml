@@ -39,13 +39,13 @@
     tasks_from: asserts.yml
 
 - name: Main | Cleanup | Remove any existing build artifacts
-  when: imagebuilder_stage == 'clean'
+  when: imagebuilder_phase == 'clean'
   block:
     - name: (MAIN) Cleanup | Remove any existing build artifacts
       ansible.builtin.include_tasks: cleanup.yml
 
 - name: Main | Build Phase
-  when: imagebuilder_stage == 'build'
+  when: imagebuilder_phase == 'build'
   block:
     - name: (MAIN) Build OS-specific profile
       ansible.builtin.include_role:
@@ -141,7 +141,7 @@
       changed_when: false
 
 - name: Main | Build Phase
-  when: imagebuilder_stage == 'build'
+  when: imagebuilder_phase == 'build'
   block:
 
     - name: (MAIN) Define canonical artifact
