@@ -120,4 +120,4 @@ imagebuilder_build_default:
     - name: hardening
     - name: template-cleanup
 
-imagebuilder_stage: "{{ imagebuilder_stage | default('build') }}"
+imagebuilder_phase: "{{ imagebuilder_phase | default('build') }}"

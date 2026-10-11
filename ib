@@ -22,7 +22,7 @@ Usage:
   ib build <image>
   ib clean <image>
 
-  ib stage <stage> <image>
+  ib phase <phase> <image>
 
   ib validate <image>
   ib inspect <image>
@@ -33,9 +33,9 @@ Examples:
 
   ib clean win2025
 
-  ib stage clean win2025
-  ib stage uplift win2025
-  ib stage patch win2025
+  ib phase clean win2025
+  ib phase uplift win2025
+  ib phase patch win2025
 
   ib validate win2025
 
@@ -108,9 +108,9 @@ docker_run() {
         "$@"
 }
 
-run_stage() {
+run_phase() {
 
-    local stage="$1"
+    local phase="$1"
     local image="$2"
     local verbosity="$3"
 
@@ -123,18 +123,18 @@ run_stage() {
     echo "Image Builder"
     echo "=================================================="
     echo "Image    : ${image}"
-    echo "Stage    : ${stage}"
+    echo "phase    : ${phase}"
     echo "VNC Port : ${RESERVED_VNC_PORT}"
     echo "=================================================="
     echo
 
-    local logfile="${image}.${stage}.log"
+    local logfile="${image}.${phase}.log"
 
     docker_run \
         "${RESERVED_VNC_PORT}" \
         ansible-playbook \
         "${verbosity}" \
-        -e "imagebuilder_stage=${stage}" \
+        -e "imagebuilder_phase=${phase}" \
         -e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
         "${image}.yml" \
         | tee "${logfile}"
@@ -161,7 +161,7 @@ build)
         verbosity="-vv"
     fi
 
-    run_stage "build" "${image}" "${verbosity}"
+    run_phase "build" "${image}" "${verbosity}"
 
     ;;
 
@@ -174,17 +174,17 @@ clean)
         exit 1
     fi
 
-    run_stage "clean" "${image}" "-v"
+    run_phase "clean" "${image}" "-v"
 
     ;;
 
-stage)
+phase)
 
-    stage="${2:-}"
+    phase="${2:-}"
     image="${3:-}"
 
-    if [[ -z "${stage}" ]]; then
-        echo "Missing stage name"
+    if [[ -z "${phase}" ]]; then
+        echo "Missing phase name"
         exit 1
     fi
 
@@ -193,7 +193,7 @@ stage)
         exit 1
     fi
 
-    run_stage "${stage}" "${image}" "-v"
+    run_phase "${phase}" "${image}" "-v"
 
     ;;
 

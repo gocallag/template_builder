@@ -1,0 +1,10 @@
+---
+
+- name: almalinux | patching | Prepare patching
+  ansible.builtin.include_tasks: patching/prepare.yml
+
+- name: almalinux | patching | Converge patching
+  ansible.builtin.include_tasks: patching/converge.yml
+
+- name: almalinux | patching | Cleanup patching
+  ansible.builtin.include_tasks: patching/cleanup.yml
