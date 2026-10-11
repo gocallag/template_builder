@@ -72,10 +72,10 @@
                             </OSImage>
                         </ImageInstall>
                         <UserData>
-                            <ProductKey>
+                            <!--<ProductKey>
                                   <Key>{{ os.config.key.id }}</Key>
                                 <WillShowUI>OnError</WillShowUI>
-                            </ProductKey>
+                            </ProductKey> -->
                             <AcceptEula>true</AcceptEula>
                             <FullName>{{ imagebuilder_config.credentials.ansible.username }}</FullName>
                             <Organization>{{ os.config.key.organization }}</Organization>
