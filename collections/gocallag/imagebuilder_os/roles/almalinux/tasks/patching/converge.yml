@@ -1,0 +1,8 @@
+---
+- name: Almalinux | Initialise patch state
+  ansible.builtin.set_fact:
+    imagebuilder_Almalinux_patch_pass: 0
+
+- name: Almalinux | Converge Almalinux updates
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml
