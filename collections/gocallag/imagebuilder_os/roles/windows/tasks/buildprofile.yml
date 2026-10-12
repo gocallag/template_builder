@@ -72,10 +72,10 @@
                             </OSImage>
                         </ImageInstall>
                         <UserData>
-                            <ProductKey>
+                            <!--<ProductKey>
                                   <Key>{{ os.config.key.id }}</Key>
                                 <WillShowUI>OnError</WillShowUI>
-                            </ProductKey>
+                            </ProductKey> -->
                             <AcceptEula>true</AcceptEula>
                             <FullName>{{ imagebuilder_config.credentials.ansible.username }}</FullName>
                             <Organization>{{ os.config.key.organization }}</Organization>
@@ -224,7 +224,7 @@
                             <RunSynchronousCommand wcm:action="add">
                                 <Order>3</Order>
                                 <Description>Turn off defender</Description>
-                                <Path>>powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Set-MpPreference -DisableRealtimeMonitoring $true"</Path>
+                                <Path>powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command "Set-MpPreference -DisableRealtimeMonitoring $true"</Path>
                             </RunSynchronousCommand>
                         </RunSynchronous>
                     </component>
