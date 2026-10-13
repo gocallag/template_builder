@@ -123,6 +123,12 @@
 - name: (RESTORE) Base Image Exists?
   when: not imagebuilder_restored_from_image
   block:
+    - name: Debug restore variables
+      ansible.builtin.debug:
+        msg:
+          imagebuilder_id_base: "{{ imagebuilder_id_base }}"
+          imagebuilder_base_artifact: "{{ imagebuilder_base_artifact }}"
+          imagebuilder_path_imagedir: "{{ imagebuilder_path_imagedir }}"
     - name: (RESTORE) restore base image if it exists and matches current profile hash
       ansible.builtin.command: cp "{{ imagebuilder_base_artifact }}" "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
       changed_when: imagebuilder_qemu_disk_restore is defined and imagebuilder_qemu_disk_restore.rc == 0
