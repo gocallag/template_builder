@@ -20,7 +20,7 @@
 - name: (Windows-UPLIFT) Boot target image
   ansible.builtin.include_role:
     name: gocallag.template_builder.imagebuilder
-    tasks_from: capabilities/qemu_boot_existing
+    tasks_from: capabilities/qemu_boot_existing.yml
   vars:
     imagebuilder_capability_artifact:
       path: "{{ imagebuilder_uplift_artifact.path }}"
@@ -28,27 +28,25 @@
 - name: (Windows-UPLIFT) Configure guest
   block:
 
-    - name: (Windows-UPLIFT) Wait for guest
-      ansible.builtin.include_role:
-        name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/wait_guest
+    - name: (Windows-UPLIFT) Wait for guest after reboot
+      ansible.builtin.include_tasks:
+        file: wait_settled.yml
 
     - name: (Windows-UPLIFT) Apply feature
       ansible.builtin.include_tasks:
         file: "features/{{ item }}.yml"
       loop: "{{ imagebuilder_target_features }}"
 
-    - name: (Windows-UPLIFT) Wait for Windows servicing to settle
-      ansible.builtin.include_role:
-        name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/wait_settled
+    - name: (Windows-UPLIFT) Wait for guest after reboot
+      ansible.builtin.include_tasks:
+        file: wait_settled.yml
 
   always:
 
     - name: (Windows-UPLIFT) Shutdown target image
       ansible.builtin.include_role:
         name: gocallag.template_builder.imagebuilder
-        tasks_from: capabilities/qemu_shutdown
+        tasks_from: capabilities/qemu_shutdown.yml
       vars:
         imagebuilder_capability_artifact:
           path: "{{ imagebuilder_uplift_artifact.path }}"
