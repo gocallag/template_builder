@@ -13,7 +13,7 @@
     state: present
   become: true
   become_user: SYSTEM
-  become_method: runas
+  become_method: ansible.builtin.runas
   delegate_to: bob_build
 
 - name: (Windows-UPLIFT) Check reboot state
