@@ -7,6 +7,13 @@
     timeout: 900
   delegate_to: localhost
 
+- name: Windows | Wait for connection 
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 10
+    timeout: 1200
+  delegate_to: bob_build
+
 - name: Windows | Wait for Windows servicing to settle
   ansible.windows.win_shell: |
     Add-Type @'
