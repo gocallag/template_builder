@@ -27,6 +27,25 @@
         msg: "(CAP-QEMU) Guest is already shut down or unreachable; continuing without failure."
       changed_when: false
 
+- name: (CAP-QEMU) Shutdown Windows guest
+  when:
+    - os_type | lower == "windows"
+  block:
+    - name: (CAP-QEMU) Request guest shutdown
+      ansible.windows.win_shell: shutdown /s /t 0
+      become: true
+      become_user: SYSTEM
+      become_method: ansible.builtin.runas
+      delegate_to: bob_build
+      register: imagebuilder_shutdown_request
+      failed_when: false
+
+  rescue:
+    - name: (CAP-QEMU) Guest already shut down or unreachable
+      ansible.builtin.debug:
+        msg: "(CAP-QEMU) Guest is already shut down or unreachable; continuing without failure."
+      changed_when: false
+
 - name: (CAP-QEMU) Wait for QEMU job
   ansible.builtin.async_status:
     jid: "{{ imagebuilder_cap_qemu_job.ansible_job_id }}"
