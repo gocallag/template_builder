@@ -102,6 +102,8 @@ RUN groupadd -g 1001 runner || true && \
 
 RUN mv /usr/bin/passt /usr/bin/passt.disabled
 COPY ansible.cfg /etc/ansible/ansible.cfg
+COPY plugins/callback /opt/imagebuilder/plugins/callback
+
 
 # Working directory and default entrypoint
 WORKDIR /root
