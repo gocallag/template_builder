@@ -3,16 +3,16 @@ imagebuilder_config_path: "{{ '~/.template_builder/config.yml' | expanduser }}"
 imagebuilder_useauxiso: false
 imagebuilder_prefix_port_offset_map:
     alma: 0
-    ol: 1
+    ol: 0
     rocky: 0  # the client has to choose it's local port.
-    debian: 3
-    ubuntu: 4
+    debian: 0
+    ubuntu: 0
     windows: 0 # the client has to choose it's local port. This is being deprecated.
-    suse: 6
+    suse: 0
     fedora: 0 # the client has to choose it's local port. This is being deprecated.
-    centos: 8
-    rhel: 9
-    leap: 10
+    centos: 0
+    rhel: 0
+    leap: 0
 imagebuilder_prefix_ostype_map:
     alma: linux
     ol: linux
