@@ -85,7 +85,7 @@
     disk: virtio0
     storage: "{{ imagebuilder_proxmox.storage }}"
     import_from: "{{ imagebuilder_proxmox_import_source }}"
-    timeout: 1800
+    timeout: 3600
     state: present
   delegate_to: localhost
 
