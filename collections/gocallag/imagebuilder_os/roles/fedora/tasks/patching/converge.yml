@@ -1,0 +1,8 @@
+---
+- name: fedora | Initialise patch state
+  ansible.builtin.set_fact:
+    imagebuilder_fedora_patch_pass: 0
+
+- name: fedora | Converge fedora updates
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml

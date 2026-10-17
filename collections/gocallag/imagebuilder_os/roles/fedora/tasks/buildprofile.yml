@@ -56,6 +56,8 @@
                   # Fedora 43 and later
                   @Base
                   rsyslog
+                  cloud-init
+                  cloud-utils-growpart
                           {% elif os_variant is defined and (os_variant | lower) == 'centos' %}
                             {% if (version_major | default('') | int) == 8 %}
                   # CentOS 8-specific packages
