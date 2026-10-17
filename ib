@@ -3,6 +3,7 @@
 set -euo pipefail
 
 IMAGEBUILDER_IMAGE="${IMAGEBUILDER_IMAGE:-imagebuilder:latest}"
+CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 
 CONFIG="${HOME}/.template_builder/config.yml"
 PLUGINS="${HOME}/.template_builder/plugins"
@@ -14,37 +15,305 @@ VNC_PORT_END="${IB_VNC_PORT_END:-5999}"
 
 LOCK_DIR="/tmp/imagebuilder"
 mkdir -p "${LOCK_DIR}"
+BUILD_JOBS_DIR="${BUILD_DIR}/jobs"
+
+mkdir -p "${BUILD_JOBS_DIR}"
+
+runtime() {
+    "${CONTAINER_RUNTIME}" "$@"
+}
 
 usage() {
-    cat <<EOF
-Usage:
+cat <<EOF
+Image Builder
 
-  ib build <image>
-  ib clean <image>
+USAGE
 
-  ib phase <phase> <image>
+  ib build <image> [--follow] [--verbose]
+
+  ib phase <phase> <image> [--follow]
 
   ib validate <image>
   ib inspect <image>
 
-Examples:
+  ib ps
+  ib status <jobid>
+  ib follow <jobid>
 
-  ib build win2025
+  ib stop <jobid>
+  ib clean <jobid>
+  ib rm <jobid>
 
-  ib clean win2025
+IMAGE OPERATIONS
 
-  ib phase clean win2025
-  ib phase uplift win2025
-  ib phase patch win2025
+  Build an image
 
-  ib validate win2025
+      ib build samples/win2022
 
-Environment:
+  Build and follow progress
+
+      ib build samples/win2022 --follow
+
+  Run a specific phase
+
+      ib phase cleanup samples/alma-8
+      ib phase uplift  samples/alma-8
+      ib phase patch   samples/alma-8
+
+  Run a phase and follow progress
+
+      ib phase patch samples/alma-8 --follow
+
+JOB OPERATIONS
+
+  List jobs
+
+      ib ps
+
+  Show status
+
+      ib status 8c37028431d7
+
+  Follow events
+
+      ib follow 8c37028431d7
+
+  Stop a running job
+
+      ib stop 8c37028431d7
+
+  Remove job metadata and container
+
+      ib clean 8c37028431d7
+      ib rm    8c37028431d7
+
+ENVIRONMENT
 
   IMAGEBUILDER_IMAGE
+      Container image to execute
+
+  CONTAINER_RUNTIME
+      docker | podman
+
   IB_VNC_PORT_START
+      First VNC port
+
   IB_VNC_PORT_END
+      Last VNC port
+
+JOB STORAGE
+
+  ${BUILD_JOBS_DIR}
+
 EOF
+}
+follow_job() {
+
+    local job_id="$1"
+
+    local event_file="${BUILD_JOBS_DIR}/${job_id}.ndjson"
+    local meta_file="${BUILD_JOBS_DIR}/${job_id}.meta"
+
+    [[ -f "${meta_file}" ]] || {
+        echo "Unknown job: ${job_id}"
+        return 1
+    }
+
+    local container_id
+
+    container_id="$(
+        jq -r '.container_id' "${meta_file}"
+    )"
+
+	status="$(job_status "${job_id}")"
+
+	case "${status}" in
+		RUNNING)
+			;;
+		STOPPED|REMOVED)
+			echo "Job is not running (${status})"
+
+			if [[ -f "${event_file}" ]]; then
+				cat "${event_file}" | jq .
+			fi
+
+			return 0
+			;;
+	esac
+
+    until [[ -f "${event_file}" ]]; do
+
+        if ! runtime ps -a --no-trunc \
+                --format '{{.ID}}' \
+                | grep -q "^${container_id}$"
+        then
+            echo "Container disappeared before event file was created"
+            return 1
+        fi
+
+        sleep 1
+    done
+
+    local line_count=0
+
+    while true; do
+
+        if [[ -f "${event_file}" ]]; then
+
+            local new_count
+
+            new_count="$(wc -l < "${event_file}")"
+
+            if (( new_count > line_count )); then
+
+                sed -n "$((line_count + 1)),${new_count}p" "${event_file}" \
+                    | jq .
+
+                line_count="${new_count}"
+            fi
+        fi
+
+        if ! runtime ps --no-trunc \
+                --format '{{.ID}}' \
+                | grep -q "^${container_id}$"
+        then
+            echo
+            echo "Job completed."
+            return 0
+        fi
+
+        sleep 1
+    done
+}
+stop_job() {
+
+    local job_id="$1"
+
+    local meta_file="${BUILD_JOBS_DIR}/${job_id}.meta"
+
+    [[ -f "${meta_file}" ]] || {
+        echo "Unknown job: ${job_id}"
+        return 1
+    }
+
+    local container_id
+
+    container_id="$(
+        jq -r '.container_id' "${meta_file}"
+    )"
+
+    runtime stop "${container_id}"
+}
+cleanup_job() {
+
+    local job_id="$1"
+
+    local meta_file="${BUILD_JOBS_DIR}/${job_id}.meta"
+
+    [[ -f "${meta_file}" ]] || {
+        echo "Unknown job: ${job_id}"
+        return 1
+    }
+
+    local container_id
+
+    container_id="$(
+        jq -r '.container_id' "${meta_file}"
+    )"
+
+    runtime rm -f "${container_id}" >/dev/null 2>&1 || true
+
+    rm -f "${BUILD_JOBS_DIR}/${job_id}.meta"
+    rm -f "${BUILD_JOBS_DIR}/${job_id}.ndjson"
+}
+job_status() {
+
+    local job_id="$1"
+
+    local meta_file="${BUILD_JOBS_DIR}/${job_id}.meta"
+
+    [[ -f "${meta_file}" ]] || {
+        echo "UNKNOWN"
+        return
+    }
+
+    local container_id
+
+    container_id="$(
+        jq -r '.container_id' "${meta_file}"
+    )"
+
+    if runtime ps --no-trunc --format '{{.ID}}' \
+        | grep -q "^${container_id}$"
+    then
+        echo "RUNNING"
+        return
+    fi
+
+    if runtime ps -a --no-trunc --format '{{.ID}}' \
+        | grep -q "^${container_id}$"
+    then
+        echo "STOPPED"
+        return
+    fi
+
+    echo "REMOVED"
+}
+show_job_status() {
+
+    local job_id="$1"
+
+    local meta_file="${BUILD_JOBS_DIR}/${job_id}.meta"
+
+    [[ -f "${meta_file}" ]] || {
+        echo "Unknown job: ${job_id}"
+        return 1
+    }
+
+    local image
+    local phase
+    local container_id
+    local created
+
+    image="$(jq -r '.image' "${meta_file}")"
+    phase="$(jq -r '.phase' "${meta_file}")"
+    container_id="$(jq -r '.container_id' "${meta_file}")"
+    created="$(jq -r '.created' "${meta_file}")"
+
+    echo "Job       : ${job_id}"
+    echo "Status    : $(job_status "${job_id}")"
+    echo "Image     : ${image}"
+    echo "Phase     : ${phase}"
+    echo "Created   : ${created}"
+    echo "Container : ${container_id}"
+
+    local event_file="${BUILD_JOBS_DIR}/${job_id}.ndjson"
+
+    if [[ -f "${event_file}" ]]; then
+
+        echo
+        echo "Last Event:"
+        tail -1 "${event_file}" | jq .
+    fi
+}
+list_jobs() {
+
+    (
+        echo "JOB_ID|STATE|IMAGE|PHASE"
+
+        for meta in "${BUILD_JOBS_DIR}"/*.meta; do
+
+            [[ -f "${meta}" ]] || continue
+
+            job_id="$(jq -r '.job_id' "${meta}")"
+            image="$(jq -r '.image' "${meta}")"
+            phase="$(jq -r '.phase' "${meta}")"
+
+            state="$(job_status "${job_id}")"
+
+            echo "${job_id}|${state}|${image}|${phase}"
+        done
+    ) | column -t -s '|'
 }
 
 is_port_available() {
@@ -89,17 +358,17 @@ release_vnc_port() {
     fi
 }
 
-docker_run() {
+container_run_detached() {
     local vnc_port="$1"
     shift
 
-    docker run \
-        --rm \
+    runtime run -d \
         --privileged \
         -e LIBGUESTFS_BACKEND=direct \
         -e ANSIBLE_LOCAL_TEMP=/tmp/build/.ansible/tmp \
         -v "${CONFIG}:/root/.template_builder/config.yml" \
         -v "/tmp:/tmp" \
+		-v "${BUILD_JOBS_DIR}:/jobs" \
         -v "${BUILD_DIR}:/tmp/build" \
         -v "${SAMPLES_DIR}:/root/samples" \
         -v "${PLUGINS}:/plugins" \
@@ -113,6 +382,7 @@ run_phase() {
     local phase="$1"
     local image="$2"
     local verbosity="$3"
+    local follow="${4:-false}"
 
     reserve_vnc_port
 
@@ -130,14 +400,30 @@ run_phase() {
 
     local logfile="${image}.${phase}.log"
 
-    docker_run \
-        "${RESERVED_VNC_PORT}" \
-        ansible-playbook \
-        "${verbosity}" \
-        -e "imagebuilder_phase=${phase}" \
-        -e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
-        "${image}.yml" \
-        | tee "${logfile}"
+	container_id="$(
+		container_run_detached \
+			"${RESERVED_VNC_PORT}" \
+			ansible-playbook \
+			"${verbosity}" \
+			-e "imagebuilder_phase=${phase}" \
+			-e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
+			"${image}.yml"
+	)"
+	echo "Container : ${container_id}"
+	job_id="${container_id:0:12}"
+	echo "Job       : ${job_id}"
+	cat > "${BUILD_JOBS_DIR}/${job_id}.meta" <<EOF
+		{
+		"job_id":"${job_id}",
+		"container_id":"${container_id}",
+		"image":"${image}",
+		"phase":"${phase}",
+		"created":"$(date -Iseconds)"
+		}
+EOF
+	if [[ "${follow}" == "true" ]]; then
+		follow_job "${job_id}"
+	fi
 }
 
 cmd="${1:-}"
@@ -153,28 +439,48 @@ build)
         exit 1
     fi
 
-    shift 2
+	shift 2
 
-    verbosity="-v"
+	verbosity="-v"
+	follow=false
 
-    if [[ "${1:-}" == "--verbose" ]]; then
-        verbosity="-vv"
-    fi
+	for arg in "$@"; do
+		case "$arg" in
+			--verbose)
+				verbosity="-vv"
+				;;
+			--follow)
+				follow=true
+				;;
+		esac
+	done
 
-    run_phase "build" "${image}" "${verbosity}"
+	run_phase "build" "${image}" "${verbosity}" "${follow}"
 
     ;;
 
 clean)
 
-    image="${2:-}"
+    job_id="${2:-}"
 
-    if [[ -z "${image}" ]]; then
-        echo "Missing image name"
+    if [[ -z "${job_id}" ]]; then
+        echo "Missing job id"
         exit 1
     fi
 
-    run_phase "clean" "${image}" "-v"
+    cleanup_job "${job_id}"
+
+    ;;
+rm)
+
+    job_id="${2:-}"
+
+    if [[ -z "${job_id}" ]]; then
+        echo "Missing job id"
+        exit 1
+    fi
+
+    cleanup_job "${job_id}"
 
     ;;
 
@@ -193,7 +499,19 @@ phase)
         exit 1
     fi
 
-    run_phase "${phase}" "${image}" "-v"
+    shift 3
+
+    follow=false
+
+    for arg in "$@"; do
+        case "$arg" in
+            --follow)
+                follow=true
+                ;;
+        esac
+    done
+
+    run_phase "${phase}" "${image}" "-v" "${follow}"
 
     ;;
 
@@ -206,7 +524,7 @@ validate)
         exit 1
     fi
 
-    docker_run \
+    container_run_detached \
         5900 \
         ansible-playbook \
         --syntax-check \
@@ -225,6 +543,47 @@ inspect)
 
     echo "Playbook:"
     echo "  ${image}.yml"
+
+    ;;
+follow)
+
+    job_id="${2:-}"
+
+    if [[ -z "${job_id}" ]]; then
+        echo "Missing job id"
+        exit 1
+    fi
+
+    follow_job "${job_id}"
+
+    ;;
+stop)
+
+    job_id="${2:-}"
+
+    if [[ -z "${job_id}" ]]; then
+        echo "Missing job id"
+        exit 1
+    fi
+
+    stop_job "${job_id}"
+
+    ;;
+status)
+
+    job_id="${2:-}"
+
+    if [[ -z "${job_id}" ]]; then
+        echo "Missing job id"
+        exit 1
+    fi
+
+    show_job_status "${job_id}"
+
+    ;;
+ps)
+
+    list_jobs
 
     ;;
 
