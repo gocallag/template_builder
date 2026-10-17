@@ -19,8 +19,88 @@ BUILD_JOBS_DIR="${BUILD_DIR}/jobs"
 
 mkdir -p "${BUILD_JOBS_DIR}"
 
+declare -A task_start_times=()
+declare -A task_names=()
+task_header_shown=false
+
 runtime() {
     "${CONTAINER_RUNTIME}" "$@"
+}
+
+display_task_event() {
+    local event="$1"
+    local event_type
+    local task_uuid
+    local task_name
+    local start_time
+    local duration_ms
+    local elapsed="-"
+    local status
+
+    event_type="$(jq -r '.type // empty' <<< "${event}")"
+
+    if [[ "${event_type}" == "task_start" ]]; then
+        task_uuid="$(jq -r '.task_uuid // empty' <<< "${event}")"
+        [[ -n "${task_uuid}" ]] || return 0
+
+        task_start_times["${task_uuid}"]="$(jq -r '.timestamp // empty' <<< "${event}")"
+        task_names["${task_uuid}"]="$(jq -r '.task // "Unknown task"' <<< "${event}")"
+        return 0
+    fi
+
+    case "${event_type}" in
+        task_ok)
+            status="✓"
+            ;;
+        task_failed|task_unreachable)
+            status="✗"
+            ;;
+        task_skipped)
+            status="-"
+            ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    task_uuid="$(jq -r '.task_uuid // empty' <<< "${event}")"
+    if [[ -n "${task_uuid}" ]]; then
+        task_name="${task_names["${task_uuid}"]:-$(jq -r '.task // "Unknown task"' <<< "${event}")}"
+        start_time="${task_start_times["${task_uuid}"]:-}"
+    else
+        task_name="$(jq -r '.task // "Unknown task"' <<< "${event}")"
+        start_time="-"
+    fi
+    if [[ -z "${start_time}" ]]; then
+        start_time="-"
+    fi
+    duration_ms="$(jq -r '.duration_ms // empty' <<< "${event}")"
+
+    if [[ "${duration_ms}" =~ ^[0-9]+$ ]]; then
+        local total_seconds=$((duration_ms / 1000))
+        local hours=$((total_seconds / 3600))
+        local minutes=$(((total_seconds % 3600) / 60))
+        local seconds=$((total_seconds % 60))
+        local milliseconds=$((duration_ms % 1000))
+        elapsed="$(printf '%02d:%02d:%02d.%03d' \
+            "${hours}" "${minutes}" "${seconds}" "${milliseconds}")"
+    fi
+
+    if [[ "${task_header_shown}" != "true" ]]; then
+        printf '%-32s %-6s %-12s %s\n' "STARTED" "RESULT" "ELAPSED" "TASK"
+        task_header_shown=true
+    fi
+
+    if [[ -t 1 ]]; then
+        case "${status}" in
+            ✓) status=$'\033[32m✓\033[0m' ;;
+            ✗) status=$'\033[31m✗\033[0m' ;;
+        esac
+    fi
+
+    printf '%-32s ' "${start_time}"
+    printf '%s      %-12s %s\n' \
+        "${status}" "${elapsed}" "${task_name}"
 }
 
 usage() {
@@ -74,9 +154,11 @@ JOB OPERATIONS
 
       ib status 8c37028431d7
 
-  Follow events
+  Follow task progress
 
       ib follow 8c37028431d7
+      Shows task start time, result and elapsed time.
+      Raw events remain in the job NDJSON file.
 
   Stop a running job
 
@@ -134,7 +216,9 @@ follow_job() {
 			echo "Job is not running (${status})"
 
 			if [[ -f "${event_file}" ]]; then
-				cat "${event_file}" | jq .
+                while IFS= read -r event; do
+                    display_task_event "${event}"
+                done < "${event_file}"
 			fi
 
 			return 0
@@ -166,8 +250,9 @@ follow_job() {
 
             if (( new_count > line_count )); then
 
-                sed -n "$((line_count + 1)),${new_count}p" "${event_file}" \
-                    | jq .
+                while IFS= read -r event; do
+                    display_task_event "${event}"
+                done < <(sed -n "$((line_count + 1)),${new_count}p" "${event_file}")
 
                 line_count="${new_count}"
             fi
@@ -292,8 +377,11 @@ show_job_status() {
     if [[ -f "${event_file}" ]]; then
 
         echo
-        echo "Last Event:"
-        tail -1 "${event_file}" | jq .
+        echo "Task results:"
+        task_header_shown=false
+        while IFS= read -r event; do
+            display_task_event "${event}"
+        done < "${event_file}"
     fi
 }
 list_jobs() {

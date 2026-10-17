@@ -263,4 +263,7 @@ class CallbackModule(CallbackBase):
             "task": task.get_name(),
             "task_uuid": task._uuid,
             "host": result._host.get_name(),
+            "duration_ms": self._duration_ms(
+                task._uuid
+            ),
         })
