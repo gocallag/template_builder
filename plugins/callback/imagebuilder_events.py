@@ -22,29 +22,37 @@ class CallbackModule(CallbackBase):
     def __init__(self):
         super().__init__()
 
+        #
+        # In Docker/Podman the hostname is normally the
+        # container id (or short container id).
+        #
         self.hostname = socket.gethostname()
 
         #
-        # Prefer explicit job id, otherwise use container hostname.
-        # Docker/Podman hostname is typically the container id.
+        # Allow explicit override but default to hostname.
         #
         self.job_id = os.getenv(
             "IMAGEBUILDER_JOB_ID",
             self.hostname
         )
 
+        #
+        # Mounted by host:
+        #
+        #   -v ${BUILD_DIR}/jobs:/jobs
+        #
         self.events_path = os.getenv(
             "IMAGEBUILDER_EVENTS_FILE",
-            f"/tmp/imagebuilder-{self.job_id}.ndjson"
+            f"/jobs/{self.job_id}.ndjson"
         )
 
         self.task_start_times = {}
 
+        #
+        # Protect writes if Ansible forks.
+        #
         self._lock = threading.Lock()
 
-        #
-        # First event proves callback loaded.
-        #
         self._emit({
             "type": "callback_start",
             "hostname": self.hostname,
@@ -64,13 +72,15 @@ class CallbackModule(CallbackBase):
             self.job_id
         )
 
-        with self._lock:
+        directory = os.path.dirname(self.events_path)
 
+        if directory:
             os.makedirs(
-                os.path.dirname(self.events_path),
+                directory,
                 exist_ok=True
             )
 
+        with self._lock:
             with open(
                 self.events_path,
                 "a",
@@ -88,7 +98,9 @@ class CallbackModule(CallbackBase):
 
     def _duration_ms(self, task_uuid):
 
-        started = self.task_start_times.get(task_uuid)
+        started = self.task_start_times.get(
+            task_uuid
+        )
 
         if started is None:
             return None
@@ -97,26 +109,34 @@ class CallbackModule(CallbackBase):
             (time.time() - started) * 1000
         )
 
-    def _safe_message(self, result):
+    @staticmethod
+    def _truncate(value, max_length=4000):
 
-        msg = (
+        if value is None:
+            return None
+
+        value = str(value)
+
+        if len(value) <= max_length:
+            return value
+
+        return (
+            value[:max_length] +
+            "...(truncated)"
+        )
+
+    def _message(self, result):
+
+        output = (
             result._result.get("msg")
             or result._result.get("stderr")
             or result._result.get("stdout")
         )
 
-        if msg is None:
-            return None
-
-        msg = str(msg)
-
-        if len(msg) > 2000:
-            msg = msg[:2000] + "...(truncated)"
-
-        return msg
+        return self._truncate(output)
 
     #
-    # PLAYBOOK
+    # Playbook lifecycle
     #
 
     def v2_playbook_on_start(self, playbook):
@@ -132,36 +152,38 @@ class CallbackModule(CallbackBase):
 
     def v2_playbook_on_stats(self, stats):
 
-        processed = {}
+        summary = {}
 
         for host in stats.processed.keys():
 
-            summary = stats.summarize(host)
+            host_summary = stats.summarize(host)
 
-            processed[host] = {
-                "ok": summary.get("ok", 0),
-                "changed": summary.get("changed", 0),
-                "failed": summary.get("failures", 0),
-                "unreachable": summary.get("unreachable", 0),
-                "skipped": summary.get("skipped", 0)
+            summary[host] = {
+                "ok": host_summary.get("ok", 0),
+                "changed": host_summary.get("changed", 0),
+                "failed": host_summary.get("failures", 0),
+                "unreachable": host_summary.get("unreachable", 0),
+                "skipped": host_summary.get("skipped", 0),
             }
 
         self._emit({
             "type": "playbook_end",
-            "stats": processed
+            "stats": summary,
         })
 
     #
-    # TASKS
+    # Task lifecycle
     #
 
     def v2_playbook_on_task_start(
         self,
         task,
-        is_conditional
+        is_conditional,
     ):
 
-        self.task_start_times[task._uuid] = time.time()
+        self.task_start_times[
+            task._uuid
+        ] = time.time()
 
         self._emit({
             "type": "task_start",
@@ -169,10 +191,6 @@ class CallbackModule(CallbackBase):
             "task_uuid": task._uuid,
             "action": task.action,
         })
-
-    #
-    # SUCCESS
-    #
 
     def v2_runner_on_ok(self, result):
 
@@ -192,14 +210,10 @@ class CallbackModule(CallbackBase):
             ),
         })
 
-    #
-    # FAILURE
-    #
-
     def v2_runner_on_failed(
         self,
         result,
-        ignore_errors=False
+        ignore_errors=False,
     ):
 
         task = result._task
@@ -213,14 +227,13 @@ class CallbackModule(CallbackBase):
             "duration_ms": self._duration_ms(
                 task._uuid
             ),
-            "msg": self._safe_message(result),
+            "msg": self._message(result),
         })
 
-    #
-    # UNREACHABLE
-    #
-
-    def v2_runner_on_unreachable(self, result):
+    def v2_runner_on_unreachable(
+        self,
+        result,
+    ):
 
         task = result._task
 
@@ -232,13 +245,13 @@ class CallbackModule(CallbackBase):
             "duration_ms": self._duration_ms(
                 task._uuid
             ),
-            "msg": self._safe_message(result),
+            "msg": self._message(result),
         })
 
     #
-    # SKIPPED
-    #
-    # Keep for now. UI can ignore.
+    # Optional
+    # Keep initially so you can see
+    # branching behaviour.
     #
 
     def v2_runner_on_skipped(self, result):
