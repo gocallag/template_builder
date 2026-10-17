@@ -9,7 +9,7 @@ imagebuilder_prefix_port_offset_map:
     ubuntu: 4
     windows: 0 # the client has to choose it's local port. This is being deprecated.
     suse: 6
-    fedora: 7
+    fedora: 0 # the client has to choose it's local port. This is being deprecated.
     centos: 8
     rhel: 9
     leap: 10
