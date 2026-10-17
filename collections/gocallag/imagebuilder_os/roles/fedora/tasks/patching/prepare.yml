@@ -1,0 +1,3 @@
+  # Red Hat Linux Systems
+- name: (PATCHING-PREPARE, Fedora) Fedora Linux-specific preparation tasks
+  ansible.builtin.debug: msg="Fedora Linux preparation tasks are not required at this time."
