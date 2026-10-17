@@ -1,0 +1,38 @@
+id: windows-2019
+
+os:
+  plugin: gocallag.imagebuilder_os.windows
+  family: windows
+  distribution: windows
+  version: "2019"
+  architecture: x86_64
+  useauxiso: true
+
+  config:
+    disks:
+      - 100
+    timezone: Australia/Melbourne
+    locale: en-AU
+    key:
+      fullname: Lab
+      organization: Lab
+      type: trial
+      id: N69G4-B89J2-4G8F4-WWYCC-J464C
+    imageselect: 2
+    first_logon_commands:
+    - cmd: "cmd.exe /c powershell -Command dism /online /quiet /set-edition:ServerDatacenter /productkey:{{ os.config.key.id }} /accepteula"
+      order: 1
+    - cmd: "cmd.exe /c powershell -File E:\\pre-ansible.ps1 -Verbose"
+      order: 8
+    - cmd: "cmd.exe /c shutdown /s /t 0"
+      order: 99
+      description: "Restart computer to apply changes"
+    - cmd: "%SystemRoot%\\system32\\WindowsPowerShell\\v1.0\\powershell.exe -Command Set-ItemProperty 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Terminal Server\\' -Name 'fDenyTSConnections' -Value 0"
+      order: 9
+      description: "Enable Remote Desktop Connections"
+
+      
+
+  iso: http://192.168.1.161:8180/Microsoft/W2019/en_windows_server_2019_updated_feb_2021_x64_dvd_277a6bfe.iso
+  checksum: 2df055d0f48ec59fc43c7f6eff65a56e027e2f349bb99041ce73428915da6cbc 
+
