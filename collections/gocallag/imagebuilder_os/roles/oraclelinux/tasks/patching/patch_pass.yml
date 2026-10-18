@@ -1,10 +1,10 @@
 ---
 - name: Patching | patch_pass| Increment patch pass counter
   ansible.builtin.set_fact:
-    imagebuilder_OracleLinux_patch_pass: >-
-      {{ (imagebuilder_OracleLinux_patch_pass | default(0) | int) + 1 }}
+    imagebuilder_oraclelinux_patch_pass: >-
+      {{ (imagebuilder_oraclelinux_patch_pass | default(0) | int) + 1 }}
 
-- name: Patching| patch_pass | Check if reboot is required
+- name: Patching | patch_pass | Check if reboot is required
   ansible.builtin.command: "/usr/bin/needs-restarting -r"
   register: imagebuilder_nr
   failed_when: imagebuilder_nr.rc not in [0,1,2]
@@ -14,7 +14,7 @@
 
 - name: Patching | patch_pass | Reboot if required
   ansible.builtin.reboot:
-      reboot_timeout: 1200
+    reboot_timeout: 1200
   when:
     - imagebuilder_nr.rc == 1
   become: true
@@ -48,8 +48,8 @@
 
 - name: Patching | patch_pass | Debug yum output
   ansible.builtin.debug:
-      msg: >-
-          (PATCHING) Task '{{ imagebuilder_yum }}'.
+    msg: >-
+        (PATCHING) Task '{{ imagebuilder_yum }}'.
 
 
 - name: Patching | patch_pass | Check if reboot is required post patching
@@ -62,7 +62,7 @@
 
 - name: Patching | patch_pass | Reboot if required
   ansible.builtin.reboot:
-      reboot_timeout: 1200
+    reboot_timeout: 1200
   when:
     - imagebuilder_nr.rc == 1
   become: true

@@ -1,7 +1,7 @@
 ---
 - name: Patching | Converge | Initialise patch state
   ansible.builtin.set_fact:
-    imagebuilder_OracleLinux_patch_pass: 0
+    imagebuilder_oraclelinux_patch_pass: 0
 
 - name: Patching | Converge | Converge OracleLinux updates
   ansible.builtin.include_tasks:
