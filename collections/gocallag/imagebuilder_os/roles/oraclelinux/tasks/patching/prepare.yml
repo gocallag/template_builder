@@ -1,0 +1,3 @@
+# Red Hat Linux Systems
+- name: Patching | Prepare | OracleLinux-specific preparation tasks
+  ansible.builtin.debug: msg="Oracle Linux preparation tasks are not required at this time."
