@@ -47,6 +47,8 @@ class CallbackModule(CallbackBase):
         )
 
         self.task_start_times = {}
+        self.role_wrapper_start_events = {}
+        self.role_wrapper_failure_starts = set()
 
         #
         # Protect writes if Ansible forks.
@@ -135,6 +137,25 @@ class CallbackModule(CallbackBase):
 
         return self._truncate(output)
 
+    @staticmethod
+    def _is_role_wrapper(task):
+
+        action = task.action.rsplit(".", 1)[-1]
+        return action in {"include_role", "import_role"}
+
+    def _emit_role_wrapper_start_on_failure(self, task):
+
+        task_uuid = task._uuid
+
+        if task_uuid in self.role_wrapper_failure_starts:
+            return
+
+        event = self.role_wrapper_start_events.get(task_uuid)
+
+        if event is not None:
+            self._emit(event)
+            self.role_wrapper_failure_starts.add(task_uuid)
+
     #
     # Playbook lifecycle
     #
@@ -185,16 +206,24 @@ class CallbackModule(CallbackBase):
             task._uuid
         ] = time.time()
 
-        self._emit({
+        event = {
             "type": "task_start",
             "task": task.get_name(),
             "task_uuid": task._uuid,
             "action": task.action,
-        })
+        }
+
+        if self._is_role_wrapper(task):
+            self.role_wrapper_start_events[task._uuid] = event
+        else:
+            self._emit(event)
 
     def v2_runner_on_ok(self, result):
 
         task = result._task
+
+        if self._is_role_wrapper(task):
+            return
 
         self._emit({
             "type": "task_ok",
@@ -218,6 +247,9 @@ class CallbackModule(CallbackBase):
 
         task = result._task
 
+        if self._is_role_wrapper(task):
+            self._emit_role_wrapper_start_on_failure(task)
+
         self._emit({
             "type": "task_failed",
             "task": task.get_name(),
@@ -236,6 +268,9 @@ class CallbackModule(CallbackBase):
     ):
 
         task = result._task
+
+        if self._is_role_wrapper(task):
+            self._emit_role_wrapper_start_on_failure(task)
 
         self._emit({
             "type": "task_unreachable",
@@ -257,6 +292,9 @@ class CallbackModule(CallbackBase):
     def v2_runner_on_skipped(self, result):
 
         task = result._task
+
+        if self._is_role_wrapper(task):
+            return
 
         self._emit({
             "type": "task_skipped",
