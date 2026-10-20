@@ -1,0 +1,10 @@
+---
+
+- name: patching | Prepare patching
+  ansible.builtin.include_tasks: patching/prepare.yml
+
+- name: patching | Converge patching
+  ansible.builtin.include_tasks: patching/converge.yml
+
+- name: patching | Cleanup patching
+  ansible.builtin.include_tasks: patching/cleanup.yml
