@@ -1,0 +1,13 @@
+---
+
+- name: Patching | Apply updates and clean up registration
+  block:
+    - name: Patching | Prepare patching
+      ansible.builtin.include_tasks: patching/prepare.yml
+
+    - name: Patching | Converge patching
+      ansible.builtin.include_tasks: patching/converge.yml
+
+  always:
+    - name: Patching | Cleanup patching
+      ansible.builtin.include_tasks: patching/cleanup.yml

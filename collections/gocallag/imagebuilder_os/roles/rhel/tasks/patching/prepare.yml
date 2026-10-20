@@ -1,0 +1,36 @@
+---
+- name: Patching | prepare | Validate RHSM credentials
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_config.credentials.rhsm.username is defined
+      - imagebuilder_config.credentials.rhsm.password is defined
+      - imagebuilder_config.credentials.rhsm.username | default('', true) | string | length > 0
+      - imagebuilder_config.credentials.rhsm.password | default('', true) | string | length > 0
+    fail_msg: >-
+      RHEL patching requires imagebuilder_config.credentials.rhsm.username
+      and imagebuilder_config.credentials.rhsm.password.
+
+- name: Patching | prepare | Import current Red Hat release signing key
+  ansible.builtin.rpm_key:
+    key: https://security.access.redhat.com/data/6afedf8f.txt
+    fingerprint: FCD355B305707A62DA143AB6E422397E50FE8467A2A95343D246D6276AFEDF8F
+    state: present
+  become: true
+  delegate_to: bob_build
+  when: >-
+    (version_major | default(0) | int >= 10 and version_minor | default(0) | int >= 1)
+    or
+    (version_major | default(0) | int == 9 and version_minor | default(0) | int >= 7)
+
+- name: Patching | prepare | Mark RHSM registration attempt
+  ansible.builtin.set_fact:
+    imagebuilder_rhel_rhsm_registration_attempted: true
+
+- name: Patching | prepare | Register with RHSM
+  community.general.redhat_subscription:
+    state: present
+    username: "{{ imagebuilder_config.credentials.rhsm.username }}"
+    password: "{{ imagebuilder_config.credentials.rhsm.password }}"
+  no_log: true
+  become: true
+  delegate_to: bob_build
