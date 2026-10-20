@@ -1,0 +1,8 @@
+---
+- name: Patching | converge | Initialise patch state
+  ansible.builtin.set_fact:
+    imagebuilder_rhel_patch_pass: 0
+
+- name: Patching | converge | Converge RHEL updates
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml
