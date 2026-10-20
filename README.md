@@ -86,6 +86,16 @@ The harness reads `~/.template_builder/config.yml` on the host and mounts it at
 Ansible plugins used by the build to `~/.template_builder/plugins`; that
 directory is mounted at `/plugins`.
 
+RHEL 8, 9, and 10 patching and target uplift require Red Hat Subscription
+Management credentials in the configuration:
+
+```yaml
+credentials:
+  rhsm:
+    username: your-rhsm-username
+    password: your-rhsm-password
+```
+
 The build files are available under `~/build` on the host and at `/tmp/build` in
 the container. Job metadata and the raw JSON event streams are stored in
 `~/build/jobs`.
