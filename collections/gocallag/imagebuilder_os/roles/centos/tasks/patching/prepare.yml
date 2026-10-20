@@ -1,0 +1,3 @@
+# Red Hat Linux Systems
+- name: Patching | Prepare | CentOS-specific preparation tasks
+  ansible.builtin.debug: msg="CentOS preparation tasks are not required at this time."
