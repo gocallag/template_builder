@@ -1,0 +1,7 @@
+---
+- name: (QEMU) Wait for monitor
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_qemu_monitor_host | default('localhost') }}"
+    port: "{{ imagebuilder_env_qemu_monport }}"
+    delay: "{{ imagebuilder_qemu_monitor_delay | default(2) }}"
+    timeout: "{{ imagebuilder_qemu_monitor_timeout | default(120) }}"
