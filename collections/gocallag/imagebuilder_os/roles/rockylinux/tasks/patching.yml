@@ -1,10 +1,10 @@
 ---
 
-- name: rockylinux | patching | Prepare patching
+- name: patching | Prepare patching
   ansible.builtin.include_tasks: patching/prepare.yml
 
-- name: rockylinux | patching | Converge patching
+- name: patching | Converge patching
   ansible.builtin.include_tasks: patching/converge.yml
 
-- name: rockylinux | patching | Cleanup patching
+- name: patching | Cleanup patching
   ansible.builtin.include_tasks: patching/cleanup.yml
