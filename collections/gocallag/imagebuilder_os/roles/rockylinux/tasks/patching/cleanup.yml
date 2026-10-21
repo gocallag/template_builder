@@ -1,10 +1,10 @@
 # Rocky Linux Systems
-- name: (PATCHING-CLEANUP) Cleanup Rocky Linux
+- name: Patching | cleanup
   block:
-    - name: (PATCHING-CLEANUP, rocky) Clean dnf cache
+    - name: Patching | cleanup | Clean dnf cache
       ansible.builtin.command: dnf clean all
       register: imagebuilder_dnf_clean
       failed_when: imagebuilder_dnf_clean.rc != 0
       changed_when: false
       become: true
-      delegate_to: "{{ delegate | default(omit) }}"
+      delegate_to: bob_build
