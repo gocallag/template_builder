@@ -7,4 +7,4 @@
       failed_when: imagebuilder_dnf_clean.rc != 0
       changed_when: false
       become: true
-      delegate_to: "{{ delegate | default(omit) }}"
+      delegate_to: bob_build
