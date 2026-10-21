@@ -25,6 +25,15 @@
         imagebuilder_qemu_command: "{{ imagebuilder_qemu_command }} -drive file={{ imagebuilder_path_httpdir }}/aux.iso,media=cdrom,if=ide,index=2"
       when: os.useauxiso | default(false) | bool
 
+    - name: (QEMU) Set installer launch command
+      ansible.builtin.set_fact:
+        imagebuilder_qemu_install_launch_command: >-
+          {{ imagebuilder_qemu_command }}
+          -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off
+          -mon chardev=mon0
+          -boot order=d
+          -drive file={{ imagebuilder_build_iso }},media=cdrom,if=ide,index=1
+
     - name: (QEMU) Start temporary web server
       ansible.builtin.shell: |
         python3 -m http.server {{ imagebuilder_localport }} --directory {{ imagebuilder_path_httpdir }}
@@ -38,24 +47,18 @@
       block:
         - name: (QEMU) Show QEMU command
           ansible.builtin.debug:
-            msg: "{{ imagebuilder_qemu_command }} -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off -mon chardev=mon0, -boot order=d -drive file={{ imagebuilder_path_downloadsdir }}/{{ imagebuilder_id_base }}.iso,media=cdrom,if=ide,index=1"
+            msg: "{{ imagebuilder_qemu_install_launch_command }}"
         - name: (QEMU) Launch QEMU VM
-          ansible.builtin.command: >
-              {{ imagebuilder_qemu_command }} \
-              -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off \
-              -mon chardev=mon0, \
-              -boot order=d \
-              -drive file="{{ imagebuilder_build_iso }}",media=cdrom,if=ide,index=1
-          async: 99999
-          changed_when: true
-          poll: 0
-          register: qemu_boot # noqa: var-naming
+          ansible.builtin.include_tasks:
+            file: qemu/launch.yml
+          vars:
+            imagebuilder_qemu_launch_command: "{{ imagebuilder_qemu_install_launch_command }}"
 
         - name: "(QEMU) Wait for QEMU monitor"
-          ansible.builtin.wait_for:
-            port: "{{ imagebuilder_env_qemu_monport }}"
-            delay: 5
-            timeout: 120
+          ansible.builtin.include_tasks:
+            file: qemu/wait_monitor.yml
+          vars:
+            imagebuilder_qemu_monitor_delay: 5
         - name: "(QEMU) Show console boot commands"
           ansible.builtin.debug: msg="{{ os.console_boot | map('string') | join('') }}" # noqa: no-free-form
           when:
@@ -85,41 +88,27 @@
           when:
             - os.console_boot is defined
 
-        - name: "(QEMU) Wait for QEMU monitor"
-          ansible.builtin.wait_for:
-            port: "{{ imagebuilder_env_qemu_monport }}"
-            delay: 20
-            timeout: 120
+        - name: "(QEMU) Wait for QEMU monitor after installer input"
+          ansible.builtin.include_tasks:
+            file: qemu/wait_monitor.yml
+          vars:
+            imagebuilder_qemu_monitor_delay: 20
 
         - name: "(QEMU) Wait for QEMU async job to finish"
-          ansible.builtin.async_status:
-            jid: "{{ qemu_boot.ansible_job_id }}"
-          register: qemu_wait # noqa: var-naming
-          until: qemu_wait.finished
-          retries: 45
-          delay: 60
-          failed_when: qemu_wait.rc != 0
-          changed_when: false
-          delegate_to: "{{ run_on | default('localhost') }}"
+          ansible.builtin.include_tasks:
+            file: qemu/wait_job.yml
+          vars:
+            imagebuilder_qemu_job_retries: 45
+            imagebuilder_qemu_job_delay: 60
+            imagebuilder_qemu_delegate: "{{ run_on | default('localhost') }}"
 
         - name: (QEMU) save base image
           block:
-            # Ensure qcow2 is not open by any process
-            - name: Wait for qcow2 to be released by all processes
-              ansible.builtin.shell: |
-                  set -o pipefail;
-                  lsof "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" 2>/dev/null | tail -n +2 | wc -l
-              changed_when: false
-              register: imagebuilder_qcow2_lsof
-              retries: 30
-              delay: 2
-              until: imagebuilder_qcow2_lsof.stdout | int == 0
-              failed_when: false
-
-            - name: Fail if qcow2 is still open after wait
-              ansible.builtin.fail:
-                msg: "qcow2 still open after waiting 60 seconds"
-              when: imagebuilder_qcow2_lsof.stdout | int != 0
+            - name: (QEMU) Wait for base image release
+              ansible.builtin.include_tasks:
+                file: qemu/wait_image_release.yml
+              vars:
+                imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
 
             # Flush host page cache before conversion
             - name: Sync host filesystem
@@ -155,19 +144,7 @@
         - always
   always:
     - name: (QEMU) Cleanup temporary webserver + dangling QEMU
-      ansible.builtin.shell: |
-        set -o pipefail;
-        # Kill webserver (TERM only)
-        pgrep -f "python3 -m http.server {{ imagebuilder_localport }}" \
-          | xargs -r kill -15 2>/dev/null || true
-
-        # Kill QEMU (TERM -> wait -> KILL)
-        pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
-          | xargs -r kill -15 2>/dev/null || true
-
-        sleep 5
-
-        pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
-          | xargs -r kill -9 2>/dev/null || true
-      changed_when: true
-      failed_when: false
+      ansible.builtin.include_tasks:
+        file: qemu/cleanup_process.yml
+      vars:
+        imagebuilder_qemu_cleanup_webserver: true

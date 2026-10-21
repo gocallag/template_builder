@@ -1,0 +1,13 @@
+---
+- name: (QEMU) Wait for VM process
+  ansible.builtin.async_status:
+    jid: "{{ imagebuilder_qemu_job.ansible_job_id }}"
+  register: imagebuilder_qemu_job_status
+  until: imagebuilder_qemu_job_status.finished
+  retries: "{{ imagebuilder_qemu_job_retries | default(60) }}"
+  delay: "{{ imagebuilder_qemu_job_delay | default(5) }}"
+  changed_when: false
+  failed_when: >-
+    (imagebuilder_qemu_job_fail_on_error | default(true) | bool)
+    and imagebuilder_qemu_job_status.rc | default(0) | int != 0
+  delegate_to: "{{ imagebuilder_qemu_delegate | default(omit) }}"
