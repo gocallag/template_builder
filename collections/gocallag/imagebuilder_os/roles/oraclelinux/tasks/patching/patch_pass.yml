@@ -9,7 +9,7 @@
   register: imagebuilder_nr
   failed_when: imagebuilder_nr.rc not in [0,1,2]
   changed_when: false
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build 
 
 
 - name: Patching | patch_pass | Reboot if required
@@ -18,7 +18,7 @@
   when:
     - imagebuilder_nr.rc == 1
   become: true
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
 
 - name: Patching | patch_pass | Wait for connection after reboot
   ansible.builtin.wait_for_connection:
@@ -40,7 +40,7 @@
 
 - name: Patching | patch_pass | Update the system
   ansible.builtin.command: "dnf upgrade -y"
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
   register: imagebuilder_yum
   become: true
   changed_when: imagebuilder_yum.rc == 0 and 'Nothing to do' not in imagebuilder_yum.stdout
@@ -57,7 +57,7 @@
   register: imagebuilder_nr
   changed_when: false
   failed_when: imagebuilder_nr.rc not in [0,1,2]
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
 
 
 - name: Patching | patch_pass | Reboot if required
@@ -66,7 +66,7 @@
   when:
     - imagebuilder_nr.rc == 1
   become: true
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
 
 
 - name: Patching | patch_pass | Wait for guest to settle after update reboot
@@ -86,7 +86,7 @@
 
 - name: Patching | patch_pass | Update the system
   ansible.builtin.command: "dnf check-update"
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
   register: imagebuilder_yum
   become: true
   changed_when: false
