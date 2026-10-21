@@ -78,20 +78,8 @@
             mode: '0755'
         delegate_to: "{{ run_on | default('localhost') }}"
 
-      - name: (SETUP) Cleanup temporary webserver + dangling QEMU
-        ansible.builtin.shell: |
-          set -o pipefail
-          # Kill webserver (TERM only)
-          pgrep -f "python3 -m http.server {{ imagebuilder_localport }}" \
-            | xargs -r kill -15 2>/dev/null || true
-
-          # Kill QEMU (TERM -> wait -> KILL)
-          pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
-            | xargs -r kill -15 2>/dev/null || true
-
-          sleep 5
-
-          pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
-            | xargs -r kill -9 2>/dev/null || true
-        changed_when: true
-        failed_when: false
+      - name: (SETUP) Cleanup temporary webserver and dangling QEMU
+        ansible.builtin.include_tasks:
+            file: qemu/cleanup_process.yml
+        vars:
+            imagebuilder_qemu_cleanup_webserver: true
