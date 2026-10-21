@@ -76,19 +76,11 @@
           loop: "{{ imagebuilder_build | default([]) }}"
           loop_control:
             loop_var: imagebuilder_buildtask
-        - name: (QEMU) wait for 60 seconds for the system to be shutdown before we try to save the image
-          ansible.builtin.wait_for:
-            timeout: 60
-        # Ensure qcow2 is not open by any process
-        - name: Check for open handles on qcow2
-          ansible.builtin.shell: lsof "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" || true
-          register: imagebuilder_qcow2_lsof
-          changed_when: false
-          delegate_to: localhost
-
-        - name: Fail if qcow2 is still open
-          ansible.builtin.debug:
-            msg: "qcow2 still open by a process: {{ imagebuilder_qcow2_lsof.stdout }}"
+        - name: (QEMU) Wait for custom image release
+          ansible.builtin.include_tasks:
+            file: qemu/wait_image_release.yml
+          vars:
+            imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
 
         # Flush host page cache before conversion
         - name: Sync host filesystem

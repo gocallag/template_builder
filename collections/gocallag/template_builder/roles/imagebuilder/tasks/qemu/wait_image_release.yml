@@ -1,0 +1,28 @@
+---
+- name: (QEMU) Validate image path for release check
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_qemu_image_path is defined
+      - imagebuilder_qemu_image_path | trim | length > 0
+    fail_msg: "(QEMU) No image path supplied for release check"
+
+- name: (QEMU) Wait for image release
+  ansible.builtin.command:
+    argv:
+      - lsof
+      - -t
+      - "{{ imagebuilder_qemu_image_path }}"
+  register: imagebuilder_qemu_image_users
+  changed_when: false
+  failed_when: >-
+    imagebuilder_qemu_image_users.rc not in [0, 1]
+    or imagebuilder_qemu_image_users.stderr | default('') | length > 0
+  retries: "{{ imagebuilder_qemu_image_release_retries | default(30) }}"
+  delay: "{{ imagebuilder_qemu_image_release_delay | default(2) }}"
+  until: imagebuilder_qemu_image_users.stdout | trim | length == 0
+
+- name: (QEMU) Verify image released
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_qemu_image_users.stdout | trim | length == 0
+    fail_msg: "QEMU still holds {{ imagebuilder_qemu_image_path }}"

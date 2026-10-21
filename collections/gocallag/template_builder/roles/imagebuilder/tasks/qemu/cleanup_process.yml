@@ -1,0 +1,18 @@
+---
+- name: (QEMU) Cleanup temporary webserver and dangling QEMU
+  ansible.builtin.shell: |
+    set -o pipefail
+    {% if imagebuilder_qemu_cleanup_webserver | default(false) | bool %}
+    pgrep -f "python3 -m http.server {{ imagebuilder_localport }}" \
+      | xargs -r kill -15 2>/dev/null || true
+    {% endif %}
+
+    pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
+      | xargs -r kill -15 2>/dev/null || true
+
+    sleep 5
+
+    pgrep -f "^{{ imagebuilder_base_qemu_command }}.*{{ imagebuilder_id_base }}" \
+      | xargs -r kill -9 2>/dev/null || true
+  changed_when: true
+  failed_when: false

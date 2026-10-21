@@ -13,16 +13,18 @@
         - build_customise
       block:
         - name: (BUILDIMAGE) Power on QEMU VM (customise)
-          ansible.builtin.command: >
-            {{ imagebuilder_qemu_command }} \
-            -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off \
-            -mon chardev=mon0, \
-            -boot order=c \
-            -drive file="{{ imagebuilder_build_iso }}",media=cdrom,index=1
-          async: 99999
-          poll: 0
-          register: qemu_boot # noqa: var-naming
-          changed_when: true
+          ansible.builtin.include_tasks:
+            file: qemu/launch.yml
+          vars:
+            imagebuilder_qemu_launch_command: >-
+              {{ imagebuilder_qemu_command }}
+              -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off
+              -mon chardev=mon0
+              -boot order=c
+              -drive file="{{ imagebuilder_build_iso }}",media=cdrom,index=1
+        - name: (BUILDIMAGE) Wait for QEMU monitor
+          ansible.builtin.include_tasks:
+            file: qemu/wait_monitor.yml
         - name: (BUILDIMAGE) Wait for QEMU VM to be accessible
           ansible.builtin.wait_for:
             host: "{{ imagebuilder_localip }}"
