@@ -41,7 +41,7 @@
                     identity:
                       hostname: {{ imagebuilder_id_base }}
                       username: {{ imagebuilder_config.credentials.ansible.username }}
-                      password: "{{ imagebuilder_config.credentials.ansible.password | password_hash('sha512') }}"
+                      password: "{{ imagebuilder_config.credentials.ansible.password | password_hash('sha512',  (imagebuilder_id_base | hash('sha1'))[:16]) }}"
 
                     ssh:
                       allow-pw: true
@@ -90,7 +90,7 @@
 
                   chpasswd:
                     list: |
-                      {{ imagebuilder_config.credentials.ansible.username }}:{{ imagebuilder_config.credentials.ansible.password | password_hash('sha512') }}
+                      {{ imagebuilder_config.credentials.ansible.username }}:{{ imagebuilder_config.credentials.ansible.password | password_hash('sha512',  (imagebuilder_id_base | hash('sha1'))[:16] ) }}
                     expire: False
                     hashed: False
 
