@@ -1,0 +1,105 @@
+---
+# Ubuntu-Based Systems
+- name: (BUILDPROFILE, ubuntu)
+  tags:
+      - build_aux
+  block:
+
+      - name: (BUILDPROFILE, ubuntu) Generate hashed password (Ubuntu)
+        ansible.builtin.shell: "set -o pipefail; printf '{{ imagebuilder_config.credentials.ansible.password }}' | openssl passwd -6 -stdin"
+        register: hashed_password # noqa: var-naming
+        changed_when: false
+
+      - name: (BUILDPROFILE, ubuntu) Set hashed password fact (Ubuntu)
+        ansible.builtin.set_fact:
+            hashed_password: "{{ hashed_password.stdout }}" # noqa: var-naming
+
+      - name: (BUILDPROFILE, ubuntu) use default metadata if none provided
+        ansible.builtin.set_fact:
+            metadata: "" # noqa: var-naming
+        when: metadata is not defined
+      - name: (BUILDPROFILE, ubuntu) use default userdata if none provided
+        ansible.builtin.set_fact:
+            userdata: # noqa: var-naming
+                |
+                  #cloud-config
+                  autoinstall:
+                    version: 1
+                    shutdown: poweroff
+
+                    storage:
+                      layout:
+                        name: lvm
+                        sizing-policy: all
+                      match:
+                        size: largest
+
+                    locale: en_AU.UTF-8
+                    keyboard:
+                      layout: us
+
+                    identity:
+                      hostname: {{ imagebuilder_id_base }}
+                      username: {{ imagebuilder_config.credentials.ansible.username }}
+                      password: "{{ imagebuilder_config.credentials.ansible.password | password_hash('sha512') }}"
+
+                    ssh:
+                      allow-pw: true
+                      install-server: true
+
+                    apt:
+                      primary:
+                        - arches: [default]
+                          uri: file:///cdrom
+                      disable_components: []
+                      disable_suites: []
+
+                    packages:
+                      - openssh-server
+
+                    late-commands:
+                      - rm -f /target/etc/netplan/*.yaml
+                      - |
+                        cat <<EOF >/target/etc/netplan/01-netcfg.yaml
+                        network:
+                          version: 2
+                          renderer: networkd
+                        EOF
+
+                      - |
+                        cat <<EOF | sudo tee /target/etc/sudoers.d/{{ imagebuilder_config.credentials.ansible.username }}
+                        {{ imagebuilder_config.credentials.ansible.username }}  ALL=(ALL)       NOPASSWD: ALL
+                        EOF
+
+                      - curtin in-target --target /target netplan generate
+                      - curtin in-target --target /target netplan apply
+
+                  # -------------------------------
+                  # Cloud-init section (top-level)
+                  # -------------------------------
+
+                  user-data:
+                    runcmd:
+                      - ssh-keygen -A
+                      - systemctl enable ssh
+
+                  users:
+                    - name: {{ imagebuilder_config.credentials.ansible.username }}
+                      sudo: ALL=(ALL) NOPASSWD:ALL
+                      shell: /bin/bash
+
+                  chpasswd:
+                    list: |
+                      {{ imagebuilder_config.credentials.ansible.username }}:{{ imagebuilder_config.credentials.ansible.password | password_hash('sha512') }}
+                    expire: False
+                    hashed: False
+
+        when: userdata is not defined or userdata | length == 0
+      - name: (BUILDPROFILE, debian) build profile fact
+        ansible.builtin.set_fact:
+            imagebuilder_build_profile:
+                os: "{{ os | to_json }}"  # noqa: var-naming
+                userdata: "{{ userdata }}"            # noqa: var-naming
+      - name: (BUILDPROFILE, debian) create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"
