@@ -1,23 +1,16 @@
 ---
-- name: UBUNTU_2404    # noqa: fqcn[keyword]
+- name: UBUNTU-2404 Build
   hosts: "{{ run_on | default('localhost') }}"
   gather_facts: false
   become: false
 
-  vars:
-    id: ubuntu-2404
-    useauxiso: true
-    os:
-      config:
-        disks:
-          - 50
-      iso: http://192.168.1.161:8180/canonical/Ubuntu-2404/ubuntu-24.04.2-live-server-amd64.iso
-      checksum: d6dab0c3a657988501b4bd76f1297c053df710e06e0c3aece60dead24f270b4d
-      console_boot: |
-          e<down><down><down><end><backspace><backspace><backspace><backspace> autoinstall<leftCtrlOn>x<leftCtrlOff>
+  vars_files:
+    - images/ubuntu/ubuntu2404.yml
 
-  collections:
-    - gocallag.template_builder
+  vars:
+    imagebuilder_targets:
+      - plugin: gocallag.imagebuilder_target.proxmox
+      # - plugin: gocallag.imagebuilder_target.vsphere
+
   roles:
-    - imagebuilder
-    - target_proxmox
+    - gocallag.template_builder.imagebuilder
