@@ -87,20 +87,38 @@
 # whether another patch pass is required.
 #
 
-- name: Patching | patch_pass | Update the system
-  ansible.builtin.command: "zypper refresh && zypper list-updates"
+- name: Patching | patch_pass | Refresh repositories
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - --non-interactive
+      - refresh
   delegate_to: bob_build
-  register: imagebuilder_yum
   become: true
   changed_when: false
-  failed_when: imagebuilder_yum.rc not in [0,1,100]
+
+- name: Patching | patch_pass | Check for available updates
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - --non-interactive
+      - list-updates
+  delegate_to: bob_build
+  become: true
+  register: imagebuilder_zypper_updates
+  changed_when: false
+- name: Patching | patch_pass | Set update availability
+  ansible.builtin.set_fact:
+    imagebuilder_updates_available: >-
+      {{
+        imagebuilder_zypper_updates.stdout_lines
+        | select('search', '^v\\s')
+        | list
+        | length > 0
+      }}
 
 - name: Patching | patch_pass | Continue patching
   ansible.builtin.include_tasks:
     file: patch_pass.yml
   when:
-    - >-
-      imagebuilder_yum.rc
-      | default(0)
-      | int
-      == 100
+    - imagebuilder_updates_available
