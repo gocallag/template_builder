@@ -1,19 +1,14 @@
 ---
-- name: (MAIN) setup to get facts for the build system
+- name: Main | setup to get facts for the build system
   ansible.builtin.setup:
 
-# - name: (MAIN) Display build banner
-#   ansible.builtin.include_tasks: banner.yml
-#   vars:
-#     imagebuilder_banner_message: "Starting build: {{ imagebuilder_id_base }}"
-
-- name: Load imagebuilder configuration
+- name: Main | Load imagebuilder configuration
   ansible.builtin.include_vars:
     file: "{{ imagebuilder_config_path }}"
     name: imagebuilder_config
   no_log: true
 
-- name: (MAIN) Assert core build variables
+- name: Main | Assert core build variables
   ansible.builtin.assert:
     that:
       - os is defined
@@ -26,14 +21,14 @@
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
 
-- name: (MAIN) Get the system ready for the build
+- name: Main | Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml
 
-- name: (MAIN) add default build steps if none are defined defined by the build task
+- name: Main | add default build steps if none are defined defined by the build task
   ansible.builtin.set_fact:
     imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
 
-- name: (MAIN) Validate OS plugin
+- name: Main | Validate OS plugin
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
     tasks_from: asserts.yml
@@ -41,29 +36,29 @@
 - name: Main | Cleanup | Remove any existing build artifacts
   when: imagebuilder_phase == 'clean'
   block:
-    - name: (MAIN) Cleanup | Remove any existing build artifacts
+    - name: Main | Cleanup | Remove any existing build artifacts
       ansible.builtin.include_tasks: cleanup.yml
 
 - name: Main | Build Phase
   when: imagebuilder_phase == 'build'
   block:
-    - name: (MAIN) Build OS-specific profile
+    - name: Main | Build OS-specific profile
       ansible.builtin.include_role:
         name: "{{ os.plugin }}"
         tasks_from: buildprofile.yml
 
-    - name: (MAIN) Restore Image(s) if they exist
+    - name: Main | Restore Image(s) if they exist
       ansible.builtin.include_tasks: restore.yml
 
-    - name: (MAIN) OS-specific downloads
+    - name: Main | OS-specific downloads
       ansible.builtin.include_role:
         name: "{{ os.plugin }}"
         tasks_from: download.yml
-    - name: (MAIN) use inbuilt download role if OS plugin does not have a download task
+    - name: Main | use inbuilt download role if OS plugin does not have a download task
       ansible.builtin.include_tasks: download.yml
       when: imagebuilder_download_result is false
 
-    - name: (MAIN) Perform the defined build
+    - name: Main | Perform the defined build
       when: not imagebuilder_restored_from_custom_image | default(false)
       block:
         - name: (MAIN) include build roles if any are defined
@@ -88,17 +83,17 @@
           changed_when: false
           delegate_to: localhost
 
-        - name: (QEMU) save custom image
+        - name: Main | save custom image
           block:
-            - name: (QEMU) convert custom image with free block cleanup
+            - name: Main | convert custom image with free block cleanup
               ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp"
               changed_when: true
 
-            - name: (QEMU) finalize custom image
+            - name: Main | finalize custom image
               ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
               changed_when: true
 
-            - name: (QEMU) write custom artifact metadata
+            - name: Main | write custom artifact metadata
               ansible.builtin.copy:
                 dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
                 mode: "0644"
@@ -111,20 +106,20 @@
 
   rescue:
 
-    - name: "(MAIN) Show error on failure"
+    - name: "Main | Show error on failure"
       ansible.builtin.debug:
         msg: >-
-          (MAIN) Task '{{ ansible_failed_task }}' failed.
+          Main | Task '{{ ansible_failed_task }}' failed.
           {{ ansible_failed_result.msg | default('no additional message') }}
 
   always:
 
-    - name: (MAIN) Display Webserver job_id
+    - name: Main | Display Webserver job_id
       ansible.builtin.debug:
-        msg: "(MAIN) Webserver jobid is {{ webserver.ansible_job_id }} "
+        msg: "Main | Webserver jobid is {{ webserver.ansible_job_id }} "
       when: webserver is defined and webserver.ansible_job_id is defined
 
-    - name: (MAIN) kill dangly web servers
+    - name: Main | kill dangly web servers
       ansible.builtin.shell: |
         kill {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
         sleep 5
@@ -132,11 +127,11 @@
       when: webserver is defined and webserver.ansible_job_pid is defined
       changed_when: false
 
-- name: Main | Build Phase
+- name: Main | Extended Build Phase
   when: imagebuilder_phase == 'build'
   block:
 
-    - name: (MAIN) Define canonical artifact
+    - name: Main | Define canonical artifact
       ansible.builtin.set_fact:
         imagebuilder_artifact:
           id: "{{ imagebuilder_id_base }}"
@@ -144,7 +139,7 @@
           format: qcow2
           architecture: "{{ os.architecture }}"
 
-    - name: (MAIN) Execute target plugins
+    - name: Main | Execute target plugins
       ansible.builtin.include_role:
         name: "{{ imagebuilder_target.plugin }}"
       loop: "{{ imagebuilder_targets | default([]) }}"
