@@ -87,7 +87,7 @@ display_task_event() {
     fi
 
     if [[ "${task_header_shown}" != "true" ]]; then
-        printf '%-32s %-6s %-12s %s\n' "STARTED" "RESULT" "ELAPSED" "TASK"
+        printf '%-12s %-32s %-6s %-12s %s\n' "JOBID" "STARTED" "RESULT" "ELAPSED" "TASK"
         task_header_shown=true
     fi
 
@@ -98,7 +98,8 @@ display_task_event() {
         esac
     fi
 
-    printf '%-32s ' "${start_time}"
+    printf '%-12s ' "${job_id}"
+	printf '%-32s ' "${start_time}"
     printf '%s      %-12s %s\n' \
         "${status}" "${elapsed}" "${task_name}"
 }
