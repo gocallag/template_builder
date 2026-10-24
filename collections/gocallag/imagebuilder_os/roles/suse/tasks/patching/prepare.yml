@@ -1,0 +1,3 @@
+  # Red Hat Linux Systems
+- name: Patching | prepare | SuSE Linux-specific preparation tasks
+  ansible.builtin.debug: msg="SuSE Linux preparation tasks are not required at this time."

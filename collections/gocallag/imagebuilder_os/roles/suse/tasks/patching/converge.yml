@@ -1,0 +1,8 @@
+---
+- name: Patching | converge| Initialise patch state
+  ansible.builtin.set_fact:
+    imagebuilder_suse_patch_pass: 0
+
+- name: Patching | converge | Converge suse updates
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml

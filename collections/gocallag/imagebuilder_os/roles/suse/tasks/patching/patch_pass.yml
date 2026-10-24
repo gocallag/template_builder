@@ -1,0 +1,124 @@
+---
+- name: Patching | patch_pass| Increment patch pass counter
+  ansible.builtin.set_fact:
+    imagebuilder_suse_patch_pass: >-
+      {{ (imagebuilder_suse_patch_pass | default(0) | int) + 1 }}
+
+- name: Patching | patch_pass | Check whether reboot is required
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - needs-rebooting
+  register: reboot_check
+  changed_when: false
+  failed_when: reboot_check.rc not in [0,102]
+  delegate_to: bob_build
+
+- name: Patching | patch_pass | Reboot if required
+  ansible.builtin.reboot:
+    reboot_timeout: 1200
+  when:
+    - reboot_check.rc == 102
+  become: true
+  delegate_to: bob_build
+
+- name: Patching | patch_pass | Wait for connection after reboot
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 10
+    timeout: 1200
+  delegate_to: bob_build
+
+
+- name: Patching | patch_pass | Wait for guest to settle after bootstrap reboot
+  ansible.builtin.include_tasks:
+    file: wait_settled.yml
+  when:
+    - reboot_check.rc == 102
+
+#
+# Normal Ansible suse Update pass.
+#
+
+- name: Patching | patch_pass | Update the system
+  ansible.builtin.command: "zypper update -y"
+  delegate_to: bob_build
+  register: imagebuilder_yum
+  become: true
+  changed_when: imagebuilder_yum.rc == 0 and 'Nothing to do' not in imagebuilder_yum.stdout
+  ignore_errors: true
+
+- name: Patching | patch_pass | Debug yum output
+  ansible.builtin.debug:
+      msg: >-
+          (PATCHING) Task '{{ imagebuilder_yum }}'.
+
+- name: Patching | patch_pass | Check whether reboot is required
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - needs-rebooting
+  register: reboot_check
+  changed_when: false
+  failed_when: reboot_check.rc not in [0,102]
+  delegate_to: bob_build
+
+- name: Patching | patch_pass | Reboot if required
+  ansible.builtin.reboot:
+    reboot_timeout: 1200
+  when:
+    - reboot_check.rc == 102
+  become: true
+  delegate_to: bob_build
+
+
+- name: Patching | patch_pass | Wait for guest to settle after update reboot
+  ansible.builtin.include_tasks:
+    file: wait_settled.yml
+  when:
+    - reboot_check.rc == 102
+
+
+#
+# Convergence test.
+#
+# There is intentionally no pre-install search. state=installed already
+# searches for applicable updates. This search exists only to determine
+# whether another patch pass is required.
+#
+
+- name: Patching | patch_pass | Refresh repositories
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - --non-interactive
+      - refresh
+  delegate_to: bob_build
+  become: true
+  changed_when: false
+
+- name: Patching | patch_pass | Check for available updates
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - --non-interactive
+      - list-updates
+  delegate_to: bob_build
+  become: true
+  register: imagebuilder_zypper_updates
+  changed_when: false
+- name: Patching | patch_pass | Set update availability
+  ansible.builtin.set_fact:
+    imagebuilder_updates_available: >-
+      {{
+        imagebuilder_zypper_updates.stdout_lines
+        | select('search', '^v\\s')
+        | list
+        | length > 0
+      }}
+
+- name: Patching | patch_pass | Continue patching
+  ansible.builtin.include_tasks:
+    file: patch_pass.yml
+  when:
+    - imagebuilder_updates_available
