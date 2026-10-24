@@ -1,26 +1,28 @@
 ---
-- name: fedora | patch_pass| Increment patch pass counter
+- name: Patching | patch_pass| Increment patch pass counter
   ansible.builtin.set_fact:
-    imagebuilder_fedora_patch_pass: >-
-      {{ (imagebuilder_fedora_patch_pass | default(0) | int) + 1 }}
+    imagebuilder_suse_patch_pass: >-
+      {{ (imagebuilder_suse_patch_pass | default(0) | int) + 1 }}
 
-- name: fedora | patch_pass | Check if reboot is required
-  ansible.builtin.command: "/usr/bin/needs-restarting -r"
-  register: imagebuilder_nr
-  failed_when: imagebuilder_nr.rc not in [0,1,2]
+- name: Patching | patch_pass | Check whether reboot is required
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - needs-rebooting
+  register: reboot_check
   changed_when: false
-  delegate_to: "{{ delegate | default(omit) }}"
+  failed_when: reboot_check.rc not in [0,102]
+  delegate_to: bob_build
 
-
-- name: fedora | patch_pass | Reboot if required
+- name: Patching | patch_pass | Reboot if required
   ansible.builtin.reboot:
-      reboot_timeout: 1200
+    reboot_timeout: 1200
   when:
-    - imagebuilder_nr.rc == 1
+    - reboot_check.rc == 102
   become: true
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
 
-- name: fedora | patch_pass | Wait for connection after reboot
+- name: Patching | patch_pass | Wait for connection after reboot
   ansible.builtin.wait_for_connection:
     connect_timeout: 10
     sleep: 10
@@ -28,52 +30,53 @@
   delegate_to: bob_build
 
 
-- name: fedora | patch_pass | Wait for guest to settle after bootstrap reboot
+- name: Patching | patch_pass | Wait for guest to settle after bootstrap reboot
   ansible.builtin.include_tasks:
     file: wait_settled.yml
   when:
-    - imagebuilder_nr.rc == 1
+    - reboot_check.rc == 102
 
 #
-# Normal Ansible fedora Update pass.
+# Normal Ansible suse Update pass.
 #
 
-- name: fedora | patch_pass | Update the system
+- name: Patching | patch_pass | Update the system
   ansible.builtin.command: "zypper update -y"
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
   register: imagebuilder_yum
   become: true
   changed_when: imagebuilder_yum.rc == 0 and 'Nothing to do' not in imagebuilder_yum.stdout
   ignore_errors: true
 
-- name: fedora | patch_pass | Debug yum output
+- name: Patching | patch_pass | Debug yum output
   ansible.builtin.debug:
       msg: >-
           (PATCHING) Task '{{ imagebuilder_yum }}'.
 
-
-- name: fedora | patch_pass | Check if reboot is required post patching
-  ansible.builtin.command: "/usr/bin/needs-restarting -r"
-  register: imagebuilder_nr
+- name: Patching | patch_pass | Check whether reboot is required
+  ansible.builtin.command:
+    argv:
+      - zypper
+      - needs-rebooting
+  register: reboot_check
   changed_when: false
-  failed_when: imagebuilder_nr.rc not in [0,1,2]
-  delegate_to: "{{ delegate | default(omit) }}"
+  failed_when: reboot_check.rc not in [0,102]
+  delegate_to: bob_build
 
-
-- name: fedora | patch_pass | Reboot if required
+- name: Patching | patch_pass | Reboot if required
   ansible.builtin.reboot:
-      reboot_timeout: 1200
+    reboot_timeout: 1200
   when:
-    - imagebuilder_nr.rc == 1
+    - reboot_check.rc == 102
   become: true
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
 
 
-- name: fedora | patch_pass | Wait for guest to settle after update reboot
+- name: Patching | patch_pass | Wait for guest to settle after update reboot
   ansible.builtin.include_tasks:
     file: wait_settled.yml
   when:
-    - imagebuilder_nr.rc == 1
+    - reboot_check.rc == 102
 
 
 #
@@ -86,7 +89,7 @@
 
 - name: Patching | patch_pass | Update the system
   ansible.builtin.command: "zypper refresh && zypper list-updates"
-  delegate_to: "{{ delegate | default(omit) }}"
+  delegate_to: bob_build
   register: imagebuilder_yum
   become: true
   changed_when: false
