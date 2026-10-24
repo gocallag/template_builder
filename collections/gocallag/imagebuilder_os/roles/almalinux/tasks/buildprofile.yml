@@ -1,11 +1,11 @@
 # ansible-lint: ignore=line-length
 
 # RedHat-Based Systems
-- name: (BUILDPROFILE, AlmaLinux)
+- name: Buildprofile | AlmaLinux build profile
   tags:
       - always
   block:
-      - name: (BUILDAUX, AlmaLinux) use default ks if none provided
+      - name: Buildprofile | use default ks if none provided
         ansible.builtin.set_fact:
             ks: # noqa: var-naming
                 |
@@ -187,11 +187,11 @@
                   %end
         when: ks is not defined or ks | length == 0
 
-      - name: (BUILDPROFILE, AlmaLinux) build profile fact
+      - name: Buildprofile | build profile fact
         ansible.builtin.set_fact:
             imagebuilder_build_profile:
                 os: "{{ os | to_json }}"  # noqa: var-naming
                 ks: "{{ ks }}"            # noqa: var-naming
-      - name: (BUILDPROFILE, AlmaLinux) create sha256 of build profile
+      - name: Buildprofile | create sha256 of build profile
         ansible.builtin.set_fact:
             imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"
