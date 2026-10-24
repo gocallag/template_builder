@@ -1,0 +1,119 @@
+# ansible-lint: ignore=line-length
+
+# RedHat-Based Systems
+- name: Buildprofile 
+  tags:
+      - always
+  block:
+      - name: Buildprofile | use default ks if none provided
+        ansible.builtin.set_fact:
+          autoinst: |
+              {
+                "product": {
+                  "id": "openSUSE_Leap"
+                },
+                "hostname": {
+                  "static": "{{ id }}"
+                },
+                "root": {
+                  "password": "{{ imagebuilder_config.credentials.linux_admin.password }}"
+                },
+                "user": {
+                  "fullName": "{{ imagebuilder_config.credentials.ansible.username}}",
+                  "userName": "{{ imagebuilder_config.credentials.ansible.username}}",
+                  "password": "{{ imagebuilder_config.credentials.ansible.password }}",
+                },
+                "localization": {
+                  "language": "en_US.UTF-8",
+                  "keyboard": "us"
+
+                },
+                "network": {
+                  "connections": [
+                    {
+                      "id": "eth0-connection",
+                      "method4": "auto",
+                      "interface": "eth0",
+                      "autoconnect": true,
+                      "persistent": true
+                    }
+                  ]
+                },
+                "storage": {
+                  "drives": [
+                    {
+                      "alias": "bootDisk",
+                      "search": "/dev/sda",
+                      "ptableType": "gpt",
+                      "partitions": [
+                        {
+                          "search": "*",
+                          "delete": true
+                        },
+                        {
+                          "filesystem": {
+                            "path": "/"
+                          },
+                          "size": {
+                            "min": "15 GiB"
+                          }
+                        },
+                        {
+                          "filesystem": {
+                            "path": "swap",
+                            "type": "swap"
+                          },
+                          "size": "2 GiB"
+                        }
+                      ]
+                    }
+                  ],
+                  "boot": {
+                    "configure": true,
+                    "device": "bootDisk"
+                  }
+                },
+                "software": {
+                  "patterns": [
+                    "base"
+                  ],
+                  "packages": []
+                },
+                  "files": [
+                    {
+                      "destination": "/etc/sudoers.d/{{ imagebuilder_config.credentials.ansible.username}}",
+                      "content": "{{ imagebuilder_config.credentials.ansible.username }} ALL=(ALL) NOPASSWD:ALL",
+                      "user": "root",
+                      "group": "root",
+                      "permissions": "0440",
+                    },
+                    {
+                    "destination": "/root/.config/combustion/script",
+                    "mode": "0755",
+                    "owner": "root",
+                    "group": "root",
+                    "content": "#!/bin/bash\nset -e\nsystemctl enable sshd.service\nsystemctl start sshd.service\n",
+                  },
+                  ],
+
+                "scripts": {
+
+                    "post": [
+                      {
+                        "name": "FIRST-BOOT.sh",
+                        "content": "#!/usr/bin/bash\necho 'System booted for the first time'\nsystemctl enable --now sshd.service\n",
+                        "chroot": true
+                      }
+                    ]
+                  }
+              }
+        when: autoinst is not defined or autoinst | length == 0
+
+      - name: Buildprofile | build profile fact
+        ansible.builtin.set_fact:
+            imagebuilder_build_profile:
+                os: "{{ os | to_json }}"  # noqa: var-naming
+                autoinst: "{{ autoinst }}"            # noqa: var-naming
+      - name: Buildprofile | create sha256 of build profile
+        ansible.builtin.set_fact:
+            imagebuilder_profile_hash: "{{ imagebuilder_build_profile | to_json | hash('sha256') }}"

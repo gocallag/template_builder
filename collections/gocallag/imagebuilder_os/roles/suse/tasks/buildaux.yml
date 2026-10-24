@@ -1,0 +1,31 @@
+
+    - name: (BUILDAUX, OpenSuSE) remove existing aux ISO (if it exists)
+      file:
+        path: "{{ imagebuilder_path_mntdir }}/aux.iso"
+        state: absent
+
+    - name: (BUILDAUX, OpenSuSE) create temporary iso contents dir
+      file:
+        path: "{{ imagebuilder_path_mntdir }}"
+        state: directory
+
+    - name: (BUILDAUX, OpenSuSE) Copy autoinst.xml file (OpenSuSE) to ISO contents
+      copy:
+        content: "{{ autoinst }}"
+        dest: "{{ imagebuilder_path_mntdir }}/autoinst.xml"
+      become: true
+    - name: (BUILDAUX, OpenSuSE) Copy autoinst.xml file (OpenSuSE) to http directory
+      copy:
+        content: "{{ autoinst }}"
+        dest: "{{ imagebuilder_path_httpdir }}/profile.jsonnet"
+      become: true
+
+    - name: (BUILDAUX, OpenSuSE) Build aux ISO from contents (label OEMDRV)
+      command: >
+        genisoimage -output aux.iso -volid OEMDRV -joliet -rock .
+      args:
+        chdir: "{{ imagebuilder_path_mntdir }}"
+        creates: "{{ imagebuilder_path_mntdir }}/aux.iso"
+      register: mkiso
+      failed_when: mkiso.rc != 0
+

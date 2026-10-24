@@ -1,0 +1,10 @@
+# Fedora Linux Systems
+- name: Patching | cleanup | Clean zypper cache
+  block:
+    - name: (PATCHING-CLEANUP, fedora) Clean zypper cache
+      ansible.builtin.command: zypper clean
+      register: imagebuilder_zypper_clean
+      failed_when: imagebuilder_zypper_clean.rc != 0
+      changed_when: false
+      become: true
+      delegate_to: "{{ delegate | default(omit) }}"
