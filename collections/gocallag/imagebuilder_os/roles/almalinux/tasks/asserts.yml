@@ -1,5 +1,5 @@
 ---
-- name: (ALMALINUX) Validate OS configuration
+- name: Asserts | Validate OS configuration
   ansible.builtin.assert:
     that:
       - os is defined

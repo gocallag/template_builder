@@ -1,5 +1,5 @@
 ---
-- name: (AlmaLinux) Reject direct invocation
+- name: Main | Reject direct invocation
   ansible.builtin.fail:
     msg: >-
       gocallag.imagebuilder_os.almalinux is an imagebuilder OS plugin.
