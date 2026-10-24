@@ -77,12 +77,6 @@
           vars:
             imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
 
-        # Flush host page cache before conversion
-        - name: Sync host filesystem
-          ansible.builtin.command: sync
-          changed_when: false
-          delegate_to: localhost
-
         - name: Main | save custom image
           block:
             - name: Main | convert custom image with free block cleanup
@@ -109,7 +103,7 @@
     - name: "Main | Show error on failure"
       ansible.builtin.debug:
         msg: >-
-          Main | Task '{{ ansible_failed_task }}' failed.
+          Main | Task '{{ ansible_failed_task.name }}' failed.
           {{ ansible_failed_result.msg | default('no additional message') }}
 
   always:
@@ -127,8 +121,8 @@
       when: webserver is defined and webserver.ansible_job_pid is defined
       changed_when: false
 
-- name: Main | Extended Build Phase
-  when: imagebuilder_phase == 'build'
+- name: Main | Publish Artifact
+  when: imagebuilder_phase == 'publish' or imagebuilder_phase == 'build'
   block:
 
     - name: Main | Define canonical artifact
