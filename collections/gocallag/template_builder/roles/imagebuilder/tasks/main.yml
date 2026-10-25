@@ -69,42 +69,45 @@
         - name: Main | build the base image
           ansible.builtin.include_tasks:
             file: buildimage.yml
-        - name: (MAIN) include build roles if any are defined
-          ansible.builtin.include_role:
-            name: imagebuilder
-            tasks_from: "glue/glue.yml"
-          vars:
-            imagebuilder_stage: "{{ imagebuilder_buildtask.name }}"
-            imagebuilder_task_vars: "{{ imagebuilder_buildtask.task_vars | default({}) }}"
-          loop: "{{ imagebuilder_build | default([]) }}"
-          loop_control:
-            loop_var: imagebuilder_buildtask
-        - name: (QEMU) Wait for custom image release
-          ansible.builtin.include_tasks:
-            file: qemu/wait_image_release.yml
-          vars:
-            imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
-
-        - name: Main | save custom image
+        - name: Main | Legacy build
+          when: imagebuilder_phase in ['build']
           block:
-            - name: Main | convert custom image with free block cleanup
-              ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp"
-              changed_when: true
+            - name: Main | include legacy build roles if any are defined
+              ansible.builtin.include_role:
+                name: imagebuilder
+                tasks_from: "glue/glue.yml"
+              vars:
+                imagebuilder_stage: "{{ imagebuilder_buildtask.name }}"
+                imagebuilder_task_vars: "{{ imagebuilder_buildtask.task_vars | default({}) }}"
+              loop: "{{ imagebuilder_build | default([]) }}"
+              loop_control:
+                loop_var: imagebuilder_buildtask
+            - name: Main | Legacy Wait for custom image release
+              ansible.builtin.include_tasks:
+                file: qemu/wait_image_release.yml
+              vars:
+                imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
 
-            - name: Main | finalize custom image
-              ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-              changed_when: true
+            - name: Main | Legacy save custom image
+              block:
+                - name: Main | Legacy convert custom image with free block cleanup
+                  ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp"
+                  changed_when: true
 
-            - name: Main | write custom artifact metadata
-              ansible.builtin.copy:
-                dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
-                mode: "0644"
-                content: |
-                  profile_hash: "{{ imagebuilder_profile_hash }}"
-                  id: "{{ imagebuilder_id_base }}"
-                  created_at: "{{ ansible_date_time.iso8601 }}"
-                  stage: custom
-                  ttl_days: 7
+                - name: Main | Legacy finalize custom image
+                  ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
+                  changed_when: true
+
+                - name: Main | Legacy write custom artifact metadata
+                  ansible.builtin.copy:
+                    dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+                    mode: "0644"
+                    content: |
+                      profile_hash: "{{ imagebuilder_profile_hash }}"
+                      id: "{{ imagebuilder_id_base }}"
+                      created_at: "{{ ansible_date_time.iso8601 }}"
+                      stage: custom
+                      ttl_days: 7
 
   rescue:
 
