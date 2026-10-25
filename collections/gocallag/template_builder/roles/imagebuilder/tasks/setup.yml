@@ -39,7 +39,7 @@
             - "{{ imagebuilder_build_imagedir }}"
         when: "'cleanup' in ansible_run_tags"
 
-      - name: (SETUP) create build directories
+      - name: Setup | Create build directories
         ansible.builtin.file:
             path: "{{ file }}"
             state: directory
@@ -49,7 +49,6 @@
         loop_control:
             loop_var: file
         loop:
-            # - "{{ imagebuilder_config.builder.build_path }}"
             - "{{ imagebuilder_path_httpdir }}"
             - "{{ imagebuilder_path_httpdir }}/aux/drivers"
             - "{{ imagebuilder_path_httpdir }}/aux/tools"
@@ -59,11 +58,11 @@
             - "{{ imagebuilder_path_savedir }}"
             - "{{ imagebuilder_path_mntdir }}"
             - "{{ imagebuilder_path_librarydir }}"
+            - "{{ imagebuilder_path_librarydir }}/isos"
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}"
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/checkpoints"
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/exports"
-            # - "{{ imagebuilder_build_output | dirname }}"
-            # - "{{ imagebuilder_build_output | dirname }}/mnt"
+
 
       - name: (SETUP) copy qemu monitor script
         ansible.builtin.template:
