@@ -6,16 +6,6 @@
         ansible.builtin.fail:
             msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. I don't know how to build it. Please check your ID and the documentation for supported prefixes."
         when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
-    #   - name: (SETUP) get os_type
-    #     ansible.builtin.set_fact:
-    #         os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}"
-    #     when: imagebuilder_id_prefix in imagebuilder_prefix_ostype_map
-    #     failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_ostype_map
-    #   - name: (SETUP) get os_variant
-    #     ansible.builtin.set_fact:
-    #         os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}"
-    #     when: imagebuilder_id_prefix in imagebuilder_prefix_variant_map
-    #     failed_when: imagebuilder_id_prefix not in imagebuilder_prefix_variant_map
       - name: (SETUP) Add new system to in-memory inventory
         ansible.builtin.add_host:
             name: 'bob_build'
@@ -68,6 +58,10 @@
             - "{{ imagebuilder_path_imagedir }}"
             - "{{ imagebuilder_path_savedir }}"
             - "{{ imagebuilder_path_mntdir }}"
+            - "{{ imagebuilder_path_librarydir }}"
+            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}"
+            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/checkpoints"
+            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/exports"
             # - "{{ imagebuilder_build_output | dirname }}"
             # - "{{ imagebuilder_build_output | dirname }}/mnt"
 
