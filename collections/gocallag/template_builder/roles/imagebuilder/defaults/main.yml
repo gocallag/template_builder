@@ -108,8 +108,6 @@ imagebuilder_base_qemu_command: "qemu-system-x86_64"
 # default build steps
 
 imagebuilder_build_default:
-    - name: buildaux
-    - name: buildimage
     - name: patching
       task_vars:
           location: internet
