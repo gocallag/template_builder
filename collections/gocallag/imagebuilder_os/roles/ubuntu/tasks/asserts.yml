@@ -14,3 +14,6 @@
       - os.checksum is defined
       - os.checksum | length > 0
     fail_msg: "(Ubuntu) Invalid Ubuntu configuration"
+- set_fact:
+    imagebuilder_plugin:
+      download: false

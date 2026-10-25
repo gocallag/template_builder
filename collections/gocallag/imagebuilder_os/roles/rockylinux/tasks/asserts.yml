@@ -14,3 +14,6 @@
       - os.checksum is defined
       - os.checksum | length > 0
     fail_msg: "(ROCKYLINUX) Invalid Rocky Linux configuration"
+- set_fact:
+    imagebuilder_plugin:
+      download: false

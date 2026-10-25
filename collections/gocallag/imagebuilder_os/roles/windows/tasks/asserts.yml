@@ -14,3 +14,7 @@
       - os.checksum is defined
       - os.checksum | length > 0
     fail_msg: "(WINDOWS) Invalid Windows configuration"
+
+- set_fact:
+    imagebuilder_plugin:
+      download: false
