@@ -121,3 +121,4 @@ imagebuilder_build_default:
     - name: template-cleanup
 
 imagebuilder_phase: "{{ imagebuilder_phase | default('build') }}"
+

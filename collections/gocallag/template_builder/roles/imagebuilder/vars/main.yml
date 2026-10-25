@@ -1,5 +1,7 @@
 # set a whole bunch of variables for the build process - we set them all in advance to avoid multiple set_fact calls during the build which can cause performance issues with Ansible
 
+os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}"
+os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}"
 imagebuilder_id_prefix: "{{ id | regex_replace('^(.*?)-.*$', '\\1') }}"   # alma-9.8 -> alma
 imagebuilder_id_base: "{{ id | regex_replace('(\\.\\d+)$', '') }}"  # alma-9.8 -> alma-9
 imagebuilder_id_version: "{{ id | regex_replace('^.*-', '') }}" # alma-9.8 -> 9.8

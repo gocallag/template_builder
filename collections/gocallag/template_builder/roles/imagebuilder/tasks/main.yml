@@ -21,6 +21,11 @@
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
 
+- name: Main | Get the OS-specific profile
+  ansible.builtin.include_role:
+    name: "{{ os.plugin }}"
+    tasks_from: buildprofile.yml
+
 - name: Main | Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml
 
@@ -42,11 +47,6 @@
 - name: Main | Build Phase
   when: imagebuilder_phase == 'build'
   block:
-    - name: Main | Build OS-specific profile
-      ansible.builtin.include_role:
-        name: "{{ os.plugin }}"
-        tasks_from: buildprofile.yml
-
     - name: Main | Restore Image(s) if they exist
       ansible.builtin.include_tasks: restore.yml
 
