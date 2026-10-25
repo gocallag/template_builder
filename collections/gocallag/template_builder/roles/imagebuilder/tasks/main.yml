@@ -21,6 +21,11 @@
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
 
+- name: Main | Validate OS plugin has required inputs
+  ansible.builtin.include_role:
+    name: "{{ os.plugin }}"
+    tasks_from: asserts.yml
+
 - name: Main | Get the OS-specific profile
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
@@ -33,10 +38,7 @@
   ansible.builtin.set_fact:
     imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
 
-- name: Main | Validate OS plugin
-  ansible.builtin.include_role:
-    name: "{{ os.plugin }}"
-    tasks_from: asserts.yml
+
 
 - name: Main | Cleanup | Remove any existing build artifacts
   when: imagebuilder_phase == 'clean'
@@ -45,7 +47,7 @@
       ansible.builtin.include_tasks: cleanup.yml
 
 - name: Main | Build Phase
-  when: imagebuilder_phase == 'build'
+  when: imagebuilder_phase in ['build','base']
   block:
     - name: Main | Restore Image(s) if they exist
       ansible.builtin.include_tasks: restore.yml
@@ -61,6 +63,12 @@
     - name: Main | Perform the defined build
       when: not imagebuilder_restored_from_custom_image | default(false)
       block:
+        - name: Main | call the OS specific BUILDAUX
+          ansible.builtin.include_tasks:
+            file: buildaux.yml
+        - name: Main | build the base image
+          ansible.builtin.include_tasks:
+            file: buildimage.yml
         - name: (MAIN) include build roles if any are defined
           ansible.builtin.include_role:
             name: imagebuilder
