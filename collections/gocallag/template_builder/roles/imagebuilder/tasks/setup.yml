@@ -27,18 +27,6 @@
         register: imagebuilder_current_user
         changed_when: false
 
-      - name: (SETUP) cleanup build directories
-        ansible.builtin.file:
-            path: "{{ imagebuilder_config.builder.build_path }}/{{ imagebuilder_id_base }}/{{ build_loop }}"
-            state: absent
-        loop_control:
-            loop_var: build_loop
-        loop:
-            - "{{ imagebuilder_build_httpdir }}"
-            - "{{ imagebuilder_build_downloadsdir }}"
-            - "{{ imagebuilder_build_imagedir }}"
-        when: "'cleanup' in ansible_run_tags"
-
       - name: Setup | Create build directories
         ansible.builtin.file:
             path: "{{ file }}"
