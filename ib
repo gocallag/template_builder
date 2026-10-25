@@ -8,6 +8,7 @@ CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-docker}"
 CONFIG="${HOME}/.template_builder/config.yml"
 PLUGINS="${HOME}/.template_builder/plugins"
 BUILD_DIR="${HOME}/build"
+LIBRARY_DIR="/srv/ib"
 SAMPLES_DIR="$(pwd)/samples"
 
 VNC_PORT_START="${IB_VNC_PORT_START:-5900}"
@@ -512,6 +513,7 @@ container_run_detached() {
         -v "/tmp:/tmp" \
 		-v "${BUILD_JOBS_DIR}:/jobs" \
         -v "${BUILD_DIR}:/tmp/build" \
+		-v "$(LIBRARY_DIR):/library" \
         -v "${SAMPLES_DIR}:/root/samples" \
         -v "${PLUGINS}:/plugins" \
         -p "${vnc_port}:5900" \
