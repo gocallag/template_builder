@@ -22,6 +22,59 @@ mkdir -p "${BUILD_JOBS_DIR}"
 declare -A task_start_times=()
 declare -A task_names=()
 task_header_shown=false
+VALID_PHASES=(
+    build
+    clean
+    base
+    patch
+    harden
+    uplift
+)
+
+validate_phase() {
+
+    local phase="$1"
+
+    case "${phase}" in
+        build|clean|base|patch|harden|uplift)
+            return 0
+            ;;
+        *)
+            echo "Unknown phase: ${phase}" >&2
+            echo
+            echo "Valid phases:"
+            printf '  %s\n' "${VALID_PHASES[@]}"
+            return 1
+            ;;
+    esac
+}
+
+show_phases() {
+
+    cat <<EOF
+Available phases
+
+Lifecycle
+  base
+    Install a new operating system image
+
+  patch
+    Apply operating system updates
+
+  harden
+    Apply security baselines and compliance policies
+
+  uplift
+    Apply target specific preparation and cleanup
+
+Operational
+  build
+    Execute the full lifecycle
+
+  clean
+    Remove build artefacts
+EOF
+}
 
 runtime() {
     "${CONTAINER_RUNTIME}" "$@"
@@ -578,6 +631,8 @@ phase)
     phase="${2:-}"
     image="${3:-}"
 
+    validate_phase "${phase}"
+
     if [[ -z "${phase}" ]]; then
         echo "Missing phase name"
         exit 1
@@ -675,6 +730,12 @@ ps)
     list_jobs
 
     ;;
+phases)
+
+    show_phases
+
+    ;;
+
 
 *)
 
