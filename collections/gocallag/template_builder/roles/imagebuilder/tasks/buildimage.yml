@@ -2,7 +2,7 @@
 - name: Buildimage | Include build implementation
   block:
     - name: Buildimage | Perform the base build
-      when: imagebuilder_phase in ['base']
+      when: imagebuilder_phase in ['base','build']
       ansible.builtin.include_tasks: buildbase.yml
 
 
