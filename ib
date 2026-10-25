@@ -513,7 +513,7 @@ container_run_detached() {
         -v "/tmp:/tmp" \
 		-v "${BUILD_JOBS_DIR}:/jobs" \
         -v "${BUILD_DIR}:/tmp/build" \
-		-v "$(LIBRARY_DIR):/library" \
+		-v "${LIBRARY_DIR}:/library" \
         -v "${SAMPLES_DIR}:/root/samples" \
         -v "${PLUGINS}:/plugins" \
         -p "${vnc_port}:5900" \
