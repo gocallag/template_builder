@@ -18,6 +18,7 @@ imagebuilder_path_imagedir: "{{ imagebuilder_path_basedir }}/build"
 imagebuilder_path_downloadsdir: "{{ imagebuilder_path_basedir }}/downloads"
 imagebuilder_path_mntdir: "{{ imagebuilder_path_imagedir }}/mnt"
 imagebuilder_path_savedir: "{{ imagebuilder_path_basedir }}/images"
+imagebuilder_path_librarydir: "/library/{{ imagebuilder_id_base }}"
 
 imagebuilder_build_id: "{{ imagebuilder_id_base }}"
 imagebuilder_build_format: qcow2
