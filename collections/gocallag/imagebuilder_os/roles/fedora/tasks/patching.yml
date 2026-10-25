@@ -1,10 +1,10 @@
 ---
 
-- name: fedoralinux | patching | Prepare patching
+- name: Patching | Prepare patching
   ansible.builtin.include_tasks: patching/prepare.yml
 
-- name: fedoralinux | patching | Converge patching
+- name: Patching | Converge patching
   ansible.builtin.include_tasks: patching/converge.yml
 
-- name: fedoralinux | patching | Cleanup patching
+- name: Patching | Cleanup patching
   ansible.builtin.include_tasks: patching/cleanup.yml
