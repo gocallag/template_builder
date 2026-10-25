@@ -1,6 +1,6 @@
-- name: (QEMU) Set Template
+- name: Buildbase | Set Template
   block:
-    - name: (QEMU) Set QEMU arguments
+    - name: Buildbase |Set QEMU arguments
       ansible.builtin.set_fact:
         qemu_args: # noqa: var-naming
           - "-name {{ imagebuilder_id_base }}"
@@ -16,16 +16,16 @@
           - "-vnc 0.0.0.0:{{ imagebuilder_port_offset }}"
 
 
-    - name: (QEMU) Set QEMU command
+    - name: Buildbase | Set QEMU command
       ansible.builtin.set_fact:
         imagebuilder_qemu_command: "{{ imagebuilder_base_qemu_command }} {{ qemu_args | join(' ') }}"
 
-    - name: (QEMU) Set QEMU command with aux ISO if needed
+    - name: Buildbase | Set QEMU command with aux ISO if needed
       ansible.builtin.set_fact:
         imagebuilder_qemu_command: "{{ imagebuilder_qemu_command }} -drive file={{ imagebuilder_path_httpdir }}/aux.iso,media=cdrom,if=ide,index=2"
       when: os.useauxiso | default(false) | bool
 
-    - name: (QEMU) Set installer launch command
+    - name: Buildbase | Set installer launch command
       ansible.builtin.set_fact:
         imagebuilder_qemu_install_launch_command: >-
           {{ imagebuilder_qemu_command }}
@@ -34,36 +34,36 @@
           -boot order=d
           -drive file={{ imagebuilder_build_iso }},media=cdrom,if=ide,index=1
 
-    - name: (QEMU) Start temporary web server
+    - name: Buildbase | Start temporary web server
       ansible.builtin.shell: |
         python3 -m http.server {{ imagebuilder_localport }} --directory {{ imagebuilder_path_httpdir }}
       async: 3600        # max runtime in seconds
       poll: 0            # run in background
       register: webserver # noqa: var-naming
       changed_when: true
-    - name: (QEMU) Build base
+    - name: Buildbase | Build base
       when:
         - not imagebuilder_restored_from_image | default(false) | bool
       block:
-        - name: (QEMU) Show QEMU command
+        - name: Buildbase | Show QEMU command
           ansible.builtin.debug:
             msg: "{{ imagebuilder_qemu_install_launch_command }}"
-        - name: (QEMU) Launch QEMU VM
+        - name: Buildbase | Launch QEMU VM
           ansible.builtin.include_tasks:
             file: qemu/launch.yml
           vars:
             imagebuilder_qemu_launch_command: "{{ imagebuilder_qemu_install_launch_command }}"
 
-        - name: "(QEMU) Wait for QEMU monitor"
+        - name: "Buildbase | Wait for QEMU monitor"
           ansible.builtin.include_tasks:
             file: qemu/wait_monitor.yml
           vars:
             imagebuilder_qemu_monitor_delay: 5
-        - name: "(QEMU) Show console boot commands"
+        - name: "Buildbase | Show console boot commands"
           ansible.builtin.debug: msg="{{ os.console_boot | map('string') | join('') }}" # noqa: no-free-form
           when:
             - os.console_boot is defined
-        - name: "(QEMU) Run sendkeys script to send commands to QEMU monitor"
+        - name: "Buildbase | Run sendkeys script to send commands to QEMU monitor"
           vars:
             sendkeys_script: "{{ imagebuilder_path_basedir }}/sendkeys.py"
             sendkeys_commands: "{{ os.console_boot }}"
@@ -82,19 +82,19 @@
           register: sendkeys_result # noqa: var-naming
           when:
             - os.console_boot is defined
-        - name: "(QEMU) Show sendkeys result"
+        - name: "Buildbase | Show sendkeys result"
           ansible.builtin.debug:
             msg: "{{ sendkeys_result }}"
           when:
             - os.console_boot is defined
 
-        - name: "(QEMU) Wait for QEMU monitor after installer input"
+        - name: "Buildbase | Wait for QEMU monitor after installer input"
           ansible.builtin.include_tasks:
             file: qemu/wait_monitor.yml
           vars:
             imagebuilder_qemu_monitor_delay: 20
 
-        - name: "(QEMU) Wait for QEMU async job to finish"
+        - name: "Buildbase | Wait for QEMU async job to finish"
           ansible.builtin.include_tasks:
             file: qemu/wait_job.yml
           vars:
@@ -102,9 +102,9 @@
             imagebuilder_qemu_job_delay: 60
             imagebuilder_qemu_delegate: "{{ run_on | default('localhost') }}"
 
-        - name: (QEMU) save base image
+        - name: "Buildbase | save base image"
           block:
-            - name: (QEMU) Wait for base image release
+            - name: "Buildbase | Wait for base image release"
               ansible.builtin.include_tasks:
                 file: qemu/wait_image_release.yml
               vars:
@@ -115,15 +115,15 @@
               ansible.builtin.command: "sync"
               changed_when: false
 
-            - name: (QEMU) convert base image with free block cleanup
+            - name: "Buildbase | convert base image with free block cleanup"
               ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp"
               changed_when: true
 
-            - name: (QEMU) finalize base image
+            - name: "Buildbase | finalize base image"
               ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
               changed_when: true
 
-            - name: (QEMU) write base artifact metadata
+            - name: "Buildbase | write base artifact metadata"
               ansible.builtin.copy:
                 dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
                 mode: '0644'
@@ -135,7 +135,7 @@
 
 
   rescue:
-    - name: "(QEMU) Show error on failure"
+    - name: "Buildbase | Show error on failure"
       ansible.builtin.debug:
         msg: >-
           (QEMU) Task '{{ ansible_failed_task }}' failed.
@@ -143,7 +143,7 @@
       tags:
         - always
   always:
-    - name: (QEMU) Cleanup temporary webserver + dangling QEMU
+    - name: "Buildbase | Cleanup temporary webserver + dangling QEMU"
       ansible.builtin.include_tasks:
         file: qemu/cleanup_process.yml
       vars:
