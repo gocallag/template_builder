@@ -21,10 +21,10 @@
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
 
-- name: Main | Validate OS plugin has required inputs
+- name: Main | Initialise the plugin for the OS
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
-    tasks_from: asserts.yml
+    tasks_from: plugin.yml
 
 - name: Main | Get the OS-specific profile
   ansible.builtin.include_role:
