@@ -22,17 +22,17 @@
             ansible_psrp_reconnection_retries: 3
             ansible_psrp_reconnection_backoff: 5
 
-      - name: (SETUP) get current user info
-        ansible.builtin.command: whoami
-        register: imagebuilder_current_user
-        changed_when: false
+    #   - name: (SETUP) get current user info
+    #     ansible.builtin.command: whoami
+    #     register: imagebuilder_current_user
+    #     changed_when: false
 
       - name: Setup | Create build directories
         ansible.builtin.file:
             path: "{{ file }}"
             state: directory
             mode: "0755"
-            owner: "{{ ansible_user | default(imagebuilder_current_user.stdout) }}"
+            owner: "{{ ansible_user_id }}"
         become: true
         loop_control:
             loop_var: file
@@ -50,7 +50,9 @@
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}"
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/checkpoints"
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/exports"
-
+            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base"
+            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/patched"
+            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/hardened"
 
       - name: (SETUP) copy qemu monitor script
         ansible.builtin.template:
