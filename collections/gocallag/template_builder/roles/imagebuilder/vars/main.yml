@@ -19,6 +19,7 @@ imagebuilder_path_downloadsdir: "{{ imagebuilder_path_basedir }}/downloads"
 imagebuilder_path_mntdir: "{{ imagebuilder_path_imagedir }}/mnt"
 imagebuilder_path_savedir: "{{ imagebuilder_path_basedir }}/images"
 imagebuilder_path_librarydir: "/library/{{ imagebuilder_id_base }}"
+imagebuilder_path_librarydirbase: "/library"
 
 imagebuilder_build_id: "{{ imagebuilder_id_base }}"
 imagebuilder_build_format: qcow2
@@ -78,8 +79,9 @@ imagebuilder_required_directories:
   - "{{ imagebuilder_path_imagedir }}"
   - "{{ imagebuilder_path_savedir }}"
   - "{{ imagebuilder_path_mntdir }}"
+  - "{{ imagebuilder_path_librarydirbase }}"
+  - "{{ imagebuilder_path_librarydirbase }}/isos"
   - "{{ imagebuilder_path_librarydir }}"
-  - "{{ imagebuilder_path_librarydir }}/isos"
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}"
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/metadata"
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/checkpoints"

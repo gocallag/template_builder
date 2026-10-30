@@ -1,111 +1,117 @@
 ---
-- name: (DOWNLOAD) Check if status file exists
-  ansible.builtin.stat:
-    path: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
-  register: imagebuilder_download_status_file
-  tags:
-    - always
+# - name: (DOWNLOAD) Check if status file exists
+#   ansible.builtin.stat:
+#     path: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
+#   register: imagebuilder_download_status_file
 
-- name: (DOWNLOAD) Load status file
-  ansible.builtin.include_vars:
-    file: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
-    name: imagebuilder_download_status
-  when: imagebuilder_download_status_file.stat.exists
-  tags:
-    - always
+# - name: (DOWNLOAD) Load status file
+#   ansible.builtin.include_vars:
+#     file: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
+#     name: imagebuilder_download_status
+#   when: imagebuilder_download_status_file.stat.exists
 
-- name: (DOWNLOAD) Check if ISO exists
+- name: Download | Check if ISO exists
   ansible.builtin.stat:
-    path: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+    path: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
   register: imagebuilder_iso_file
-  tags:
-    - always
 
-- name: (DOWNLOAD) Validate existing ISO checksum
-  ansible.builtin.shell: |
-    echo "{{ os.checksum }}  {{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}" | sha256sum -c -
-  register: imagebuilder_existing_checksum
-  changed_when: false
-  failed_when: false
-  when:
-    - imagebuilder_iso_file.stat.exists
-  tags:
-    - always
+# - name: (DOWNLOAD) Validate existing ISO checksum
+#   ansible.builtin.shell: |
+#     echo "{{ os.checksum }}  {{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}" | sha256sum -c -
+#   register: imagebuilder_existing_checksum
+#   changed_when: false
+#   failed_when: false
+#   when:
+#     - imagebuilder_iso_file.stat.exists
+#   tags:
+#     - always
 
-- name: (DOWNLOAD) Determine if download is required
+- name: Download | Determine if download is required
   ansible.builtin.set_fact:
     imagebuilder_download_required: >-
       {{
         (not imagebuilder_iso_file.stat.exists)
-        or
-        (imagebuilder_existing_checksum.rc | default(1)) != 0
       }}
-  tags:
-    - always
 
-- name: (DOWNLOAD) Download ISO
+- name: Download | Download ISO
   ansible.builtin.command:
     argv:
       - curl
       - --fail
       - --location
       - --retry
-      - "10"
+      - "1"
       - --retry-delay
-      - "5"
+      - "10"
       - --continue-at
       - "-"
       - --output
-      - "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+      - "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.part"
       - "{{ os.iso }}"
   register: imagebuilder_download_result
-  retries: 3
-  delay: 10
+  retries: 1
+  delay: 20
   until: imagebuilder_download_result.rc == 0
   when:
     - imagebuilder_download_required
-  tags:
-    - always
 
-- name: (DOWNLOAD) Verify ISO checksum
+- name: Download | Verify ISO checksum
   ansible.builtin.shell: |
-    echo "{{ os.checksum }}  {{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}" | sha256sum -c -
+    echo "{{ os.checksum }}  {{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.part" | sha256sum -c -
   register: imagebuilder_final_checksum
   changed_when: false
   failed_when: false
-  tags:
-    - always
+  when:
+    - imagebuilder_download_required
 
-- name: (DOWNLOAD) Remove corrupt ISO
+- name: Download | Remove corrupt ISO
   ansible.builtin.file:
-    path: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+    path: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.part"
     state: absent
   when:
     - imagebuilder_final_checksum.rc != 0
-  tags:
-    - always
+    - imagebuilder_download_required
 
-- name: (DOWNLOAD) Fail if checksum validation failed
+- name: Download | Fail if checksum validation failed
   ansible.builtin.fail:
     msg: >-
       SHA256 validation failed for
-      {{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.
+      {{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.
       Corrupt file removed. Re-run the build to retry.
   when:
     - imagebuilder_final_checksum.rc != 0
-  tags:
-    - always
+    - imagebuilder_download_required
 
-- name: (DOWNLOAD) Save download status
+- name: Download | Save download status
   ansible.builtin.copy:
-    dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}.status"
+    dest: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.meta.yml"
     mode: "0644"
     content: |
       downloaded: true
       url: "{{ os.iso }}"
       checksum: "{{ os.checksum }}"
-      dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+      dest: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
   when:
-    - imagebuilder_final_checksum.rc == 0
-  tags:
-    - always
+    - imagebuilder_download_required
+- name: Download | Copy ISO to downloads directory
+  ansible.builtin.copy:
+    src: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
+    dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+    remote_src: true
+    mode: "0644"
+
+- name: Download | Rename .part to final filename in library directory
+  ansible.builtin.command:
+    argv:
+      - mv
+      - "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.part"
+      - "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
+  when:
+    - imagebuilder_download_required
+
+- name: Download | Copy ISO to downloads directory
+  ansible.builtin.copy:
+    src: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
+    dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+    remote_src: true
+    mode: "0644"
