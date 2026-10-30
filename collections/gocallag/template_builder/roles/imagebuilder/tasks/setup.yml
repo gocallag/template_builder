@@ -2,10 +2,6 @@
   tags:
       - always
   block:
-      - name: Setup | Fail if prefix is unknown
-        ansible.builtin.fail:
-            msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. I don't know how to build it. Please check your ID and the documentation for supported prefixes."
-        when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
       - name: Setup | Add new system to in-memory inventory
         ansible.builtin.add_host:
             name: 'bob_build'
@@ -36,23 +32,7 @@
         become: true
         loop_control:
             loop_var: file
-        loop:
-            - "{{ imagebuilder_path_httpdir }}"
-            - "{{ imagebuilder_path_httpdir }}/aux/drivers"
-            - "{{ imagebuilder_path_httpdir }}/aux/tools"
-            - "{{ imagebuilder_path_httpdir }}/aux/patches"
-            - "{{ imagebuilder_path_downloadsdir }}"
-            - "{{ imagebuilder_path_imagedir }}"
-            - "{{ imagebuilder_path_savedir }}"
-            - "{{ imagebuilder_path_mntdir }}"
-            - "{{ imagebuilder_path_librarydir }}"
-            - "{{ imagebuilder_path_librarydir }}/isos"
-            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}"
-            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/checkpoints"
-            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/exports"
-            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base"
-            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/patched"
-            - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/hardened"
+        loop: "{{ imagebuilder_required_directories }}"
 
       - name: Setup | Copy qemu monitor script
         ansible.builtin.template:
