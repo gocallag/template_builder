@@ -93,12 +93,6 @@
       dest: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
   when:
     - imagebuilder_download_required
-- name: Download | Copy ISO to downloads directory
-  ansible.builtin.copy:
-    src: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
-    dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
-    remote_src: true
-    mode: "0644"
 
 - name: Download | Rename .part to final filename in library directory
   ansible.builtin.command:
