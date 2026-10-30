@@ -6,7 +6,7 @@
         ansible.builtin.fail:
             msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. I don't know how to build it. Please check your ID and the documentation for supported prefixes."
         when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
-      - name: (SETUP) Add new system to in-memory inventory
+      - name: Setup | Add new system to in-memory inventory
         ansible.builtin.add_host:
             name: 'bob_build'
             ansible_host: "{{ imagebuilder_localip }}"
