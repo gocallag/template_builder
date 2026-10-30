@@ -1,8 +1,8 @@
-- name: (SETUP) Initial setup and variable validation
+- name: Setup | Initial setup and variable validation
   tags:
       - always
   block:
-      - name: (SETUP) Fail if prefix is unknown
+      - name: Setup | Fail if prefix is unknown
         ansible.builtin.fail:
             msg: "Unknown prefix '{{ imagebuilder_id_prefix }}'. I don't know how to build it. Please check your ID and the documentation for supported prefixes."
         when: imagebuilder_id_prefix not in imagebuilder_prefix_port_offset_map
@@ -54,14 +54,14 @@
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/patched"
             - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/hardened"
 
-      - name: (SETUP) copy qemu monitor script
+      - name: Setup | Copy qemu monitor script
         ansible.builtin.template:
             src: "files/qemu/sendkeys.py"
             dest: "{{ imagebuilder_path_basedir }}/sendkeys.py"
             mode: '0755'
         delegate_to: "{{ run_on | default('localhost') }}"
 
-      - name: (SETUP) Cleanup temporary webserver and dangling QEMU
+      - name: Setup | Cleanup temporary webserver and dangling QEMU
         ansible.builtin.include_tasks:
             file: qemu/cleanup_process.yml
         vars:
