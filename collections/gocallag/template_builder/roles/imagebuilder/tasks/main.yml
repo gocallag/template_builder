@@ -20,7 +20,7 @@
       - imagebuilder_config.builder.qemu.host is defined
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
-
+      - imagebuilder_id_prefix in imagebuilder_prefix_port_offset_map
 - name: Main | Initialise the plugin for the OS
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
