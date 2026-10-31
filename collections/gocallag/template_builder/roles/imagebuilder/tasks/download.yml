@@ -69,8 +69,9 @@
     path: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.part"
     state: absent
   when:
-    - imagebuilder_final_checksum.rc != 0
     - imagebuilder_download_required
+    - imagebuilder_final_checksum.rc != 0
+
 
 - name: Download | Fail if checksum validation failed
   ansible.builtin.fail:
@@ -79,8 +80,8 @@
       {{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}.
       Corrupt file removed. Re-run the build to retry.
   when:
-    - imagebuilder_final_checksum.rc != 0
     - imagebuilder_download_required
+    - imagebuilder_final_checksum.rc != 0
 
 - name: Download | Save download status
   ansible.builtin.copy:
@@ -102,6 +103,17 @@
       - "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
   when:
     - imagebuilder_download_required
+  changed_when: true
+
+- name: Download | Stat library iso file
+  ansible.builtin.stat:
+    path: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
+  register: imagebuilder_iso_file
+
+- name: Download | Stat iso in build directory
+  ansible.builtin.stat:
+    path: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
+  register: imagebuilder_downloaded_iso_file
 
 - name: Download | Copy ISO to downloads directory
   ansible.builtin.copy:
@@ -109,3 +121,5 @@
     dest: "{{ imagebuilder_path_downloadsdir }}/{{ os.iso | basename }}"
     remote_src: true
     mode: "0644"
+  when:
+    - ( not imagebuilder_downloaded_iso_file.stat.exists ) or ( imagebuilder_downloaded_iso_file.stat.size != imagebuilder_iso_file.stat.size )
