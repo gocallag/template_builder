@@ -123,9 +123,16 @@
               ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
               changed_when: true
 
+            - name: Buildbase | copy image to library base directory
+              ansible.builtin.copy:
+                src: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+                dest: "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base/{{ imagebuilder_id_base }}.qcow2"
+                remote_src: true
+                mode: '0644'
+
             - name: "Buildbase | write base artifact metadata"
               ansible.builtin.copy:
-                dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
+                dest: "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base/{{ imagebuilder_id_base }}.qcow2.meta.yml"
                 mode: '0644'
                 content: |
                   profile_hash: "{{ imagebuilder_profile_hash }}"
