@@ -26,6 +26,7 @@ task_header_shown=false
 VALID_PHASES=(
     build
     clean
+	download
     base
     patch
     harden
@@ -37,7 +38,7 @@ validate_phase() {
     local phase="$1"
 
     case "${phase}" in
-        build|clean|base|patch|harden|uplift)
+        build|clean|download|base|patch|harden|uplift)
             return 0
             ;;
         *)
@@ -56,6 +57,9 @@ show_phases() {
 Available phases
 
 Lifecycle
+  download
+	Download the ISO from the remote to the library and local build cache as required
+
   base
     Install a new operating system image
 
@@ -452,7 +456,7 @@ list_jobs() {
             image="$(jq -r '.image' "${meta}")"
             phase="$(jq -r '.phase' "${meta}")"
 
-            state="$(job_status "${job_id}")"
+            state="$(job_status "${job_id}")"s
 
             echo "${job_id}|${state}|${image}|${phase}"
         done
