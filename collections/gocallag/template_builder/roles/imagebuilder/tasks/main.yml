@@ -75,6 +75,10 @@
         - name: Main | Legacy build
           when: imagebuilder_phase in ['build']
           block:
+            - name: Main | OS-specific patching
+              ansible.builtin.include_role:
+                name: "{{ os.plugin }}"
+                tasks_from: patching.yml
             - name: Main | include legacy build roles if any are defined
               ansible.builtin.include_role:
                 name: imagebuilder
