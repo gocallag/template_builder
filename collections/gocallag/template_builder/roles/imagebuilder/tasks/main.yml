@@ -38,20 +38,15 @@
   ansible.builtin.set_fact:
     imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
 
-
-
 - name: Main | Cleanup | Remove any existing build artifacts
-  when: imagebuilder_phase == 'clean'
+  when: imagebuilder_phase in ['clean']
   block:
     - name: Main | Cleanup | Remove any existing build artifacts
       ansible.builtin.include_tasks: cleanup.yml
 
-- name: Main | Build Phase
-  when: imagebuilder_phase in ['build','base']
+- name: Main | OS-specific downloads
+  when: imagebuilder_phase in ['build', 'base', 'download']
   block:
-    - name: Main | Restore Image(s) if they exist
-      ansible.builtin.include_tasks: restore.yml
-
     - name: Main | OS-specific downloads
       when: imagebuilder_plugin.download | default(false) | bool
       ansible.builtin.include_role:
@@ -61,6 +56,12 @@
     - name: Main | use inbuilt download role if OS plugin does not have a download task
       ansible.builtin.include_tasks: download.yml
       when: imagebuilder_plugin.download | default(false) | bool is not true
+
+- name: Main | Build Phase
+  when: imagebuilder_phase in ['build','base']
+  block:
+    - name: Main | Restore Image(s) if they exist
+      ansible.builtin.include_tasks: restore.yml
 
     - name: Main | Perform the defined build
       when: not imagebuilder_restored_from_custom_image | default(false)
