@@ -1,12 +1,12 @@
 ---
-- name: (QEMU) Validate launch command
+- name: Qemu | launch | Validate launch command
   ansible.builtin.assert:
     that:
       - imagebuilder_qemu_launch_command is defined
       - imagebuilder_qemu_launch_command | trim | length > 0
     fail_msg: "(QEMU) No launch command supplied"
 
-- name: (QEMU) Launch VM
+- name: Qemu | launch | Launch VM
   ansible.builtin.command: "{{ imagebuilder_qemu_launch_command }}"
   async: 99999
   poll: 0
