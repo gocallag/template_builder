@@ -449,45 +449,47 @@ show_artifact() {
     local profile_hash="$2"
     local phase="$3"
 
-    local artifact_dir="${LIBRARY_DIR}/${image}/${profile_hash}/${phase}"
+    local phase_dir="${LIBRARY_DIR}/${image}/${profile_hash}/${phase}"
 
-    if [[ ! -d "${artifact_dir}" ]]; then
-        echo "Artifact not found:"
-        echo "  ${artifact_dir}"
+    [[ -d "${phase_dir}" ]] || {
+        echo "Artifact phase not found:"
+        echo "  ${phase_dir}"
         return 1
-    fi
+    }
+
+    local generation
+
+    generation="$(
+        find "${phase_dir}" \
+            -maxdepth 1 \
+            -mindepth 1 \
+            -type d \
+            -regex '.*/[0-9][0-9][0-9][0-9]$' \
+            | sort \
+            | tail -1
+    )"
+
+    [[ -n "${generation}" ]] || {
+        echo "No generations found"
+        return 1
+    }
+
+    local metadata="${generation}/metadata.yml"
+    local artifact="${generation}/image.qcow2"
 
     echo "=================================================="
     echo "IMAGE        : ${image}"
     echo "PROFILE HASH : ${profile_hash}"
     echo "PHASE        : ${phase}"
+    echo "GENERATION   : $(basename "${generation}")"
     echo "=================================================="
+
+    [[ -f "${metadata}" ]] && cat "${metadata}"
 
     echo
 
-    if [[ -f "${artifact_dir}/metadata.yml" ]]; then
-
-        echo "Metadata"
-        echo "--------------------------------------------------"
-
-        cat "${artifact_dir}/metadata.yml"
-
-        echo
-
-    fi
-
-    if [[ -f "${artifact_dir}/image.qcow2" ]]; then
-
-        echo "Artifact"
-        echo "--------------------------------------------------"
-
-        ls -lh "${artifact_dir}/image.qcow2"
-
-        echo
-
-        qemu-img info \
-            "${artifact_dir}/image.qcow2" \
-            2>/dev/null || true
+    if [[ -f "${artifact}" ]]; then
+        qemu-img info "${artifact}"
     fi
 }
 list_jobs() {
@@ -570,34 +572,55 @@ list_artifacts() {
         echo "PROFILE : ${profile_hash}"
         echo "=================================================="
 
+        printf '%-12s %-10s %-10s %s\n' \
+            "PHASE" "GEN" "SIZE" "CREATED"
+        echo "--------------------------------------------------"
+
         for phase in base patched hardened; do
 
-            artifact="${profile}/${phase}/${image}.qcow2"
-            metadata="${profile}/${phase}/${image}.qcow2.meta.yml"
+            phase_dir="${profile}/${phase}"
 
-            if [[ -f "${artifact}" ]]; then
+            if [[ ! -d "${phase_dir}" ]]; then
+                printf '%-12s %s\n' "${phase}" "missing"
+                continue
+            fi
 
+            latest_generation="$(
+                find "${phase_dir}" \
+                    -mindepth 1 \
+                    -maxdepth 1 \
+                    -type d \
+                    | sed 's#.*/##' \
+                    | grep -E '^[0-9]{4}$' \
+                    | sort \
+                    | tail -1
+            )"
+
+            if [[ -z "${latest_generation}" ]]; then
+                printf '%-12s %s\n' "${phase}" "empty"
+                continue
+            fi
+
+            generation_dir="${phase_dir}/${latest_generation}"
+
+            artifact="${generation_dir}/image.qcow2"
+            metadata="${generation_dir}/metadata.yml"
+
+            size="-"
+            created="-"
+
+            [[ -f "${artifact}" ]] && \
                 size="$(du -h "${artifact}" | awk '{print $1}')"
 
-                created="-"
+            [[ -f "${metadata}" ]] && \
+                created="$(awk -F': ' '/^created_at:/ {gsub(/"/,"",$2); print $2}' "${metadata}")"
 
-                if [[ -f "${metadata}" ]]; then
-                    created="$(grep '^created_at:' "${metadata}" \
-                        | sed 's/^created_at:[[:space:]]*//')"
-                fi
+            printf '%-12s %-10s %-10s %s\n' \
+                "${phase}" \
+                "${latest_generation}" \
+                "${size}" \
+                "${created}"
 
-                printf '%-12s %-12s %s\n' \
-                    "${phase}" \
-                    "${size}" \
-                    "${created}"
-
-            else
-
-                printf '%-12s %s\n' \
-                    "${phase}" \
-                    "missing"
-
-            fi
         done
     done
 }
