@@ -443,6 +443,53 @@ show_job_status() {
         done < "${event_file}"
     fi
 }
+show_artifact() {
+
+    local image="$1"
+    local profile_hash="$2"
+    local phase="$3"
+
+    local artifact_dir="${LIBRARY_DIR}/${image}/${profile_hash}/${phase}"
+
+    if [[ ! -d "${artifact_dir}" ]]; then
+        echo "Artifact not found:"
+        echo "  ${artifact_dir}"
+        return 1
+    fi
+
+    echo "=================================================="
+    echo "IMAGE        : ${image}"
+    echo "PROFILE HASH : ${profile_hash}"
+    echo "PHASE        : ${phase}"
+    echo "=================================================="
+
+    echo
+
+    if [[ -f "${artifact_dir}/metadata.yml" ]]; then
+
+        echo "Metadata"
+        echo "--------------------------------------------------"
+
+        cat "${artifact_dir}/metadata.yml"
+
+        echo
+
+    fi
+
+    if [[ -f "${artifact_dir}/image.qcow2" ]]; then
+
+        echo "Artifact"
+        echo "--------------------------------------------------"
+
+        ls -lh "${artifact_dir}/image.qcow2"
+
+        echo
+
+        qemu-img info \
+            "${artifact_dir}/image.qcow2" \
+            2>/dev/null || true
+    fi
+}
 list_jobs() {
 
     (
@@ -497,6 +544,62 @@ reserve_vnc_port() {
 
     echo "No free VNC ports available in range ${VNC_PORT_START}-${VNC_PORT_END}" >&2
     return 1
+}
+list_artifacts() {
+
+    local image="$1"
+
+    local image_root="${LIBRARY_DIR}/${image}"
+
+    if [[ ! -d "${image_root}" ]]; then
+        echo "No library entry found for: ${image}"
+        return 1
+    fi
+
+    for profile in "${image_root}"/*; do
+
+        [[ -d "${profile}" ]] || continue
+		if [ "${profile: -4}" == "isos" ]; then
+		  continue
+		fi
+
+        profile_hash="$(basename "${profile}")"
+
+        echo
+        echo "=================================================="
+        echo "PROFILE : ${profile_hash}"
+        echo "=================================================="
+
+        for phase in base patched hardened; do
+
+            artifact="${profile}/${phase}/${image}.qcow2"
+            metadata="${profile}/${phase}/${image}.qcow2.meta.yml"
+
+            if [[ -f "${artifact}" ]]; then
+
+                size="$(du -h "${artifact}" | awk '{print $1}')"
+
+                created="-"
+
+                if [[ -f "${metadata}" ]]; then
+                    created="$(grep '^created_at:' "${metadata}" \
+                        | sed 's/^created_at:[[:space:]]*//')"
+                fi
+
+                printf '%-12s %-12s %s\n' \
+                    "${phase}" \
+                    "${size}" \
+                    "${created}"
+
+            else
+
+                printf '%-12s %s\n' \
+                    "${phase}" \
+                    "missing"
+
+            fi
+        done
+    done
 }
 
 release_vnc_port() {
@@ -739,6 +842,28 @@ ps)
 phases)
 
     show_phases
+
+    ;;
+artifact)
+
+    image="${2:-}"
+    profile_hash="${3:-}"
+    phase="${4:-}"
+
+    if [[ -z "${image}" ]]; then
+        echo "Missing image name"
+        exit 1
+    fi
+
+    if [[ -z "${profile_hash}" || -z "${phase}" ]]; then
+		list_artifacts ${image}
+        exit 1
+    fi
+
+    show_artifact \
+        "${image}" \
+        "${profile_hash}" \
+        "${phase}"
 
     ;;
 
