@@ -111,34 +111,45 @@
                 imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
 
             # Flush host page cache before conversion
-            - name: Sync host filesystem
-              ansible.builtin.command: "sync"
-              changed_when: false
+            # - name: Sync host filesystem
+            #   ansible.builtin.command: "sync"
+            #   changed_when: false
 
-            - name: "Buildbase | convert base image with free block cleanup"
-              ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp"
-              changed_when: true
+            # - name: "Buildbase | convert base image with free block cleanup"
+            #   ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp"
+            #   changed_when: true
 
-            - name: "Buildbase | finalize base image"
-              ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
-              changed_when: true
+            - name: Buildbase | Store artifact
+              ansible.builtin.include_tasks:
+                file: store_artifact.yml
+              vars:
 
-            - name: Buildbase | copy image to library base directory
-              ansible.builtin.copy:
-                src: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
-                dest: "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base/{{ imagebuilder_id_base }}.qcow2"
-                remote_src: true
-                mode: '0644'
+                imagebuilder_artifact_phase: base
 
-            - name: "Buildbase | write base artifact metadata"
-              ansible.builtin.copy:
-                dest: "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base/{{ imagebuilder_id_base }}.qcow2.meta.yml"
-                mode: '0644'
-                content: |
-                  profile_hash: "{{ imagebuilder_profile_hash }}"
-                  id: "{{ imagebuilder_id_base }}"
-                  created_at: "{{ ansible_date_time.iso8601 }}"
-                  phase: base
+                imagebuilder_artifact_source: >-
+                  {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2
+
+                imagebuilder_artifact_parent: null
+            # - name: "Buildbase | finalize base image"
+            #   ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+            #   changed_when: true
+
+            # - name: Buildbase | copy image to library base directory
+            #   ansible.builtin.copy:
+            #     src: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.base.{{ imagebuilder_profile_hash }}.qcow2"
+            #     dest: "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base/{{ imagebuilder_id_base }}.qcow2"
+            #     remote_src: true
+            #     mode: '0644'
+
+            # - name: "Buildbase | write base artifact metadata"
+            #   ansible.builtin.copy:
+            #     dest: "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base/{{ imagebuilder_id_base }}.qcow2.meta.yml"
+            #     mode: '0644'
+            #     content: |
+            #       profile_hash: "{{ imagebuilder_profile_hash }}"
+            #       id: "{{ imagebuilder_id_base }}"
+            #       created_at: "{{ ansible_date_time.iso8601 }}"
+                  # phase: base
 
 
   rescue:

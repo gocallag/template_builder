@@ -1,0 +1,137 @@
+---
+- name: Store Artifact | Validate inputs
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_artifact_phase is defined
+      - imagebuilder_artifact_source is defined
+
+- name: Store Artifact | Define profile root
+  ansible.builtin.set_fact:
+    imagebuilder_profile_root: >-
+      {{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}
+
+- name: Store Artifact | Define phase root
+  ansible.builtin.set_fact:
+    imagebuilder_phase_root: >-
+      {{ imagebuilder_profile_root }}/{{ imagebuilder_artifact_phase }}
+
+- name: Store Artifact | Ensure phase root exists
+  ansible.builtin.file:
+    path: "{{ imagebuilder_phase_root }}"
+    state: directory
+    mode: "0755"
+- name: Store Artifact | Discover existing generations
+  ansible.builtin.find:
+    paths: "{{ imagebuilder_phase_root }}"
+    file_type: directory
+    recurse: false
+  register: imagebuilder_existing_generations
+- name: Store Artifact | Show discovered generations
+  ansible.builtin.debug:
+    var: imagebuilder_existing_generations.files
+
+- name: Store Artifact | Calculate highest generation
+  ansible.builtin.set_fact:
+    imagebuilder_highest_generation: >-
+      {{
+        (
+          imagebuilder_existing_generations.files
+          | map(attribute='path')
+          | map('basename')
+          | select('match', '^[0-9]{4}$')
+          | map('int')
+          | list
+        )
+      }}
+
+- name: Store Artifact | Calculate next generation
+  ansible.builtin.set_fact:
+    imagebuilder_artifact_generation: >-
+      {{
+        '%04d' | format(
+          (
+            (imagebuilder_highest_generation | max)
+            if (imagebuilder_highest_generation | length > 0)
+            else 0
+          ) + 1
+        )
+      }}
+- name: Store Artifact | Define generation root
+  ansible.builtin.set_fact:
+    imagebuilder_generation_root: >-
+      {{ imagebuilder_phase_root }}/{{ imagebuilder_artifact_generation }}
+- name: Store Artifact | Create generation directory
+  ansible.builtin.file:
+    path: "{{ imagebuilder_generation_root }}"
+    state: directory
+- name: Store Artifact | Convert qcow2
+  ansible.builtin.command:
+    argv:
+      - qemu-img
+      - convert
+      - -f
+      - qcow2
+      - -O
+      - qcow2
+      - "{{ imagebuilder_artifact_source }}"
+      - "{{ imagebuilder_generation_root }}/image.qcow2.tmp"
+  changed_when: true
+- name: Store Artifact | Finalise image
+  ansible.builtin.command:
+    argv:
+      - mv
+      - "{{ imagebuilder_generation_root }}/image.qcow2.tmp"
+      - "{{ imagebuilder_generation_root }}/image.qcow2"
+  changed_when: true
+- name: Store Artifact | Write metadata
+  ansible.builtin.copy:
+    dest: "{{ imagebuilder_generation_root }}/metadata.yml"
+    mode: "0644"
+    content: |
+      artifact_version: 1
+      profile_hash: "{{ imagebuilder_profile_hash }}"
+      id: "{{ imagebuilder_id_base }}"
+      phase: "{{ imagebuilder_artifact_phase }}"
+      generation: "{{ imagebuilder_artifact_generation }}"
+      created_at: "{{ ansible_date_time.iso8601 }}"
+      parent:
+      {% if imagebuilder_artifact_parent is defined %}
+        {{ imagebuilder_artifact_parent | to_nice_yaml(indent=2) | indent(2) }}
+      {% else %}
+        null
+      {% endif %}
+- name: Store Artifact | Load profile metadata
+  ansible.builtin.stat:
+    path: "{{ imagebuilder_profile_root }}/metadata.yml"
+  register: imagebuilder_profile_metadata_stat
+
+- name: Store Artifact | Update profile metadata
+  ansible.builtin.copy:
+    dest: "{{ imagebuilder_profile_root }}/metadata.yml"
+    mode: "0644"
+    content: |
+      profile_hash: "{{ imagebuilder_profile_hash }}"
+
+      image_id: "{{ imagebuilder_id_base }}"
+
+      latest:
+
+        {{ imagebuilder_artifact_phase }}:
+          generation: "{{ imagebuilder_artifact_generation }}"
+          created_at: "{{ ansible_date_time.iso8601 }}"
+- name: Store Artifact | Return artifact
+  ansible.builtin.set_fact:
+
+    imagebuilder_current_artifact:
+
+      profile_hash: "{{ imagebuilder_profile_hash }}"
+
+      phase: "{{ imagebuilder_artifact_phase }}"
+
+      generation: "{{ imagebuilder_artifact_generation }}"
+
+      path: >-
+        {{ imagebuilder_generation_root }}/image.qcow2
+
+      metadata_path: >-
+        {{ imagebuilder_generation_root }}/metadata.yml
