@@ -1,0 +1,49 @@
+    # Ubuntu-Specific Preparation
+
+  - name: Patching | prepare | Check if sources.list exists
+    stat:
+      path: /etc/apt/sources.list
+    register: sources_stat
+    become: true
+    delegate_to: bob_build
+
+  - name: Patching | prepare | Read sources.list
+    slurp:
+      path: /etc/apt/sources.list
+    register: sources_slurp
+    when: sources_stat.stat.exists
+    become: true
+    delegate_to: bob_build
+
+  - name: Patching | prepare | Remove old sources.list if it contains file:///cdrom
+    file:
+      path: /etc/apt/sources.list
+      state: absent
+    when:
+      - sources_stat.stat.exists
+      - sources_slurp.content | b64decode is search("file:///cdrom")
+    become: true
+    delegate_to: bob_build
+
+  - name: Patching | prepare | Check if ubuntu.sources already exists
+    stat:
+      path: /etc/apt/sources.list.d/ubuntu.sources
+    register: ubuntu_sources_stat
+    become: true
+    delegate_to: bob_build
+
+  - name: Patching | prepare | Read ubuntu.sources if it exists
+    slurp:
+      path: /etc/apt/sources.list.d/ubuntu.sources
+    register: ubuntu_sources_slurp
+    when: ubuntu_sources_stat.stat.exists
+    become: true
+    delegate_to: bob_build
+
+  - name: Patching | prepare | Install ubuntu.sources template only if missing or if it contains file:///cdrom
+    template:
+      src: ubuntu.source.j2
+      dest: /etc/apt/sources.list.d/ubuntu.sources
+    when: not ubuntu_sources_stat.stat.exists or (ubuntu_sources_slurp.content | b64decode is search("file:///cdrom"))
+    become: true
+    delegate_to: bob_build

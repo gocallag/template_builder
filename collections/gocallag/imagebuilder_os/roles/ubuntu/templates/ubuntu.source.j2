@@ -1,0 +1,12 @@
+Types: deb
+URIs: http://archive.ubuntu.com/ubuntu
+Suites:
+  {{ ansible_distribution_release }}
+  {{ ansible_distribution_release }}-updates
+  {{ ansible_distribution_release }}-security
+  {{ ansible_distribution_release }}-backports
+Components:
+  main
+  restricted
+  universe
+  multiverse
