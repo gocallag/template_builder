@@ -1,0 +1,25 @@
+---
+- name: Resolve Artifact | Define candidate phases
+  ansible.builtin.set_fact:
+    imagebuilder_candidate_phases: >-
+      {{
+        imagebuilder_restore_precedence[imagebuilder_phase]
+      }}
+
+- name: Resolve Artifact | Initialise resolution result
+  ansible.builtin.set_fact:
+    imagebuilder_resolved_artifact:
+      exists: false
+
+- name: Resolve Artifact | Evaluate candidate phases
+  ansible.builtin.include_tasks:
+    file: resolve_artifact_candidate.yml
+  loop: "{{ imagebuilder_candidate_phases }}"
+  loop_control:
+    loop_var: imagebuilder_candidate_phase
+  when:
+    - not imagebuilder_resolved_artifact.exists | default(false)
+
+- name: Resolve Artifact | Show selected artifact
+  ansible.builtin.debug:
+    var: imagebuilder_resolved_artifact

@@ -1,0 +1,26 @@
+---
+- name: Restore Artifact | Validate artifact
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_restore_artifact is defined
+
+- name: Restore Artifact | Restore image
+  ansible.builtin.command:
+    argv:
+      - cp
+      - "{{ imagebuilder_restore_artifact.path }}"
+      - "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
+  register: imagebuilder_qemu_disk_restore
+
+- name: Restore Artifact | Return state
+  ansible.builtin.set_fact:
+    imagebuilder_restored_from_image: true
+
+    imagebuilder_current_artifact: >-
+      {{ imagebuilder_restore_artifact }}
+
+    imagebuilder_banner_message: >-
+      Restored
+      {{ imagebuilder_restore_artifact.phase }}
+      generation
+      {{ imagebuilder_restore_artifact.generation }}

@@ -89,3 +89,34 @@ imagebuilder_required_directories:
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/base"
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/patched"
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/hardened"
+
+imagebuilder_restore_precedence:
+
+  build:
+    - hardened
+    - patched
+    - base
+
+  base:
+    - base
+
+  patch:
+    - patched
+    - base
+
+  harden:
+    - hardened
+    - patched
+    - base
+
+  uplift:
+    - uplift
+    - hardened
+    - patched
+    - base
+
+  publish:
+    - uplift
+    - hardened
+    - patched
+    - base
