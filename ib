@@ -443,54 +443,37 @@ show_job_status() {
         done < "${event_file}"
     fi
 }
-show_artifact() {
+show_generation() {
 
     local image="$1"
     local profile_hash="$2"
     local phase="$3"
+    local generation="$4"
 
-    local phase_dir="${LIBRARY_DIR}/${image}/${profile_hash}/${phase}"
+    local generation_dir="${LIBRARY_DIR}/${image}/${profile_hash}/${phase}/${generation}"
 
-    [[ -d "${phase_dir}" ]] || {
-        echo "Artifact phase not found:"
-        echo "  ${phase_dir}"
+    [[ -d "${generation_dir}" ]] || {
+        echo "Generation not found:"
+        echo "  ${generation_dir}"
         return 1
     }
 
-    local generation
-
-    generation="$(
-        find "${phase_dir}" \
-            -maxdepth 1 \
-            -mindepth 1 \
-            -type d \
-            -regex '.*/[0-9][0-9][0-9][0-9]$' \
-            | sort \
-            | tail -1
-    )"
-
-    [[ -n "${generation}" ]] || {
-        echo "No generations found"
-        return 1
-    }
-
-    local metadata="${generation}/metadata.yml"
-    local artifact="${generation}/image.qcow2"
+    local metadata="${generation_dir}/metadata.yml"
+    local artifact="${generation_dir}/image.qcow2"
 
     echo "=================================================="
     echo "IMAGE        : ${image}"
     echo "PROFILE HASH : ${profile_hash}"
     echo "PHASE        : ${phase}"
-    echo "GENERATION   : $(basename "${generation}")"
+    echo "GENERATION   : ${generation}"
     echo "=================================================="
+    echo
 
     [[ -f "${metadata}" ]] && cat "${metadata}"
 
     echo
 
-    if [[ -f "${artifact}" ]]; then
-        qemu-img info "${artifact}"
-    fi
+    
 }
 list_jobs() {
 
@@ -622,6 +605,47 @@ list_artifacts() {
                 "${created}"
 
         done
+    done
+}
+show_phase() {
+
+    local image="$1"
+    local profile_hash="$2"
+    local phase="$3"
+
+    local phase_dir="${LIBRARY_DIR}/${image}/${profile_hash}/${phase}"
+
+    [[ -d "${phase_dir}" ]] || {
+        echo "Phase not found: ${phase}"
+        return 1
+    }
+
+    printf '%-12s %-24s\n' "GENERATION" "CREATED"
+    echo "------------------------------------------------"
+
+    for generation_dir in \
+        $(find "${phase_dir}" \
+            -mindepth 1 \
+            -maxdepth 1 \
+            -type d \
+            | sort)
+    do
+
+        generation="$(basename "${generation_dir}")"
+
+        [[ "${generation}" =~ ^[0-9]{4}$ ]] || continue
+
+        metadata="${generation_dir}/metadata.yml"
+
+        created="-"
+
+        [[ -f "${metadata}" ]] && \
+            created="$(awk -F': ' '/^created_at:/ {gsub(/"/,"",$2); print $2}' "${metadata}")"
+
+        printf '%-12s %-24s\n' \
+            "${generation}" \
+            "${created}"
+
     done
 }
 
@@ -872,21 +896,39 @@ artifact)
     image="${2:-}"
     profile_hash="${3:-}"
     phase="${4:-}"
+    generation="${5:-}"
 
     if [[ -z "${image}" ]]; then
         echo "Missing image name"
         exit 1
     fi
 
-    if [[ -z "${profile_hash}" || -z "${phase}" ]]; then
-		list_artifacts ${image}
-        exit 1
-    fi
+	if [[ -z "${profile_hash}" ]]; then
+		list_artifacts "${image}"
+		exit 0
+	fi
 
-    show_artifact \
-        "${image}" \
-        "${profile_hash}" \
-        "${phase}"
+	if [[ -z "${phase}" ]]; then
+		echo "Specify a phase:"
+		echo "  base"
+		echo "  patched"
+		echo "  hardened"
+		exit 0
+	fi
+
+	if [[ -z "${generation}" ]]; then
+		show_phase \
+			"${image}" \
+			"${profile_hash}" \
+			"${phase}"
+		exit 0
+	fi
+
+	show_generation \
+		"${image}" \
+		"${profile_hash}" \
+		"${phase}" \
+		"${generation}"
 
     ;;
 
