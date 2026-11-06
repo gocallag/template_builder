@@ -17,6 +17,7 @@
             ansible_psrp_read_timeout: 1800
             ansible_psrp_reconnection_retries: 3
             ansible_psrp_reconnection_backoff: 5
+            ansible_python_interpreter: "{{ build.ansible_python_interpreter | default('/usr/bin/python3') }}"
 
     #   - name: (SETUP) get current user info
     #     ansible.builtin.command: whoami
