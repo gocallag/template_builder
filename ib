@@ -701,7 +701,7 @@ run_phase() {
 	container_id="$(
 		container_run_detached \
 			"${RESERVED_VNC_PORT}" \
-			ansible-playbook \
+			ansible-playbook -vvv \
 			"${verbosity}" \
 			-e "imagebuilder_phase=${phase}" \
 			-e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
