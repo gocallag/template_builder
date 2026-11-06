@@ -1,0 +1,71 @@
+---
+- name: Patch | Validate restore state
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_current_artifact is defined
+      - imagebuilder_current_artifact.exists | default(false)
+    fail_msg: >-
+      Patch phase requires a restored artifact.
+
+- name: Patch | Show restore source
+  ansible.builtin.debug:
+    msg:
+      phase: "{{ imagebuilder_current_artifact.phase }}"
+      generation: "{{ imagebuilder_current_artifact.generation }}"
+- name: "Patch | Power on QEMU VM (patching)"
+  ansible.builtin.include_tasks:
+    file: qemu/launch.yml
+  vars:
+    imagebuilder_qemu_launch_command: >-
+      {{ imagebuilder_qemu_command }}
+      -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off
+      -mon chardev=mon0
+      -boot order=c
+      -drive file="{{ imagebuilder_build_iso }}",media=cdrom,index=1
+- name: "Patch | Wait for QEMU monitor"
+  ansible.builtin.include_tasks:
+    file: qemu/wait_monitor.yml
+- name: "Patch | Wait for QEMU VM to be accessible"
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_localip }}"
+    port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
+    delay: 10
+    timeout: 900
+# - name: "Patch | Wait for SSH/PSRP to be ready on QEMU VM"
+#   ansible.builtin.include_tasks: waitfor.yml
+#   vars:
+#     wait_host_ip: "{{ imagebuilder_config.builder.qemu.host }}"
+#     wait_port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
+#     wait_proto: "{{ (os_type | lower == 'windows') | ternary('psrp', 'ssh') }}"
+#     ponder: true
+- name: Patch | Wait for connection
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 10
+    timeout: 1200
+  delegate_to: bob_build
+
+- name: Patch | Apply operating system updates
+  ansible.builtin.include_role:
+    name: "{{ os.plugin }}"
+    tasks_from: patching.yml
+
+- name: Patch | Wait for image release
+  ansible.builtin.include_tasks:
+    file: qemu/wait_image_release.yml
+  vars:
+    imagebuilder_qemu_image_path: >-
+      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2
+
+- name: Patch | Store patched artifact
+  ansible.builtin.include_tasks:
+    file: store_artifact.yml
+  vars:
+    imagebuilder_artifact_phase: patched
+
+    imagebuilder_artifact_source: >-
+      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2
+
+    imagebuilder_artifact_parent:
+      phase: "{{ imagebuilder_current_artifact.phase }}"
+      generation: "{{ imagebuilder_current_artifact.generation }}"

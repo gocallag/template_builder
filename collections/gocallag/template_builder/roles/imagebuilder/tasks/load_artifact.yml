@@ -45,10 +45,17 @@
 - name: Load Artifact | Decode metadata
   ansible.builtin.set_fact:
     imagebuilder_loaded_artifact:
+
+      exists: true
+
       phase: "{{ imagebuilder_artifact_phase }}"
+
       generation: "{{ imagebuilder_artifact_generation }}"
+
       path: "{{ imagebuilder_artifact_generation_root }}/image.qcow2"
+
       metadata_path: "{{ imagebuilder_artifact_generation_root }}/metadata.yml"
+
       metadata: >-
         {{
           imagebuilder_artifact_metadata_raw.content
