@@ -90,8 +90,7 @@
     argv:
       - qemu-img
       - convert
-      - -S
-      - "0"
+      - -c
       - -O
       - qcow2
       - "{{ imagebuilder_target_artifact.path }}"
