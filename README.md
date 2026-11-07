@@ -33,7 +33,7 @@ playbook is selected by appending `.yml` to the image argument.
 
 ```text
 ib build <image> [--follow] [--verbose]
-ib phase <phase> <image> [--follow]
+ib phase <phase> <image> [--follow] [--patch-from base|latest]
 ib validate <image>
 ib inspect <image>
 
@@ -55,9 +55,9 @@ Examples:
 ./ib build samples/win2022 --follow
 
 # Run an individual phase
-./ib phase cleanup samples/alma-8
-./ib phase uplift samples/alma-8
+./ib phase base samples/alma-8
 ./ib phase patch samples/alma-8 --follow
+./ib phase patch samples/alma-8 --patch-from base
 
 # Check and follow a detached job
 ./ib ps
@@ -78,6 +78,17 @@ remove the job's container and both files.
 
 `ib validate <image>` runs an Ansible syntax check for the image playbook.
 `ib inspect <image>` prints the playbook path.
+
+`ib phase base` creates a new immutable base artifact. `ib phase patch` creates
+a new patched generation from the latest patched artifact by default; use
+`--patch-from base` to start from the latest base artifact instead. Each patched
+generation records its parent artifact.
+
+`ib build` is the end-to-end flow: it uses the latest patched artifact, or
+creates a base and patches it if only a base (or no artifact) is available,
+then runs the configured target plugins. Targets perform their own platform
+uplift, generic hardening, template cleanup, and publication. Target processing
+uses a working copy and does not modify the source artifact in the library.
 
 ## Configuration
 
