@@ -1,218 +1,68 @@
 ---
-- name: Main | Validate variables
-  ansible.builtin.include_tasks: assert.yml
-
-- name: Main | Resolve configuration
+- name: Proxmox | Initialise target lifecycle state
   ansible.builtin.set_fact:
-    imagebuilder_proxmox:
-      server: "{{ imagebuilder_config.targets.proxmox.server }}"
-      username: "{{ imagebuilder_config.targets.proxmox.username }}"
-      password: "{{ imagebuilder_config.targets.proxmox.password }}"
-      storage: "{{ imagebuilder_config.targets.proxmox.storage }}"
-      node: "{{ imagebuilder_config.targets.proxmox.node }}"
-  no_log: true
+    imagebuilder_target_pipeline_complete: false
+    imagebuilder_target_runtime_stopped: false
 
-- name: Main | Define working image
-  ansible.builtin.set_fact:
-    imagebuilder_proxmox_working_image: >-
-      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_artifact.id }}.proxmox.qcow2
-
-- name: Main | Create target working image
-  ansible.builtin.copy:
-    src: "{{ imagebuilder_artifact.path }}"
-    dest: "{{ imagebuilder_proxmox_working_image }}"
-    remote_src: true
-    mode: "0600"
-
-- name: Main | Define working artifact
-  ansible.builtin.set_fact:
-    imagebuilder_target_artifact:
-      target: proxmox
-      source: "{{ imagebuilder_artifact.path }}"
-      path: "{{ imagebuilder_proxmox_working_image }}"
-      format: qcow2
-- name: Main | Create target working image
-  ansible.builtin.copy:
-    src: "{{ imagebuilder_artifact.path }}"
-    dest: "{{ imagebuilder_proxmox_working_image }}"
-    remote_src: true
-    mode: "0600"
-
-- name: Main | Define working artifact
-  ansible.builtin.set_fact:
-    imagebuilder_target_artifact:
-      target: proxmox
-      source: "{{ imagebuilder_artifact.path }}"
-      path: "{{ imagebuilder_proxmox_working_image }}"
-      format: qcow2
-
-- name: Main | Request OS-specific uplift
-  ansible.builtin.include_role:
-    name: "{{ os.plugin }}"
-    tasks_from: target_uplift.yml
-  vars:
-    imagebuilder_uplift_artifact:
-      path: "{{ imagebuilder_target_artifact.path }}"
-      format: "{{ imagebuilder_target_artifact.format }}"
-
-    imagebuilder_target_features:
-      - qemu_guest_agent
-
-- name: Main | Define converted artifact
-  ansible.builtin.set_fact:
-    imagebuilder_proxmox_output: >-
-      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_artifact.id }}.proxmox-final.qcow2
-
-
-- name: Main | Convert artifact
-  ansible.builtin.command:
-    argv:
-      - cp
-      - "{{ imagebuilder_target_artifact.path }}"
-      - "{{ imagebuilder_proxmox_output }}"
-  changed_when: true
-
-- name: Main | Update target artifact
-  ansible.builtin.set_fact:
-    imagebuilder_target_artifact:
-      target: proxmox
-      source: "{{ imagebuilder_artifact.path }}"
-      path: "{{ imagebuilder_proxmox_output }}"
-      format: qcow2
-
-- name: Main | Publish
+- name: Proxmox | Execute target pipeline
   block:
+    - name: Proxmox | Prepare, uplift, harden, clean, and publish
+      ansible.builtin.include_tasks: pipeline.yml
 
-    - name: Main | Register Proxmox SSH host
-      ansible.builtin.add_host:
-        name: imagebuilder_proxmox_server
-        ansible_host: "{{ imagebuilder_proxmox.server }}"
-        ansible_port: 22
-        ansible_user: "{{ imagebuilder_proxmox.username }}"
-        ansible_password: "{{ imagebuilder_proxmox.password }}"
-        ansible_connection: ssh
-
-    - name: Main | Define remote paths
+    - name: Proxmox | Mark target pipeline complete
       ansible.builtin.set_fact:
-        imagebuilder_proxmox_remote_dir: >-
-          /mnt/pve/{{ imagebuilder_proxmox.storage }}/import
+        imagebuilder_target_pipeline_complete: true
 
-        imagebuilder_proxmox_remote_image: >-
-          /mnt/pve/{{ imagebuilder_proxmox.storage }}/import/{{ imagebuilder_artifact.id }}.qcow2
+  rescue:
+    - name: Proxmox | Report target pipeline failure
+      ansible.builtin.debug:
+        msg: >-
+          Proxmox target failed at '{{ ansible_failed_task.name }}':
+          {{ ansible_failed_result.msg | default('no additional message') }}
 
-        imagebuilder_proxmox_import_source: >-
-          {{ imagebuilder_proxmox.storage }}:import/{{ imagebuilder_artifact.id }}.qcow2
-
-    - name: Main | Create staging directory
-      ansible.builtin.file:
-        path: "{{ imagebuilder_proxmox_remote_dir }}"
-        state: directory
-        mode: "0755"
-      delegate_to: imagebuilder_proxmox_server
-      become: true
-
-    - name: Main | Copy artifact
-      ansible.builtin.command:
-        argv:
-          - sshpass
-          - -p
-          - "{{ imagebuilder_proxmox.password }}"
-          - scp
-          - -q
-          - -o
-          - StrictHostKeyChecking=no
-          - -o
-          - UserKnownHostsFile=/dev/null
-          - "{{ imagebuilder_target_artifact.path }}"
-          - "{{ imagebuilder_proxmox.username }}@{{ imagebuilder_proxmox.server }}:{{ imagebuilder_proxmox_remote_image }}"
-      no_log: true
-      changed_when: true
-
-    - name: Main | Remove previous template
-      community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_proxmox.username }}@pam"
-        api_password: "{{ imagebuilder_proxmox.password }}"
-        api_host: "{{ imagebuilder_proxmox.server }}"
-        node: "{{ imagebuilder_proxmox.node }}"
-        name: "{{ imagebuilder_proxmox_vm_name }}"
-        state: absent
-      delegate_to: localhost
-      failed_when: false
-
-    - name: Main | Create VM
-      community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_proxmox.username }}@pam"
-        api_password: "{{ imagebuilder_proxmox.password }}"
-        api_host: "{{ imagebuilder_proxmox.server }}"
-        node: "{{ imagebuilder_proxmox.node }}"
-        name: "{{ imagebuilder_proxmox_vm_name }}"
-        cores: "{{ imagebuilder_proxmox_cores }}"
-        vcpus: "{{ imagebuilder_proxmox_cores }}"
-        cpu: "{{ imagebuilder_proxmox_cpu }}"
-        memory: "{{ imagebuilder_config.builder.qemu.memory }}"
-        agent: true
-        net:
-          net0: "virtio,bridge={{ imagebuilder_proxmox_bridge }}"
-        description: |
-          Imagebuilder template
-          Build ID: {{ imagebuilder_artifact.id }}
-      delegate_to: localhost
-      register: imagebuilder_proxmox_vm
-
-    - name: Main | Import disk
-      community.proxmox.proxmox_disk:
-        api_user: "{{ imagebuilder_proxmox.username }}@pam"
-        api_password: "{{ imagebuilder_proxmox.password }}"
-        api_host: "{{ imagebuilder_proxmox.server }}"
-        vmid: "{{ imagebuilder_proxmox_vm.vmid }}"
-        disk: virtio0
-        storage: "{{ imagebuilder_proxmox.storage }}"
-        import_from: "{{ imagebuilder_proxmox_import_source }}"
-        timeout: 3600
-        state: present
-      delegate_to: localhost
-
-
-    - name: Main | Configure boot disk
-      community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_proxmox.username }}@pam"
-        api_password: "{{ imagebuilder_proxmox.password }}"
-        api_host: "{{ imagebuilder_proxmox.server }}"
-        node: "{{ imagebuilder_proxmox.node }}"
-        name: "{{ imagebuilder_proxmox_vm_name }}"
-        boot: order=virtio0
-        update: true
-      delegate_to: localhost
-
-    - name: Main | Convert VM to template
-      community.proxmox.proxmox_kvm:
-        api_user: "{{ imagebuilder_proxmox.username }}@pam"
-        api_password: "{{ imagebuilder_proxmox.password }}"
-        api_host: "{{ imagebuilder_proxmox.server }}"
-        node: "{{ imagebuilder_proxmox.node }}"
-        name: "{{ imagebuilder_proxmox_vm_name }}"
-        state: template
-        update: true
-      delegate_to: localhost
-
+    - name: Proxmox | Re-raise target pipeline failure
+      ansible.builtin.fail:
+        msg: "Proxmox target failed at '{{ ansible_failed_task.name }}'."
 
   always:
+    - name: Proxmox | Recover QEMU job state for cleanup
+      ansible.builtin.set_fact:
+        imagebuilder_cap_qemu_job: "{{ imagebuilder_qemu_job }}"
+      when:
+        - not imagebuilder_target_pipeline_complete
+        - imagebuilder_cap_qemu_job is not defined
+        - imagebuilder_qemu_job is defined
 
-    - name: Main | Remove remote staging directory
+    - name: Proxmox | Stop guest after target failure
+      ansible.builtin.include_role:
+        name: gocallag.template_builder.imagebuilder
+        tasks_from: capabilities/qemu_shutdown
+      vars:
+        imagebuilder_capability_artifact:
+          path: "{{ imagebuilder_target_artifact.path }}"
+      when:
+        - not imagebuilder_target_pipeline_complete
+        - not imagebuilder_target_runtime_stopped
+        - imagebuilder_cap_qemu_job is defined
+        - imagebuilder_target_artifact.path is defined
+
+    - name: Proxmox | Remove remote import file
       ansible.builtin.file:
-        path: "{{ imagebuilder_proxmox_remote_dir }}"
+        path: "{{ imagebuilder_proxmox_remote_image }}"
         state: absent
       delegate_to: imagebuilder_proxmox_server
       become: true
       when:
-        - imagebuilder_proxmox_remote_dir is defined
+        - imagebuilder_proxmox_remote_image is defined
 
-    - name: Main | Remove target working image
+    - name: Proxmox | Remove local target working image
       ansible.builtin.file:
         path: "{{ imagebuilder_proxmox_working_image }}"
         state: absent
+      when:
+        - imagebuilder_proxmox_working_image is defined
 
-    - name: Main | Remove final converted image
+    - name: Proxmox | Remove local converted image
       ansible.builtin.file:
         path: "{{ imagebuilder_proxmox_output }}"
         state: absent
