@@ -29,8 +29,6 @@ VALID_PHASES=(
 	download
     base
     patch
-    harden
-    uplift
 )
 
 validate_phase() {
@@ -38,7 +36,7 @@ validate_phase() {
     local phase="$1"
 
     case "${phase}" in
-        build|clean|download|base|patch|harden|uplift)
+        build|clean|download|base|patch)
             return 0
             ;;
         *)
@@ -65,12 +63,6 @@ Lifecycle
 
   patch
     Apply operating system updates
-
-  harden
-    Apply security baselines and compliance policies
-
-  uplift
-    Apply target specific preparation and cleanup
 
 Operational
   build
@@ -170,7 +162,7 @@ USAGE
 
   ib build <image> [--follow] [--verbose]
 
-  ib phase <phase> <image> [--follow]
+  ib phase <phase> <image> [--follow] [--patch-from base|latest]
 
   ib validate <image>
   ib inspect <image>
@@ -195,9 +187,9 @@ IMAGE OPERATIONS
 
   Run a specific phase
 
-      ib phase cleanup samples/alma-8
-      ib phase uplift  samples/alma-8
-      ib phase patch   samples/alma-8
+      ib phase base  samples/alma-8
+      ib phase patch samples/alma-8
+      ib phase patch samples/alma-8 --patch-from base
 
   Run a phase and follow progress
 
@@ -542,11 +534,10 @@ list_artifacts() {
     fi
 
     for profile in "${image_root}"/*; do
-
-        [[ -d "${profile}" ]] || continue
-		if [ "${profile: -4}" == "isos" ]; then
-		  continue
-		fi
+        # [[ -d "${profile}" ]] || continue
+		# if [ "${profile: -4}" == "isos" ]; then
+		#   continue
+		# fi
 
         profile_hash="$(basename "${profile}")"
 
@@ -559,7 +550,7 @@ list_artifacts() {
             "PHASE" "GEN" "SIZE" "CREATED"
         echo "--------------------------------------------------"
 
-        for phase in base patched hardened; do
+        for phase in base patched ; do
 
             phase_dir="${profile}/${phase}"
 
@@ -681,6 +672,12 @@ run_phase() {
     local image="$2"
     local verbosity="$3"
     local follow="${4:-false}"
+    local patch_from="${5:-}"
+    local -a phase_args=()
+
+    if [[ -n "${patch_from}" ]]; then
+        phase_args=(-e "imagebuilder_patch_from=${patch_from}")
+    fi
 
     reserve_vnc_port
 
@@ -705,6 +702,7 @@ run_phase() {
 			"${verbosity}" \
 			-e "imagebuilder_phase=${phase}" \
 			-e "imagebuilder_env_qemu_vnc_port=${RESERVED_VNC_PORT}" \
+			"${phase_args[@]}" \
 			"${image}.yml"
 	)"
 	echo "Container : ${container_id}"
@@ -802,16 +800,49 @@ phase)
     shift 3
 
     follow=false
+    patch_from=""
 
-    for arg in "$@"; do
+    while (($#)); do
+        arg="$1"
         case "$arg" in
             --follow)
                 follow=true
+                shift
+                ;;
+            --patch-from)
+                patch_from="${2:-}"
+                if [[ -z "${patch_from}" ]]; then
+                    echo "Missing value for --patch-from (base|latest)"
+                    exit 1
+                fi
+                shift 2
+                ;;
+            --patch-from=*)
+                patch_from="${arg#--patch-from=}"
+                if [[ -z "${patch_from}" ]]; then
+                    echo "Missing value for --patch-from (base|latest)"
+                    exit 1
+                fi
+                shift
+                ;;
+            *)
+                echo "Unknown phase option: ${arg}"
+                exit 1
                 ;;
         esac
     done
 
-    run_phase "${phase}" "${image}" "-v" "${follow}"
+    if [[ "${phase}" == "patch" && -n "${patch_from}" && ! "${patch_from}" =~ ^(base|latest)$ ]]; then
+        echo "--patch-from must be 'base' or 'latest'"
+        exit 1
+    fi
+
+    if [[ "${phase}" != "patch" && -n "${patch_from}" ]]; then
+        echo "--patch-from is only valid for the patch phase"
+        exit 1
+    fi
+
+    run_phase "${phase}" "${image}" "-v" "${follow}" "${patch_from}"
 
     ;;
 
@@ -912,7 +943,6 @@ artifact)
 		echo "Specify a phase:"
 		echo "  base"
 		echo "  patched"
-		echo "  hardened"
 		exit 0
 	fi
 
