@@ -160,6 +160,9 @@
           {{ ansible_failed_result.msg | default('no additional message') }}
       tags:
         - always
+    - name: "Buildbase | Fail after diagnostics"
+      ansible.builtin.fail:
+        msg: "Base image creation failed at task '{{ ansible_failed_task.name }}'."
   always:
     - name: "Buildbase | Cleanup temporary webserver + dangling QEMU"
       ansible.builtin.include_tasks:
