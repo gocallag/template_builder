@@ -4,9 +4,12 @@
     file: load_artifact.yml
   vars:
     imagebuilder_artifact_phase: "{{ imagebuilder_candidate_phase }}"
+  when:
+    - not imagebuilder_resolved_artifact.exists | default(false)
 
 - name: Resolve Artifact | Accept candidate
   ansible.builtin.set_fact:
     imagebuilder_resolved_artifact: "{{ imagebuilder_loaded_artifact }}"
   when:
     - imagebuilder_loaded_artifact.exists | default(false)
+    - not imagebuilder_resolved_artifact.exists | default(false)

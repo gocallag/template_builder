@@ -4,6 +4,7 @@
     that:
       - imagebuilder_current_artifact is defined
       - imagebuilder_current_artifact.exists | default(false)
+      - imagebuilder_current_artifact.phase in ['base', 'patched']
     fail_msg: >-
       Patch phase requires a restored artifact.
 

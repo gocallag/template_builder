@@ -11,6 +11,7 @@
 - name: Main | Assert core build variables
   ansible.builtin.assert:
     that:
+      - imagebuilder_phase in ['build', 'base', 'patch', 'download', 'clean']
       - os is defined
       - os.plugin is defined
       - os.iso is defined
@@ -34,10 +35,6 @@
 - name: Main | Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml
 
-- name: Main | add default build steps if none are defined defined by the build task
-  ansible.builtin.set_fact:
-    imagebuilder_build: "{{ build | default(imagebuilder_build_default) }}"
-
 - name: Main | Cleanup | Remove any existing build artifacts
   when: imagebuilder_phase in ['clean']
   block:
@@ -57,90 +54,51 @@
       ansible.builtin.include_tasks: download.yml
       when: imagebuilder_plugin.download | default(false) | bool is not true
 
+    - name: Main | Validate patch source selection
+      ansible.builtin.assert:
+        that:
+          - imagebuilder_patch_from in ['latest', 'base']
+        fail_msg: "imagebuilder_patch_from must be 'latest' or 'base'"
+      when: imagebuilder_phase == 'patch'
 
-    - name: Main | Resolve restore candidate based on the current phase
+    - name: Main | Resolve patch source
       ansible.builtin.include_tasks:
         file: resolve_artifact.yml
+      when: imagebuilder_phase == 'patch'
+
+    - name: Main | Require a patch source artifact
+      ansible.builtin.assert:
+        that:
+          - imagebuilder_resolved_artifact.exists | default(false)
+        fail_msg: >-
+          No patch source artifact found for '{{ imagebuilder_patch_from }}'.
+          Create a base artifact first with 'ib phase base <image>'.
+      when: imagebuilder_phase == 'patch'
+
     - name: Main | Restore resolved artifact
       ansible.builtin.include_tasks:
         file: restore_artifact.yml
       vars:
         imagebuilder_restore_artifact: "{{ imagebuilder_resolved_artifact }}"
       when:
+        - imagebuilder_phase == 'patch'
         - imagebuilder_resolved_artifact.exists | default(false)
 
-    - name: Main | drive phase
-      ansible.builtin.include_tasks: "phase-{{ imagebuilder_phase }}.yml"
+    - name: Main | Create base artifact
+      ansible.builtin.include_tasks: phase-base.yml
+      vars:
+        imagebuilder_pipeline_phase: base
+      when: imagebuilder_phase == 'base'
 
-# - name: Main | Build Phase
-#   when: imagebuilder_phase in ['build','base']
-#   block:
-#     - name: Main | Resolve restore candidate
-#       ansible.builtin.include_tasks:
-#         file: resolve_artifact.yml
+    - name: Main | Patch selected artifact
+      ansible.builtin.include_tasks: phase-patch.yml
+      vars:
+        imagebuilder_pipeline_phase: patch
+      when: imagebuilder_phase == 'patch'
 
-#     - ansible.builtin.set_fact:
-#         imagebuilder_base_artifact: "{{ imagebuilder_loaded_artifact }}"
-#     - name: Restore | Restore base artifact
-#       include_tasks:
-#         file: restore_artifact.yml
-#       vars:
-#         imagebuilder_restore_artifact: "{{ imagebuilder_base_artifact }}"
-#     - ansible.builtin.debug:
-#         msg: "Restored base artifact {{ imagebuilder_base_artifact }}"
-
-#     - name: Main | Perform the defined build
-#       when: not imagebuilder_restored_from_custom_image | default(false)
-#       block:
-#         - name: Main | call the OS specific BUILDAUX
-#           ansible.builtin.include_tasks:
-#             file: buildaux.yml
-#         - name: Main | build the base image
-#           ansible.builtin.include_tasks:
-#             file: buildimage.yml
-#         - name: Main | Legacy build
-#           when: imagebuilder_phase in ['build']
-#           block:
-#             - name: Main | OS-specific patching
-#               ansible.builtin.include_role:
-#                 name: "{{ os.plugin }}"
-#                 tasks_from: patching.yml
-#             - name: Main | include legacy build roles if any are defined
-#               ansible.builtin.include_role:
-#                 name: imagebuilder
-#                 tasks_from: "glue/glue.yml"
-#               vars:
-#                 imagebuilder_stage: "{{ imagebuilder_buildtask.name }}"
-#                 imagebuilder_task_vars: "{{ imagebuilder_buildtask.task_vars | default({}) }}"
-#               loop: "{{ imagebuilder_build | default([]) }}"
-#               loop_control:
-#                 loop_var: imagebuilder_buildtask
-#             - name: Main | Legacy Wait for custom image release
-#               ansible.builtin.include_tasks:
-#                 file: qemu/wait_image_release.yml
-#               vars:
-#                 imagebuilder_qemu_image_path: "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
-
-#             - name: Main | Legacy save custom image
-#               block:
-#                 - name: Main | Legacy convert custom image with free block cleanup
-#                   ansible.builtin.command: qemu-img convert -f qcow2 -O qcow2 "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp"
-#                   changed_when: true
-
-#                 - name: Main | Legacy finalize custom image
-#                   ansible.builtin.command: mv "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.tmp" "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-#                   changed_when: true
-
-#                 - name: Main | Legacy write custom artifact metadata
-#                   ansible.builtin.copy:
-#                     dest: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2.meta.yml"
-#                     mode: "0644"
-#                     content: |
-#                       profile_hash: "{{ imagebuilder_profile_hash }}"
-#                       id: "{{ imagebuilder_id_base }}"
-#                       created_at: "{{ ansible_date_time.iso8601 }}"
-#                       stage: custom
-#                       ttl_days: 7
+    - name: Main | Execute end-to-end build
+      ansible.builtin.include_tasks: phase-build.yml
+      when: imagebuilder_phase == 'build'
 
   rescue:
 
@@ -149,6 +107,12 @@
         msg: >-
           Main | Task '{{ ansible_failed_task.name }}' failed.
           {{ ansible_failed_result.msg | default('no additional message') }}
+
+    - name: Main | Fail orchestration after diagnostics
+      ansible.builtin.fail:
+        msg: >-
+          Image build orchestration failed at task
+          '{{ ansible_failed_task.name }}'.
 
   always:
 
@@ -164,22 +128,3 @@
         kill -9 {{ webserver.ansible_job_pid | default('') }} 2>/dev/null || true
       when: webserver is defined and webserver.ansible_job_pid is defined
       changed_when: false
-
-- name: Main | Publish Artifact
-  when: imagebuilder_phase == 'publish' or imagebuilder_phase == 'build'
-  block:
-
-    - name: Main | Define canonical artifact
-      ansible.builtin.set_fact:
-        imagebuilder_artifact:
-          id: "{{ imagebuilder_id_base }}"
-          path: "{{ imagebuilder_path_savedir }}/{{ imagebuilder_id_base }}.custom.{{ imagebuilder_profile_hash }}.qcow2"
-          format: qcow2
-          architecture: "{{ os.architecture }}"
-
-    - name: Main | Execute target plugins
-      ansible.builtin.include_role:
-        name: "{{ imagebuilder_target.plugin }}"
-      loop: "{{ imagebuilder_targets | default([]) }}"
-      loop_control:
-        loop_var: imagebuilder_target

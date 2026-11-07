@@ -1,0 +1,60 @@
+---
+- name: Build | Validate target configuration
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_targets is defined
+      - imagebuilder_targets | length > 0
+    fail_msg: "Build requires at least one configured imagebuilder target."
+
+- name: Build | Resolve reusable source artifact
+  ansible.builtin.include_tasks:
+    file: resolve_artifact.yml
+
+- name: Build | Create base when no artifact is available
+  ansible.builtin.include_tasks:
+    file: phase-base.yml
+  vars:
+    imagebuilder_pipeline_phase: base
+  when:
+    - not imagebuilder_resolved_artifact.exists | default(false)
+
+- name: Build | Select newly created base artifact
+  ansible.builtin.set_fact:
+    imagebuilder_resolved_artifact: >-
+      {{ imagebuilder_current_artifact | combine({'exists': true}) }}
+  when:
+    - not imagebuilder_resolved_artifact.exists | default(false)
+
+- name: Build | Restore selected source artifact
+  ansible.builtin.include_tasks:
+    file: restore_artifact.yml
+  vars:
+    imagebuilder_restore_artifact: "{{ imagebuilder_resolved_artifact }}"
+
+- name: Build | Patch base artifact
+  ansible.builtin.include_tasks:
+    file: phase-patch.yml
+  vars:
+    imagebuilder_pipeline_phase: patch
+  when:
+    - imagebuilder_current_artifact.phase == 'base'
+
+- name: Build | Define canonical source artifact
+  ansible.builtin.set_fact:
+    imagebuilder_artifact:
+      id: "{{ imagebuilder_id_base }}"
+      path: "{{ imagebuilder_current_artifact.path }}"
+      format: qcow2
+      architecture: "{{ os.architecture }}"
+      phase: "{{ imagebuilder_current_artifact.phase }}"
+      generation: "{{ imagebuilder_current_artifact.generation }}"
+      metadata_path: "{{ imagebuilder_current_artifact.metadata_path }}"
+      parent: >-
+        {{ imagebuilder_current_artifact.metadata.parent | default(none) }}
+
+- name: Build | Execute target plugins
+  ansible.builtin.include_role:
+    name: "{{ imagebuilder_target.plugin }}"
+  loop: "{{ imagebuilder_targets }}"
+  loop_control:
+    loop_var: imagebuilder_target
