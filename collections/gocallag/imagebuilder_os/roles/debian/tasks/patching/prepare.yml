@@ -1,0 +1,7 @@
+# Debian-Based Systems
+- block:
+    - name: Patching-prepare | Enable Security Fixes for Debian
+      shell: "sed -i -e '/^# deb.*ht.*-security.*/s/^..//g' /etc/apt/sources.list"
+      become: true
+      delegate_to: bob_build
+  when: ansible_facts['os_family'] | lower == "debian"

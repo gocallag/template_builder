@@ -1,0 +1,6 @@
+
+    # Ubuntu-Specific Cleanup
+
+- name: Patching | cleanup | Placeholder for Ubuntu-specific cleanup tasks
+  debug:
+    msg: "No cleanup tasks defined for Ubuntu yet."
