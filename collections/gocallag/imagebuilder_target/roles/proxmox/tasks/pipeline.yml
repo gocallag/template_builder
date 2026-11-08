@@ -191,7 +191,7 @@
         api_host: "{{ imagebuilder_proxmox.server }}"
         vmid: "{{ imagebuilder_proxmox_vm.vmid }}"
         disk: virtio0
-        storage: "{{ imagebuilder_proxmox.storage }}"
+        storage: "{{ imagebuilder_proxmox.targetstorage }}"
         import_from: "{{ imagebuilder_proxmox_import_source }}"
         timeout: 3600
         state: present
