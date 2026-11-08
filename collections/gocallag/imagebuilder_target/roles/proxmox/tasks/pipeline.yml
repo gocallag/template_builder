@@ -9,6 +9,7 @@
       username: "{{ imagebuilder_config.targets.proxmox.username }}"
       password: "{{ imagebuilder_config.targets.proxmox.password }}"
       storage: "{{ imagebuilder_config.targets.proxmox.storage }}"
+      targetstorage: "{{ imagebuilder_config.targets.proxmox.targetstorage | default(imagebuilder_config.targets.proxmox.storage) }}"
       node: "{{ imagebuilder_config.targets.proxmox.node }}"
   no_log: true
 
