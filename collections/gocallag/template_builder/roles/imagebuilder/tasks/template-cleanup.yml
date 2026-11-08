@@ -1,10 +1,10 @@
 ---
-- name: (TEMPLATE-CLEANUP) Initial Setup
+- name: Template-cleanup | Initial Setup
   tags:
       - build_customise
   block:
       # Debug Information
-      - name: (TEMPLATE-CLEANUP) Debug OS Information
+      - name: Template-cleanup | Debug OS Information
         ansible.builtin.debug:
             msg:
                 - "OS Family: {{ ansible_os_family }}"
@@ -12,17 +12,17 @@
                 - "OS Variant: {{ os_variant | default('unknown') | lower }}"
 
     # RedHat-Based Systems
-      - name: (TEMPLATE-CLEANUP, redhat) Setup
+      - name: Template-cleanup | RedHat Setup
         when: os_variant|lower in ["redhat","almalinux"]
         block:
-            - name: (TEMPLATE-CLEANUP, redhat) Ensure dnf-utils is installed
+            - name: Template-cleanup | Ensure dnf-utils is installed
               ansible.builtin.shell: |
                   dnf install -y dnf-utils
               become: true
               changed_when: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, redhat, almalinux) Remove old kernels (if permitted)
+            - name: Template-cleanup | Remove old kernels (if permitted)
               ansible.builtin.shell: dnf remove -y $(dnf repoquery --installonly --latest-limit=-1 -q)
               become: true
               changed_when: true
@@ -30,14 +30,14 @@
               delegate_to: bob_build
               ignore_errors: true # noqa: ignore-errors
 
-            - name: (TEMPLATE-CLEANUP, redhat) Delete YUM cache
+            - name: Template-cleanup | Delete YUM cache
               ansible.builtin.shell: |
                   dnf clean all
               become: true
               changed_when: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, redhat) Remove kickstart files
+            - name: Template-cleanup | Remove kickstart files
               ansible.builtin.file:
                   path: "{{ item }}"
                   state: absent
@@ -48,13 +48,13 @@
               changed_when: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, redhat) Cleanup NetworkManager
+            - name: Template-cleanup | Cleanup NetworkManager
               ansible.builtin.shell: rm -f /etc/NetworkManager/system-connections/*
               become: true
               changed_when: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, redhat) Cleanup network-scripts
+            - name: Template-cleanup | Cleanup network-scripts
               ansible.builtin.shell: rm -f /etc/sysconfig/network-scripts/ifcfg*
               become: true
               changed_when: true
@@ -62,10 +62,10 @@
 
 
       # Common Linux Cleanup Tasks
-      - name: (TEMPLATE-CLEANUP, common Linux) Common Linux Cleanup
+      - name: Template-cleanup | Common Linux Cleanup
         when: os_type | lower == "linux"
         block:
-            - name: (TEMPLATE-CLEANUP, common Linux) Find temporary files
+            - name: Template-cleanup | Find temporary files
               ansible.builtin.find:
                   file_type: any
                   paths:
@@ -76,7 +76,7 @@
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Remove temporary files
+            - name: Template-cleanup | Remove temporary files
               ansible.builtin.file:
                   path: "{{ item.path }}"
                   state: absent
@@ -84,7 +84,7 @@
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Truncate files
+            - name: Template-cleanup | Truncate files
               ansible.builtin.command: "truncate -s 0 {{ item }}"
               loop:
                   - /etc/machine-id
@@ -102,7 +102,7 @@
               changed_when: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Remove log folders
+            - name: Template-cleanup | Remove log folders
               ansible.builtin.file:
                   path: "{{ item }}"
                   state: absent
@@ -115,7 +115,7 @@
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Find log files
+            - name: Template-cleanup | Find log files
               ansible.builtin.find:
                   paths:
                       - /var/log
@@ -125,7 +125,7 @@
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Remove log files
+            - name: Template-cleanup | Remove log files
               ansible.builtin.file:
                   path: "{{ item.path }}"
                   state: absent
@@ -133,20 +133,20 @@
               become: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Remove random-seed
+            - name: Template-cleanup | Remove random-seed
               ansible.builtin.file:
                   path: /var/lib/systemd/random-seed
                   state: absent
               become: true
               delegate_to: bob_build
 
-            - name: Get discard info
+            - name: Template-cleanup | Get discard info
               ansible.builtin.command: lsblk -D
               register: imagebuilder_lsblk_d
               changed_when: false
               delegate_to: bob_build
 
-            - name: Extract TRIM-capable devices
+            - name: Template-cleanup | Extract TRIM-capable devices
               ansible.builtin.set_fact:
                   imagebuilder_trim_capable_devices: >-
                       {{
@@ -159,13 +159,13 @@
                         | list
                       }}
 
-            - name: Map mountpoints to devices
+            - name: Template-cleanup | Map mountpoints to devices
               ansible.builtin.command: findmnt -n -o TARGET,SOURCE
               register: imagebuilder_findmnt_map
               changed_when: false
               delegate_to: bob_build
 
-            - name: Build TRIM-capable mount list
+            - name: Template-cleanup | Build TRIM-capable mount list
               ansible.builtin.set_fact:
                   imagebuilder_trim_mounts: >-
                     {{
@@ -178,7 +178,7 @@
                       | list
                     }}
 
-            - name: Run fstrim on TRIM-capable filesystems
+            - name: Template-cleanup | Run fstrim on TRIM-capable filesystems
               ansible.builtin.command: fstrim -v {{ item }}
               loop: "{{ imagebuilder_trim_mounts }}"
               changed_when: false
@@ -186,14 +186,14 @@
               delegate_to: bob_build
 
 
-            - name: (TEMPLATE-CLEANUP, common Linux) Sync disk
+            - name: Template-cleanup | Sync disk
               ansible.builtin.command: sync
               become: true
               changed_when: false
               delegate_to: bob_build
 
       # Final Cleanup
-      - name: (TEMPLATE-CLEANUP, common Linux) Remove SSH host keys and shutdown
+      - name: Template-cleanup | Remove SSH host keys and shutdown
         # ansible.builtin.shell: rm -f /etc/ssh/*host*key* && shutdown -h -t now && sleep 120
         ansible.builtin.shell: shutdown -h -t now && sleep 120
         become: true
@@ -203,16 +203,16 @@
         delegate_to: bob_build
         when: os_type == "linux"
       # Windows Systems
-      - name: (TEMPLATE-CLEANUP, windows) Cleanup block
+      - name: Template-cleanup | Cleanup block
         when: os_variant|lower == "windows"
         block:
-            - name: (TEMPLATE-CLEANUP, windows) Check if SoftwareDistribution folder exists
+            - name: Template-cleanup | Check if SoftwareDistribution folder exists
               ansible.windows.win_stat:
                   path: c:\Windows\SoftwareDistribution\Download
               register: software_distribution # noqa: var-naming
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, windows) Cleaning updates
+            - name: Template-cleanup | Cleaning updates
               ansible.windows.win_shell: |
                 Write-Host "Cleaning updates..."
                 Stop-Service -Name wuauserv -Force
@@ -223,7 +223,7 @@
               ignore_errors: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, windows) Cleaning SxS
+            - name: Template-cleanup | Cleaning SxS
               ansible.windows.win_shell: |
                 Write-Host "Cleaning SxS..."
                 Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase
@@ -231,7 +231,7 @@
               ignore_errors: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, windows) Remove cruft
+            - name: Template-cleanup | Remove cruft
               ansible.windows.win_shell: |
                 @(
                   "$env:localappdata\Nuget",
@@ -254,7 +254,7 @@
               ignore_errors: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, windows) Defragging
+            - name: Template-cleanup | Defragging
               ansible.windows.win_shell: |
                 Write-Host "Defragging..."
                 if (Get-Command Optimize-Volume -ErrorAction SilentlyContinue) {
@@ -266,7 +266,7 @@
               ignore_errors: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, windows) Zero empty space
+            - name: Template-cleanup | Zero empty space
               ansible.windows.win_shell: |
                     Write-Host "Zeroing out empty space using SDelete..."
                     $SDeleteUrl = "https://download.sysinternals.com/files/SDelete.zip"
@@ -290,7 +290,7 @@
               ignore_errors: true
               delegate_to: bob_build
 
-            - name: (TEMPLATE-CLEANUP, windows) Shut down Windows system
+            - name: Template-cleanup | Shut down Windows system
               ansible.windows.win_shell: shutdown /s /t 0
               ignore_errors: true
               ignore_unreachable: true
