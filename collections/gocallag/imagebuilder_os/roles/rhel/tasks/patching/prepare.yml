@@ -19,8 +19,7 @@
   delegate_to: bob_build
   when: >-
     (version_major | default(0) | int >= 10 and version_minor | default(0) | int >= 1)
-    or
-    (version_major | default(0) | int == 9 and version_minor | default(0) | int >= 7)
+
 
 - name: Patching | prepare | Mark RHSM registration attempt
   ansible.builtin.set_fact:
