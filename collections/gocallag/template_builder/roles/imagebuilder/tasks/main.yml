@@ -41,8 +41,8 @@
     - name: Main | Cleanup | Remove any existing build artifacts
       ansible.builtin.include_tasks: cleanup.yml
 
-- name: Main | Orchestration | Execute the build phase
-  when: imagebuilder_phase in ['build', 'base', 'patch', 'download']
+- name: Main | Orchestration | Execute the Download
+  when: imagebuilder_phase in ['download']
   block:
     - name: Main | OS-specific downloads
       when: imagebuilder_plugin.download | default(false) | bool
@@ -53,6 +53,10 @@
     - name: Main | use inbuilt download role if OS plugin does not have a download task
       ansible.builtin.include_tasks: download.yml
       when: imagebuilder_plugin.download | default(false) | bool is not true
+
+- name: Main | Orchestration | Execute the build phase
+  when: imagebuilder_phase in ['build', 'base', 'patch']
+  block:
 
     - name: Main | Validate patch source selection
       ansible.builtin.assert:
