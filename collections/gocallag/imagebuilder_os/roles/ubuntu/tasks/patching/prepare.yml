@@ -1,5 +1,7 @@
     # Ubuntu-Specific Preparation
-
+  - setup:
+    delegate_to: bob_build
+    
   - name: Patching | prepare | Check if sources.list exists
     stat:
       path: /etc/apt/sources.list
