@@ -42,7 +42,7 @@
       ansible.builtin.include_tasks: cleanup.yml
 
 - name: Main | Orchestration | Execute the Download
-  when: imagebuilder_phase in ['download']
+  when: imagebuilder_phase in ['base','download']
   block:
     - name: Main | OS-specific downloads
       when: imagebuilder_plugin.download | default(false) | bool
