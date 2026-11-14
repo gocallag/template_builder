@@ -37,6 +37,7 @@ RUN dnf -y update && \
       libxml2-devel \
       libxslt-devel \
 	  openssl \
+	  rsync \
       sshpass \
       lsof \
     && dnf clean all
