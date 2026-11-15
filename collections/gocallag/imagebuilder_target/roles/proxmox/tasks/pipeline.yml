@@ -2,7 +2,7 @@
 - name: Proxmox | Validate variables
   ansible.builtin.include_tasks: assert.yml
 
-- name: Main | Resolve configuration
+- name: Pipeline | Resolve configuration
   ansible.builtin.set_fact:
     imagebuilder_proxmox:
       server: "{{ imagebuilder_config.targets.proxmox.server }}"
@@ -13,17 +13,22 @@
       node: "{{ imagebuilder_config.targets.proxmox.node }}"
   no_log: true
 
-- name: Main | Define working image
+- name: Pipeline | Define working image
   ansible.builtin.set_fact:
     imagebuilder_proxmox_working_image: >-
       {{ imagebuilder_path_imagedir }}/{{ imagebuilder_artifact.id }}.proxmox.qcow2
 
-- name: Main | Create target working image
-  ansible.builtin.copy:
-    src: "{{ imagebuilder_artifact.path }}"
-    dest: "{{ imagebuilder_proxmox_working_image }}"
-    remote_src: true
-    mode: "0600"
+- name: Pipeline | Create target working image from restored image
+  ansible.builtin.command:
+    argv:
+      - mv
+      - "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
+      - "{{ imagebuilder_proxmox_working_image }}"
+  # ansible.builtin.copy:
+  #   src: "{{ imagebuilder_artifact.path }}"
+  #   dest: "{{ imagebuilder_proxmox_working_image }}"
+  #   remote_src: true
+  #   mode: "0600"
 
 - name: Main | Define working artifact
   ansible.builtin.set_fact:
