@@ -4,10 +4,11 @@
     that:
       - imagebuilder_restore_artifact is defined
 
-- name: Restore Artifact | Restore image
+- name: Restore_artifact | Restore image
   ansible.builtin.command:
     argv:
-      - cp
+      - rsync
+      - -a
       - "{{ imagebuilder_restore_artifact.path }}"
       - "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
   register: imagebuilder_qemu_disk_restore
