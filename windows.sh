@@ -3,7 +3,17 @@ os=windows
 
 >${os}.log
 
-for img in windows-2019 windows-2022 windows-2025; do
+if (( $# > 0 )); then
+    images=("$@")
+else
+    images=(
+        windows-2019
+        windows-2022
+        windows-2025
+    )
+fi
+
+for img in "${images[@]}"; do
    imgid=$(grep -i id: samples/images/${os}/${img}.yml | awk '{ print $2 }')
    imgsize=$(./ib artifact ${imgid} | grep -i base | awk '{ print $3 }')
    echo $imgsize
