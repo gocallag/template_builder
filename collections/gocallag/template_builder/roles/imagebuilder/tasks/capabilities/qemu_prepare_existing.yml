@@ -7,20 +7,29 @@
       - imagebuilder_capability_artifact.path | trim | length > 0
     fail_msg: "(CAP-QEMU) No artifact supplied"
 
-- name: (CAP-QEMU) Check existing image
-  ansible.builtin.stat:
-    path: "{{ imagebuilder_capability_artifact.path }}"
-  register: imagebuilder_cap_qemu_image_stat
+# - name: (CAP-QEMU) Check existing image
+#   ansible.builtin.stat:
+#     path: "{{ imagebuilder_capability_artifact.path }}"
+#   register: imagebuilder_cap_qemu_image_stat
 
-- name: (CAP-QEMU) Assert existing image exists
-  ansible.builtin.assert:
-    that:
-      - imagebuilder_cap_qemu_image_stat.stat.exists
-      - imagebuilder_cap_qemu_image_stat.stat.isreg
-    fail_msg: >-
-      (CAP-QEMU) Image does not exist:
-      {{ imagebuilder_capability_artifact.path }}
-
+# - name: (CAP-QEMU) Assert existing image exists
+#   ansible.builtin.assert:
+#     that:
+#       - imagebuilder_cap_qemu_image_stat.stat.exists
+#       - imagebuilder_cap_qemu_image_stat.stat.isreg
+#     fail_msg: >-
+#       (CAP-QEMU) Image does not exist:
+#       {{ imagebuilder_capability_artifact.path }}
+- name: (CAP-QEMU) Verify image exists
+  ansible.builtin.command:
+    argv:
+      - test
+      - -f
+      - "{{ imagebuilder_capability_artifact.path }}"
+  register: imagebuilder_image_exists
+  changed_when: false
+  failed_when: imagebuilder_image_exists.rc != 0
+  
 - name: (CAP-QEMU) Determine forwarded ports
   ansible.builtin.set_fact:
     imagebuilder_cap_qemu_host_port: >-
