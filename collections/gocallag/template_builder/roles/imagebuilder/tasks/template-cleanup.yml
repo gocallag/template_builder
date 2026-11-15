@@ -223,13 +223,12 @@
               ignore_errors: true
               delegate_to: bob_build
 
-            - name: Template-cleanup | Cleaning SxS
-              ansible.windows.win_shell: |
-                Write-Host "Cleaning SxS..."
-                Dism.exe /online /Cleanup-Image /StartComponentCleanup /ResetBase
-              register: oput # noqa: var-naming
-              ignore_errors: true
-              delegate_to: bob_build
+            # - name: Template-cleanup | Cleaning Image
+            #   ansible.windows.win_shell: |
+            #     Dism.exe /online /Cleanup-Image /StartComponentCleanup
+            #   register: oput # noqa: var-naming
+            #   ignore_errors: true
+            #   delegate_to: bob_build
 
             - name: Template-cleanup | Remove cruft
               ansible.windows.win_shell: |
@@ -238,8 +237,7 @@
                   "$env:localappdata\temp\*",
                   "$env:windir\logs",
                   "$env:windir\panther",
-                  "$env:windir\temp\*",
-                  "$env:windir\winsxs\manifestcache"
+                  "$env:windir\temp\*"
                 ) | % {
                   if(Test-Path $_) {
                     Write-Host "Removing $_"
