@@ -254,11 +254,19 @@
 
             - name: Template-cleanup | Defragging
               ansible.windows.win_shell: |
-                Write-Host "Defragging..."
+                # Write-Host "Defragging..."
+                # if (Get-Command Optimize-Volume -ErrorAction SilentlyContinue) {
+                #   Optimize-Volume -DriveLetter C
+                # } else {
+                #   Defrag.exe c: /H
+                # }
                 if (Get-Command Optimize-Volume -ErrorAction SilentlyContinue) {
-                  Optimize-Volume -DriveLetter C
-                } else {
-                  Defrag.exe c: /H
+                    try {
+                        Optimize-Volume -DriveLetter C -ReTrim -ErrorAction Stop | Out-Null
+                    }
+                    catch {
+                        Write-Host "ReTrim not supported, skipping."
+                    }
                 }
               register: oput # noqa: var-naming
               ignore_errors: true
