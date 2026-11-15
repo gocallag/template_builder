@@ -1,13 +1,25 @@
 #!/bin/bash
->centos.log
-#./ib phase base samples/images/centos/centos-9.s --follow | tee -a centos.log
-#./ib phase base samples/images/centos/centos-10.s --follow | tee -a centos.log
+os=centos
 
-./ib phase patch samples/images/centos/centos-9.s --follow | tee -a centos.log
-./ib phase patch samples/images/centos/centos-10.s --follow | tee -a centos.log
+>${os}.log
 
-./ib build samples/images/centos/centos-9.s --follow | tee -a centos.log
-./ib build samples/images/centos/centos-10.s --follow | tee -a centos.log
+if (( $# > 0 )); then
+    images=("$@")
+else
+    images=(
+        centos-9.s
+        centos-10.s
+    )
+fi
 
-./ib phase clean samples/images/centos/centos-9.s --follow
-./ib phase clean samples/images/centos/centos-10.s --follow
+for img in "${images[@]}"; do
+   imgid=$(grep -i id: samples/images/${os}/${img}.yml | awk '{ print $2 }')
+   imgsize=$(./ib artifact ${imgid} | grep -i base | awk '{ print $3 }')
+   echo $imgsize
+   if [ "$imgsize" == "" ]; then
+      ./ib phase base samples/images/${os}/${img} --follow | tee -a ubuntu.log
+   fi
+   ./ib phase patch samples/images/${os}/${img} --follow | tee -a ubuntu.log
+   ./ib build samples/images/${os}/${img} --follow | tee -a ubuntu.log
+   ./ib phase clean samples/images/${os}/${img} --follow
+done
