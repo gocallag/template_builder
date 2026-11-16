@@ -70,7 +70,7 @@
         fail_msg: "imagebuilder_patch_from must be 'latest' or 'base'"
       when: imagebuilder_phase == 'patch'
 
-    - name: Main | Resolve patch source
+    - name: Main | Resolve patch source artifact
       ansible.builtin.include_tasks:
         file: resolve_artifact.yml
       when: imagebuilder_phase == 'patch'
