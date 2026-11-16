@@ -22,6 +22,14 @@
       - imagebuilder_config.builder.build_path | trim | length > 0
       - imagebuilder_config.builder.qemu.host | trim | length > 0
       - imagebuilder_id_prefix in imagebuilder_prefix_port_offset_map
+
+- name: Main | Cleanup | Remove any existing build artifacts
+  when: imagebuilder_phase in ['clean']
+  block:
+    - name: Main | Cleanup | Remove any existing build artifacts
+      ansible.builtin.include_tasks: cleanup.yml
+    - meta: end_play
+    
 - name: Main | Initialise the plugin for the OS
   ansible.builtin.include_role:
     name: "{{ os.plugin }}"
@@ -34,12 +42,6 @@
 
 - name: Main | Get the system ready for the build
   ansible.builtin.include_tasks: setup.yml
-
-- name: Main | Cleanup | Remove any existing build artifacts
-  when: imagebuilder_phase in ['clean']
-  block:
-    - name: Main | Cleanup | Remove any existing build artifacts
-      ansible.builtin.include_tasks: cleanup.yml
 
 - name: Main | Orchestration | Execute the Download
   when: imagebuilder_phase in ['base','download']
