@@ -10,10 +10,21 @@
 #     name: imagebuilder_download_status
 #   when: imagebuilder_download_status_file.stat.exists
 
+# - name: Download | Check if ISO exists
+#   ansible.builtin.stat:
+#     path: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
+#   register: imagebuilder_iso_file
+
 - name: Download | Check if ISO exists
-  ansible.builtin.stat:
-    path: "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
+  ansible.builtin.command:
+    argv:
+      - test
+      - -f
+      - "{{ imagebuilder_path_librarydirbase }}/isos/{{ os.iso | basename }}"
   register: imagebuilder_iso_file
+  failed_when: imagebuilder_iso_file.rc not in [ 0,1 ]
+  changed_when: false
+ 
 
 # - name: (DOWNLOAD) Validate existing ISO checksum
 #   ansible.builtin.shell: |
@@ -30,7 +41,7 @@
   ansible.builtin.set_fact:
     imagebuilder_download_required: >-
       {{
-        (not imagebuilder_iso_file.stat.exists)
+        (not imagebuilder_iso_file.rc == 0)
       }}
 
 - name: Download | Download ISO
