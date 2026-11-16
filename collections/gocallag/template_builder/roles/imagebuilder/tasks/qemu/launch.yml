@@ -6,6 +6,9 @@
       - imagebuilder_qemu_launch_command | trim | length > 0
     fail_msg: "(QEMU) No launch command supplied"
 
+- ansible.builtin.debug:
+     msg: "Launch command is {{ imagebuilder_qemu_launch_command }}"
+
 - name: Qemu | launch | Launch VM
   ansible.builtin.command: "{{ imagebuilder_qemu_launch_command }}"
   async: 99999
