@@ -4,10 +4,10 @@
     that:
       - imagebuilder_qemu_launch_command is defined
       - imagebuilder_qemu_launch_command | trim | length > 0
-    fail_msg: "(QEMU) No launch command supplied"
 
-- ansible.builtin.debug:
-     msg: "Launch command is {{ imagebuilder_qemu_launch_command }}"
+- name: Qemu | launch | Display launch command
+  ansible.builtin.debug:
+    msg: "{{ imagebuilder_qemu_launch_command }}"
 
 - name: Qemu | launch | Launch VM
   ansible.builtin.command: "{{ imagebuilder_qemu_launch_command }}"
@@ -15,3 +15,9 @@
   poll: 0
   register: imagebuilder_qemu_job
   changed_when: true
+
+- name: Qemu | launch | Wait for QEMU monitor
+  ansible.builtin.include_tasks:
+    file: qemu/wait_monitor.yml
+  vars:
+    imagebuilder_qemu_monitor_delay: 5
