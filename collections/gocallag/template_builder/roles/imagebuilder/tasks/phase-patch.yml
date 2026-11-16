@@ -22,7 +22,6 @@
       -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off
       -mon chardev=mon0
       -boot order=c
-      -drive file="{{ imagebuilder_build_iso }}",media=cdrom,index=1
 - name: "Patch | Wait for QEMU monitor"
   ansible.builtin.include_tasks:
     file: qemu/wait_monitor.yml
