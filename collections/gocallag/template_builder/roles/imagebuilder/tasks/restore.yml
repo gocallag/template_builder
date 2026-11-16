@@ -147,9 +147,9 @@
         imagebuilder_restored_from_base_image: true
         imagebuilder_banner_message: "Restored base image from {{ imagebuilder_base_artifact }}"
 
-- name: Restore | Show restored base result
-  when: imagebuilder_restored_from_image | default(false) | bool
-  ansible.builtin.include_tasks: banner.yml
+# - name: Restore | Show restored base result
+#   when: imagebuilder_restored_from_image | default(false) | bool
+#   ansible.builtin.include_tasks: banner.yml
 
 - name: Restore | if no image was restored, create an empty disk for the build
   when: not imagebuilder_restored_from_image
@@ -162,7 +162,7 @@
       failed_when: imagebuilder_qemu_disk.rc != 0
       changed_when: imagebuilder_qemu_disk.rc == 0
 
-    - name: Restore | Show disk creation result
-      ansible.builtin.include_tasks: banner.yml
-      vars:
-        imagebuilder_banner_message: "Created disk at {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2 with size {{ os.config.disks[0] }}G"
+    # - name: Restore | Show disk creation result
+    #   ansible.builtin.include_tasks: banner.yml
+    #   vars:
+    #     imagebuilder_banner_message: "Created disk at {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2 with size {{ os.config.disks[0] }}G"
