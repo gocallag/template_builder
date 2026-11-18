@@ -14,7 +14,7 @@ else
 fi
 
 for img in "${images[@]}"; do
-   imgid=$(grep -i id: samples/images/${os}/${img}.yml | awk '{ print $2 }')
+   imgid=$(grep -i id: samples/images/${os}/${img}.yml | awk '{ print $2 }' | cut -d. -f1)
    imgsize=$(./ib artifact ${imgid} | grep -i base | awk '{ print $3 }')
    echo $imgsize
    if [ "$imgsize" == "" ]; then
