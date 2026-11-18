@@ -1,5 +1,5 @@
 ---
-- name: (QEMU) Cleanup temporary webserver and dangling QEMU
+- name: Qemu | cleanup_process |  Cleanup temporary webserver and dangling QEMU
   ansible.builtin.shell: |
     set -o pipefail
     {% if imagebuilder_qemu_cleanup_webserver | default(false) | bool %}

@@ -1,5 +1,5 @@
 ---
-- name: (QEMU) Wait for monitor
+- name: Qemu | wait_monitor | Wait for Qemu monitor port
   ansible.builtin.wait_for:
     host: "{{ imagebuilder_qemu_monitor_host | default('localhost') }}"
     port: "{{ imagebuilder_env_qemu_monport }}"
