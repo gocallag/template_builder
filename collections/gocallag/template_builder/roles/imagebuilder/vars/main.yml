@@ -3,7 +3,7 @@
 os_type: "{{ imagebuilder_prefix_ostype_map[imagebuilder_id_prefix] }}"
 os_variant: "{{ imagebuilder_prefix_variant_map[imagebuilder_id_prefix] }}"
 imagebuilder_id_prefix: "{{ id | regex_replace('^(.*?)-.*$', '\\1') }}"   # alma-9.8 -> alma
-imagebuilder_id_base: "{{ id | regex_replace('(\\.\\d+)$', '') }}"  # alma-9.8 -> alma-9
+imagebuilder_id_base: "{{ id | regex_replace('^(.*?-\\d+)\\..*$', '\\1') }}" # alma-9.8 -> alma-9
 imagebuilder_id_version: "{{ id | regex_replace('^.*-', '') }}" # alma-9.8 -> 9.8
 imagebuilder_env_qemu_ssh_port: "{{ 10222 + (imagebuilder_port_offset | default(0) | int) }}"
 imagebuilder_env_qemu_psrp_port: "{{ 5986 + (imagebuilder_port_offset | default(0) | int) }}"
