@@ -75,7 +75,7 @@
 
 - name: Patch | Store patched artifact
   ansible.builtin.include_tasks:
-    file: store_artifact.yml
+    file: artifact/store.yml
   vars:
     imagebuilder_artifact_phase: patched
 
