@@ -2,8 +2,6 @@
 
 An Ansible collection and container-based harness for building images.
 
-> **Beta:** This project is under active testing.
-
 ## Getting started
 
 Build the container image:
