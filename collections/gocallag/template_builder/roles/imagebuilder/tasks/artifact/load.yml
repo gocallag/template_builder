@@ -1,18 +1,18 @@
 ---
-- name: Load Artifact | Define phase root
+- name: Artifact | Load | Define phase root
   ansible.builtin.set_fact:
     imagebuilder_artifact_phase_root: >-
       {{
         imagebuilder_path_librarydir
       }}/{{ imagebuilder_profile_hash }}/{{ imagebuilder_artifact_phase }}
-- name: Load Artifact | Discover generations
+- name: Artifact | Load | Discover generations
   ansible.builtin.find:
     paths: "{{ imagebuilder_artifact_phase_root }}"
     recurse: false
     file_type: directory
   register: imagebuilder_artifact_generations
   failed_when: false
-- name: Load Artifact | Determine latest generation
+- name: Artifact | Load | Determine latest generation
   ansible.builtin.set_fact:
     imagebuilder_artifact_generation: >-
       {{
@@ -28,7 +28,7 @@
         if imagebuilder_artifact_generations.matched | default(0) > 0
         else none
       }}
-- name: Load Artifact | Define paths
+- name: Artifact | Load | Define paths
   ansible.builtin.set_fact:
     imagebuilder_artifact_generation_root: >-
       {{
@@ -36,13 +36,13 @@
       }}/{{ imagebuilder_artifact_generation }}
   when:
     - imagebuilder_artifact_generation is not none
-- name: Load Artifact | Load metadata
+- name: Artifact | Load | Load metadata
   ansible.builtin.slurp:
     src: "{{ imagebuilder_artifact_generation_root }}/metadata.yml"
   register: imagebuilder_artifact_metadata_raw
   when:
     - imagebuilder_artifact_generation is not none
-- name: Load Artifact | Decode metadata
+- name: Artifact | Load | Decode metadata
   ansible.builtin.set_fact:
     imagebuilder_loaded_artifact:
 
@@ -64,7 +64,7 @@
         }}
   when:
     - imagebuilder_artifact_generation is not none
-- name: Load Artifact | Return empty result
+- name: Artifact | Load | Return empty result
   ansible.builtin.set_fact:
     imagebuilder_loaded_artifact:
       phase: "{{ imagebuilder_artifact_phase }}"

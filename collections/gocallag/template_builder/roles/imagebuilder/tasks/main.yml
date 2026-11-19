@@ -72,7 +72,7 @@
 
     - name: Main | Resolve patch source artifact
       ansible.builtin.include_tasks:
-        file: resolve_artifact.yml
+        file: artifact/resolve.yml
       when: imagebuilder_phase == 'patch'
 
     - name: Main | Require a patch source artifact
@@ -86,7 +86,7 @@
 
     - name: Main | Restore resolved artifact
       ansible.builtin.include_tasks:
-        file: restore_artifact.yml
+        file: artifact/restore.yml
       vars:
         imagebuilder_restore_artifact: "{{ imagebuilder_resolved_artifact }}"
       when:

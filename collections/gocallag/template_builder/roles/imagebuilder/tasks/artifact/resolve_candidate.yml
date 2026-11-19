@@ -1,13 +1,13 @@
 ---
-- name: Resolve Artifact | Load phase artifact
+- name: Artifact | resolve_candidate | Load phase artifact
   ansible.builtin.include_tasks:
-    file: load_artifact.yml
+    file: artifact/load.yml
   vars:
     imagebuilder_artifact_phase: "{{ imagebuilder_candidate_phase }}"
   when:
     - not imagebuilder_resolved_artifact.exists | default(false)
 
-- name: Resolve Artifact | Accept candidate
+- name: Artifact | resolve_candidate | Accept candidate
   ansible.builtin.set_fact:
     imagebuilder_resolved_artifact: "{{ imagebuilder_loaded_artifact }}"
   when:

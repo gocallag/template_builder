@@ -1,5 +1,5 @@
 ---
-- name: Resolve Artifact | Define candidate phases
+- name: Artifact | Resolve | Define candidate phases
   ansible.builtin.set_fact:
     imagebuilder_candidate_phases: >-
       {{
@@ -12,22 +12,22 @@
         else imagebuilder_restore_precedence[imagebuilder_phase]
       }}
 
-- name: Resolve Artifact | Show candidate order
+- name: Artifact | Resolve | Show candidate order
   ansible.builtin.debug:
     msg: "Searching artifact phases in order: {{ imagebuilder_candidate_phases }}"
 
-- name: Resolve Artifact | Initialise resolution result
+- name: Artifact | Resolve | Initialise resolution result
   ansible.builtin.set_fact:
     imagebuilder_resolved_artifact:
       exists: false
 
-- name: Resolve Artifact | Evaluate candidate phases
+- name: Artifact | Resolve | Evaluate candidate phases
   ansible.builtin.include_tasks:
-    file: resolve_artifact_candidate.yml
+    file: artifact/resolve_candidate.yml
   loop: "{{ imagebuilder_candidate_phases }}"
   loop_control:
     loop_var: imagebuilder_candidate_phase
 
-- name: Resolve Artifact | Show selected artifact
+- name: Artifact | Resolve | Show selected artifact
   ansible.builtin.debug:
     var: imagebuilder_resolved_artifact

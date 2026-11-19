@@ -1,5 +1,5 @@
 ---
-- name: Restore Artifact | Validate artifact
+- name: Artifact | restore | Validate artifact
   ansible.builtin.assert:
     that:
       - imagebuilder_restore_artifact is defined
@@ -13,7 +13,7 @@
       - "{{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2"
   register: imagebuilder_qemu_disk_restore
 
-- name: Restore Artifact | Return state
+- name: Artifact | restore | Return state
   ansible.builtin.set_fact:
     imagebuilder_restored_from_image: true
 

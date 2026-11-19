@@ -8,7 +8,7 @@
 
 - name: Build | Resolve reusable source artifact
   ansible.builtin.include_tasks:
-    file: resolve_artifact.yml
+    file: artifact/resolve.yml
 
 - name: Build | Create base when no artifact is available
   ansible.builtin.include_tasks:
@@ -27,7 +27,7 @@
 
 - name: Build | Restore selected source artifact
   ansible.builtin.include_tasks:
-    file: restore_artifact.yml
+    file: artifact/restore.yml
   vars:
     imagebuilder_restore_artifact: "{{ imagebuilder_resolved_artifact }}"
 
