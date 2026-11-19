@@ -1,14 +1,25 @@
 #!/bin/bash
->rockylinux.log
+os=rockylinux
 
-# ./ib phase base samples/images/rockylinux/rockylinux-9.8 --follow | tee -a rockylinux.log
-# ./ib phase base samples/images/rockylinux/rockylinux-10.2 --follow | tee -a rockylinux.log
+>${os}.log
 
-./ib phase patch samples/images/rockylinux/rockylinux-9.8 --follow | tee -a rockylinux.log
-./ib phase patch samples/images/rockylinux/rockylinux-10.2 --follow | tee -a rockylinux.log
+if (( $# > 0 )); then
+    images=("$@")
+else
+    images=(
+        rockylinux-9.8
+        rockylinux-10.3
+    )
+fi
 
-./ib build samples/images/rockylinux/rockylinux-9.8 --follow | tee -a rockylinux.log
-./ib build samples/images/rockylinux/rockylinux-10.2 --follow | tee -a rockylinux.log
-
-./ib phase clean samples/images/rockylinux/rockylinux-9.8 --follow
-./ib phase clean samples/images/rockylinux/rockylinux-10.2 --follow
+for img in "${images[@]}"; do
+   imgid=$(grep -i id: samples/images/${os}/${img}.yml | awk '{ print $2 }'  | cut -d. -f1)
+   imgsize=$(./ib artifact ${imgid} | grep -i base | awk '{ print $3 }')
+   echo $imgsize
+   if [ "$imgsize" == "" ]; then
+      ./ib phase base samples/images/${os}/${img} --follow | tee -a ubuntu.log
+   fi
+   ./ib phase patch samples/images/${os}/${img} --follow | tee -a ubuntu.log
+   ./ib build samples/images/${os}/${img} --follow | tee -a ubuntu.log
+   ./ib phase clean samples/images/${os}/${img} --follow
+done
