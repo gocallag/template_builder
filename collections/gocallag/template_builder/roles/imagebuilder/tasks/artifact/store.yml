@@ -1,36 +1,36 @@
 ---
-- name: Store Artifact | Validate inputs
+- name: Artifact | store | Validate inputs
   ansible.builtin.assert:
     that:
       - imagebuilder_artifact_phase is defined
       - imagebuilder_artifact_source is defined
 
-- name: Store Artifact | Define profile root
+- name: Artifact | store | Define profile root
   ansible.builtin.set_fact:
     imagebuilder_profile_root: >-
       {{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}
 
-- name: Store Artifact | Define phase root
+- name: Artifact | store | Define phase root
   ansible.builtin.set_fact:
     imagebuilder_phase_root: >-
       {{ imagebuilder_profile_root }}/{{ imagebuilder_artifact_phase }}
 
-- name: Store Artifact | Ensure phase root exists
+- name: Artifact | store | Ensure phase root exists
   ansible.builtin.file:
     path: "{{ imagebuilder_phase_root }}"
     state: directory
     mode: "0755"
-- name: Store Artifact | Discover existing generations
+- name: Artifact | store | Discover existing generations
   ansible.builtin.find:
     paths: "{{ imagebuilder_phase_root }}"
     file_type: directory
     recurse: false
   register: imagebuilder_existing_generations
-- name: Store Artifact | Show discovered generations
+- name: Artifact | store | Show discovered generations
   ansible.builtin.debug:
     var: imagebuilder_existing_generations.files
 
-- name: Store Artifact | Calculate highest generation
+- name: Artifact | store | Calculate highest generation
   ansible.builtin.set_fact:
     imagebuilder_highest_generation: >-
       {{
@@ -44,7 +44,7 @@
         )
       }}
 
-- name: Store Artifact | Calculate next generation
+- name: Artifact | store | Calculate next generation
   ansible.builtin.set_fact:
     imagebuilder_artifact_generation: >-
       {{
@@ -56,15 +56,15 @@
           ) + 1
         )
       }}
-- name: Store Artifact | Define generation root
+- name: Artifact | store | Define generation root
   ansible.builtin.set_fact:
     imagebuilder_generation_root: >-
       {{ imagebuilder_phase_root }}/{{ imagebuilder_artifact_generation }}
-- name: Store Artifact | Create generation directory
+- name: Artifact | store | Create generation directory
   ansible.builtin.file:
     path: "{{ imagebuilder_generation_root }}"
     state: directory
-- name: Store Artifact | Convert qcow2
+- name: Artifact | store | Convert qcow2
   ansible.builtin.command:
     argv:
       - qemu-img
@@ -76,14 +76,14 @@
       - "{{ imagebuilder_artifact_source }}"
       - "{{ imagebuilder_generation_root }}/image.qcow2.tmp"
   changed_when: true
-- name: Store Artifact | Finalise image
+- name: Artifact | store | Finalise image
   ansible.builtin.command:
     argv:
       - mv
       - "{{ imagebuilder_generation_root }}/image.qcow2.tmp"
       - "{{ imagebuilder_generation_root }}/image.qcow2"
   changed_when: true
-- name: Store Artifact | Write metadata
+- name: Artifact | store | Write metadata
   ansible.builtin.copy:
     dest: "{{ imagebuilder_generation_root }}/metadata.yml"
     mode: "0644"
@@ -100,12 +100,12 @@
       {% else %}
         null
       {% endif %}
-- name: Store Artifact | Load profile metadata
+- name: Artifact | store | Load profile metadata
   ansible.builtin.stat:
     path: "{{ imagebuilder_profile_root }}/metadata.yml"
   register: imagebuilder_profile_metadata_stat
 
-- name: Store Artifact | Update profile metadata
+- name: Artifact | store | Update profile metadata
   ansible.builtin.copy:
     dest: "{{ imagebuilder_profile_root }}/metadata.yml"
     mode: "0644"
@@ -119,7 +119,7 @@
         {{ imagebuilder_artifact_phase }}:
           generation: "{{ imagebuilder_artifact_generation }}"
           created_at: "{{ ansible_date_time.iso8601 }}"
-- name: Store Artifact | Return artifact
+- name: Artifact | store | Return artifact
   ansible.builtin.set_fact:
 
     imagebuilder_current_artifact:
