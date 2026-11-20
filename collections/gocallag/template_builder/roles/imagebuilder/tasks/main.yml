@@ -98,6 +98,11 @@
       vars:
         imagebuilder_pipeline_phase: base
       when: imagebuilder_phase == 'base'
+    - name: Main | Store current profile hash
+      ansible.builtin.copy:
+        dest: "{{ imagebuilder_path_librarydir }}/current"
+        mode: "0644"
+        content: "{{ imagebuilder_profile_hash }}"
 
     - name: Main | Patch selected artifact
       ansible.builtin.include_tasks: phase-patch.yml
