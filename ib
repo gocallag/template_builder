@@ -240,6 +240,18 @@ JOB STORAGE
 
 EOF
 }
+resolve_profile_hash() {
+
+    local image="$1"
+    local profile="$2"
+
+    if [[ "$profile" == "current" ]]; then
+        cat "${LIBRARY_DIR}/${image}/current"
+        return
+    fi
+
+    echo "$profile"
+}
 follow_job() {
 
     local job_id="$1"
@@ -534,10 +546,10 @@ list_artifacts() {
     fi
 
     for profile in "${image_root}"/*; do
-        # [[ -d "${profile}" ]] || continue
-		# if [ "${profile: -4}" == "isos" ]; then
-		#   continue
-		# fi
+        [[ -d "${profile}" ]] || continue
+		if [ "${profile}" == "current" ]; then
+		  continue
+		fi
 
         profile_hash="$(basename "${profile}")"
 
@@ -928,7 +940,7 @@ artifact)
     profile_hash="${3:-}"
     phase="${4:-}"
     generation="${5:-}"
-
+    profile_hash="$(resolve_profile_hash "$image" "$profile_hash")"
     if [[ -z "${image}" ]]; then
         echo "Missing image name"
         exit 1
