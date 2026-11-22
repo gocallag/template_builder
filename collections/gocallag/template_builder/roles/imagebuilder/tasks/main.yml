@@ -11,7 +11,7 @@
 - name: Main | Assert core build variables
   ansible.builtin.assert:
     that:
-      - imagebuilder_phase in ['build', 'base', 'patch', 'download', 'clean']
+      - imagebuilder_phase in ['build', 'base', 'patch', 'harden', 'download', 'clean']
       - os is defined
       - os.plugin is defined
       - os.iso is defined
@@ -60,7 +60,7 @@
       when: imagebuilder_phase in ['download']
 
 - name: Main | Orchestration | Execute the build phase
-  when: imagebuilder_phase in ['build', 'base', 'patch']
+  when: imagebuilder_phase in ['build', 'base', 'patch', 'harden']
   block:
 
     - name: Main | Validate patch source selection
@@ -73,7 +73,7 @@
     - name: Main | Resolve patch source artifact
       ansible.builtin.include_tasks:
         file: artifact/resolve.yml
-      when: imagebuilder_phase == 'patch'
+      when: imagebuilder_phase in ['patch', 'harden']
 
     - name: Main | Require a patch source artifact
       ansible.builtin.assert:
@@ -90,7 +90,7 @@
       vars:
         imagebuilder_restore_artifact: "{{ imagebuilder_resolved_artifact }}"
       when:
-        - imagebuilder_phase == 'patch'
+        - imagebuilder_phase == 'patch' or imagebuilder_phase == 'harden'
         - imagebuilder_resolved_artifact.exists | default(false)
 
     - name: Main | Create base artifact
@@ -110,6 +110,11 @@
         imagebuilder_pipeline_phase: patch
       when: imagebuilder_phase == 'patch'
 
+    - name: Main | Harden selected artifact
+      ansible.builtin.include_tasks: phase-harden.yml
+      vars:
+        imagebuilder_pipeline_phase: harden
+      when: imagebuilder_phase == 'harden'
     - name: Main | Execute end-to-end build
       ansible.builtin.include_tasks: phase-build.yml
       when: imagebuilder_phase == 'build'

@@ -63,10 +63,10 @@
     name: gocallag.template_builder.imagebuilder
     tasks_from: capabilities/wait_guest
 
-- name: Main | Apply generic hardening
-  ansible.builtin.include_role:
-    name: gocallag.template_builder.imagebuilder
-    tasks_from: hardening.yml
+# - name: Main | Apply generic hardening
+#   ansible.builtin.include_role:
+#     name: gocallag.template_builder.imagebuilder
+#     tasks_from: hardening.yml
 
 - name: Main | Clean target template
   ansible.builtin.include_role:

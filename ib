@@ -29,6 +29,7 @@ VALID_PHASES=(
 	download
     base
     patch
+    harden
 )
 
 validate_phase() {
@@ -36,7 +37,7 @@ validate_phase() {
     local phase="$1"
 
     case "${phase}" in
-        build|clean|download|base|patch)
+        build|clean|download|base|patch|harden)
             return 0
             ;;
         *)
@@ -63,6 +64,9 @@ Lifecycle
 
   patch
     Apply operating system updates
+
+  Harden
+    Apply operating system hardening
 
 Operational
   build
@@ -562,7 +566,7 @@ list_artifacts() {
             "PHASE" "GEN" "SIZE" "CREATED"
         echo "--------------------------------------------------"
 
-        for phase in base patched ; do
+        for phase in base patched hardened ; do
 
             phase_dir="${profile}/${phase}"
 
@@ -955,6 +959,7 @@ artifact)
 		echo "Specify a phase:"
 		echo "  base"
 		echo "  patched"
+        echo "  hardened"
 		exit 0
 	fi
 

@@ -1,0 +1,79 @@
+---
+- name: Harden | Validate restore state
+  ansible.builtin.assert:
+    that:
+      - imagebuilder_current_artifact is defined
+    fail_msg: >-
+      Harden phase requires a restored artifact.
+
+- name: Harden | Show restore source
+  ansible.builtin.debug:
+    msg:
+      phase: "{{ imagebuilder_current_artifact.phase }}"
+      generation: "{{ imagebuilder_current_artifact.generation }}"
+- name: Harden | Power on QEMU VM (hardening)
+  ansible.builtin.include_tasks:
+    file: qemu/launch.yml
+  vars:
+    imagebuilder_qemu_launch_command: >-
+      {{ imagebuilder_qemu_command }}
+      -chardev socket,id=mon0,host=localhost,port={{ imagebuilder_env_qemu_monport }},server=on,wait=off
+      -mon chardev=mon0
+      -boot order=c
+- name: Harden | Wait for QEMU monitor
+  ansible.builtin.include_tasks:
+    file: qemu/wait_monitor.yml
+- name: Harden| Wait for QEMU VM to be accessible
+  ansible.builtin.wait_for:
+    host: "{{ imagebuilder_localip }}"
+    port: "{{ (os_type | lower == 'linux') | ternary(imagebuilder_env_qemu_ssh_port, imagebuilder_env_qemu_psrp_port) }}"
+    delay: 10
+    timeout: 900
+- name: Harden | Wait for connection
+  ansible.builtin.wait_for_connection:
+    connect_timeout: 10
+    sleep: 10
+    timeout: 1200
+  delegate_to: bob_build
+# - name: Harden | Apply operating system hardening
+#   ansible.builtin.include_role:
+#     name: "{{ os.plugin }}"
+#     tasks_from: hardening.yml
+- name: Harden | Apply generic hardening
+  ansible.builtin.include_tasks:
+    file: hardening.yml
+
+- name: Phase-harden | shutdown
+  ansible.builtin.shell: shutdown -h -t now && sleep 120
+  become: true
+  ignore_errors: true # noqa: ignore-errors
+  ignore_unreachable: true
+  changed_when: true
+  delegate_to: bob_build
+  when: os.family | lower == "linux"
+- name: Phase-harden | Shut down Windows system
+  ansible.windows.win_shell: shutdown /s /t 0
+  ignore_errors: true
+  ignore_unreachable: true
+  changed_when: true
+  delegate_to: bob_build
+  when: os.family | lower == "windows"
+- name: Harden | Wait for image release
+  ansible.builtin.include_tasks:
+    file: qemu/wait_image_release.yml
+  vars:
+    imagebuilder_qemu_image_path: >-
+      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2
+
+- name: Harden | Store hardened artifact
+  ansible.builtin.include_tasks:
+    file: artifact/store.yml
+  vars:
+    imagebuilder_artifact_phase: hardened
+
+    imagebuilder_artifact_source: >-
+      {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2
+
+    imagebuilder_artifact_parent:
+      phase: "{{ imagebuilder_current_artifact.phase }}"
+      generation: "{{ imagebuilder_current_artifact.generation }}"
