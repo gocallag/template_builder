@@ -75,5 +75,5 @@
       {{ imagebuilder_path_imagedir }}/{{ imagebuilder_id_base }}.x86_64.qcow2
 
     imagebuilder_artifact_parent:
-      phase: "{{ imagebuilder_current_artifact.phase }}"
+      phase: "patched"
       generation: "{{ imagebuilder_current_artifact.generation }}"
