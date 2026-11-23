@@ -42,7 +42,7 @@
                   logvol /home --fstype xfs --name lvhome --vgname {{ os_variant | lower }} --size 512
                   logvol /opt --fstype xfs --name lvopt --vgname {{ os_variant | lower }} --size 512
                   logvol /tmp --fstype xfs --name lvtmp --vgname {{ os_variant | lower }} --size 512
-                  logvol /usr --fstype xfs --name lvusr --vgname {{ os_variant | lower }} --size 4096
+                  logvol /usr --fstype xfs --name lvusr --vgname {{ os_variant | lower }} --size 8192
                   logvol /var --fstype xfs --name lvvar --vgname {{ os_variant | lower }} --size 3172
                   logvol /var/log --fstype xfs --name=lvvarlog --vgname {{ os_variant | lower }} --size 1024
                   logvol /var/log/audit --fstype xfs --name lvvarlogaud --vgname {{ os_variant | lower }} --size 512
