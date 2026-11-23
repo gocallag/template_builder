@@ -90,19 +90,22 @@ imagebuilder_required_directories:
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/patched"
   - "{{ imagebuilder_path_librarydir }}/{{ imagebuilder_profile_hash }}/hardened"
 imagebuilder_restore_precedence:
+
   build:
     - hardened
     - patched
     - base
+
   patch:
     - patched
     - base
+
   harden:
-    - hardened
     - patched
+
   uplift:
-    - uplifted
     - hardened
+
 
 imagebuilder_phase_graph:
 
@@ -111,18 +114,13 @@ imagebuilder_phase_graph:
 
   patch:
     produces: patched
-    restore:
-      - patched
-      - base
+    source: base
 
   harden:
     produces: hardened
-    restore:
-      - hardened
-      - patched
+    source: patched
+    max_gen: 1
 
   uplift:
-    produces: uplifted
-    restore:
-      - uplifted
-      - hardened
+    produces: null
+    source: hardened

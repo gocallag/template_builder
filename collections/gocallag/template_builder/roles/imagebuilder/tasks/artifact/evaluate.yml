@@ -1,0 +1,28 @@
+---
+- name: Artifact | Evaluate | Default state
+  ansible.builtin.set_fact:
+    imagebuilder_artifact_usable: true
+    imagebuilder_artifact_depth: 0
+
+- name: Artifact | Evaluate | Calculate generation depth
+  ansible.builtin.include_tasks:
+    file: artifact/evaluate_depth.yml
+  when:
+    - imagebuilder_loaded_artifact.exists | default(false)
+
+- name: Artifact | Evaluate | Enforce max generation depth
+  ansible.builtin.set_fact:
+    imagebuilder_artifact_usable: false
+  when:
+    - imagebuilder_loaded_artifact.exists | default(false)
+    - imagebuilder_phase_graph[imagebuilder_phase].max_gen is defined
+    - imagebuilder_artifact_depth >
+      imagebuilder_phase_graph[imagebuilder_phase].max_gen
+
+- name: Artifact | Evaluate | Show result
+  ansible.builtin.debug:
+    msg:
+      phase: "{{ imagebuilder_loaded_artifact.phase }}"
+      generation: "{{ imagebuilder_loaded_artifact.generation }}"
+      depth: "{{ imagebuilder_artifact_depth }}"
+      usable: "{{ imagebuilder_artifact_usable }}"

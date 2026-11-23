@@ -1,0 +1,17 @@
+---
+- name: Artifact | Evaluate Depth | Initialise depth
+  ansible.builtin.set_fact:
+    imagebuilder_artifact_depth: 0
+
+- name: Artifact | Evaluate Depth | Count self lineage
+  ansible.builtin.set_fact:
+    imagebuilder_artifact_depth: >-
+      {{
+        (
+          imagebuilder_loaded_artifact.metadata.generation_chain
+          | default([])
+          | select('match', '^' ~ imagebuilder_loaded_artifact.phase ~ ':')
+          | list
+          | length
+        )
+      }}

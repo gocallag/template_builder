@@ -7,9 +7,17 @@
   when:
     - not imagebuilder_resolved_artifact.exists | default(false)
 
+- name: Artifact | resolve_candidate | Evaluate artifact
+  ansible.builtin.include_tasks:
+    file: artifact/evaluate.yml
+  when:
+    - imagebuilder_loaded_artifact.exists | default(false)
+    - not imagebuilder_resolved_artifact.exists | default(false)
+
 - name: Artifact | resolve_candidate | Accept candidate
   ansible.builtin.set_fact:
     imagebuilder_resolved_artifact: "{{ imagebuilder_loaded_artifact }}"
   when:
     - imagebuilder_loaded_artifact.exists | default(false)
+    - imagebuilder_artifact_usable | default(true)
     - not imagebuilder_resolved_artifact.exists | default(false)
