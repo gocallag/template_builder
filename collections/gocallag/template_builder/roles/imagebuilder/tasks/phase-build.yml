@@ -39,6 +39,14 @@
   when:
     - imagebuilder_current_artifact.phase == 'base'
 
+- name: Build | Harden patched artifact
+  ansible.builtin.include_tasks:
+    file: phase-harden.yml
+  vars:
+    imagebuilder_pipeline_phase: harden
+  when:
+    - imagebuilder_current_artifact.phase == 'patched'
+
 - name: Build | Define canonical source artifact
   ansible.builtin.set_fact:
     imagebuilder_artifact:
