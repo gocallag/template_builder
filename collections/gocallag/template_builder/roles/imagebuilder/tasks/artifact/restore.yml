@@ -25,3 +25,9 @@
       {{ imagebuilder_restore_artifact.phase }}
       generation
       {{ imagebuilder_restore_artifact.generation }}
+- name: Artifact | restore | Selected artifact
+  ansible.builtin.debug:
+    msg:
+      event: artifact_restored
+      phase: "{{ imagebuilder_restore_artifact.phase }}"
+      generation: "{{ imagebuilder_restore_artifact.generation }}"

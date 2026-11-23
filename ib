@@ -137,11 +137,9 @@ display_task_event() {
 
             phase="$(jq -r '.msg.phase' <<< "${event}")"
             generation="$(jq -r '.msg.generation' <<< "${event}")"
-
-            printf '%-12s %-32s %s\n' \
-                "${job_id}" \
-                "RESTORE" \
-                "${phase}/${generation}"
+            display_domain_event \
+                    "${event}" \
+                    "RESTORE selected ${phase}/${generation}"
 
             return
             ;;
@@ -151,10 +149,9 @@ display_task_event() {
             phase="$(jq -r '.msg.phase' <<< "${event}")"
             generation="$(jq -r '.msg.generation' <<< "${event}")"
 
-            printf '%-12s %-32s %s\n' \
-                "${job_id}" \
-                "STORE" \
-                "${phase}/${generation}"
+            display_domain_event \
+                    "${event}" \
+                    "STORE selected ${phase}/${generation}"
 
             return
             ;;
