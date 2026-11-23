@@ -30,6 +30,7 @@ VALID_PHASES=(
     base
     patch
     harden
+
 )
 
 validate_phase() {
@@ -681,6 +682,79 @@ container_run_detached() {
         "${IMAGEBUILDER_IMAGE}" \
         "$@"
 }
+prune_artifacts() {
+
+    local image="$1"
+    local profile="$2"
+    local apply="${3:-false}"
+
+    local root="${LIBRARY_DIR}/${image}/${profile}"
+
+    [[ -d "${root}" ]] || {
+        echo "Profile not found:"
+        echo "  ${root}"
+        return 1
+    }
+
+    echo
+    echo "Profile : ${profile}"
+    echo
+
+    for phase in base patched hardened; do
+
+        local phase_dir="${root}/${phase}"
+
+        [[ -d "${phase_dir}" ]] || continue
+
+        local max_gen
+
+        max_gen="$(yq e \
+            ".builder.retention.${phase} // 0" \
+            "${CONFIG}")"
+
+        [[ "${max_gen}" != "0" ]] || continue
+
+        mapfile -t generations < <(
+            find "${phase_dir}" \
+                -mindepth 1 \
+                -maxdepth 1 \
+                -type d \
+                -printf "%f\n" \
+                | grep -E '^[0-9]{4}$' \
+                | sort
+        )
+
+        local count="${#generations[@]}"
+
+        (( count > max_gen )) || continue
+
+        local delete_count=$((count - max_gen))
+
+        echo "Phase : ${phase}"
+        echo "Keep  : ${max_gen}"
+        echo
+
+        for ((i=0; i<delete_count; i++)); do
+
+            local generation="${generations[$i]}"
+            local generation_dir="${phase_dir}/${generation}"
+
+            if [[ "${apply}" == "true" ]]; then
+
+                echo "DELETE ${phase}/${generation}"
+
+                rm -rf "${generation_dir}"
+
+            else
+
+                echo "WOULD DELETE ${phase}/${generation}"
+
+            fi
+        done
+
+        echo
+    done
+}
 
 run_phase() {
 
@@ -782,6 +856,46 @@ clean)
 
     cleanup_job "${job_id}"
 
+    ;;
+prune)
+
+    image="${2:-}"
+    profile="${3:-current}"
+
+    [[ -n "${image}" ]] || {
+        echo "Missing image name"
+        exit 1
+    }
+
+    profile="$(resolve_profile_hash "${image}" "${profile}")"
+
+    apply=false
+
+    shift
+
+    shift
+
+    if [[ $# -gt 0 ]]; then
+        shift
+    fi
+
+    while (($#)); do
+        case "$1" in
+            --apply)
+                apply=true
+                ;;
+            *)
+                echo "Unknown prune option: $1"
+                exit 1
+                ;;
+        esac
+        shift
+    done
+
+    prune_artifacts \
+        "${image}" \
+        "${profile}" \
+        "${apply}"
     ;;
 rm)
 
