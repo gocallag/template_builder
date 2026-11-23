@@ -743,7 +743,7 @@ prune_artifacts() {
 
                 echo "DELETE ${phase}/${generation}"
 
-                rm -rf "${generation_dir}"
+                sudo rm -rf "${generation_dir}"
 
             else
 
@@ -859,8 +859,42 @@ clean)
     ;;
 prune)
 
-    image="${2:-}"
-    profile="${3:-current}"
+    image=""
+    profile="current"
+    apply=false
+
+    shift
+
+    while (($#)); do
+        case "$1" in
+
+            --apply)
+                apply=true
+                ;;
+
+            current)
+                profile="current"
+                ;;
+
+            --*)
+                echo "Unknown prune option: $1"
+                exit 1
+                ;;
+
+            *)
+                if [[ -z "${image}" ]]; then
+                    image="$1"
+                elif [[ "${profile}" == "current" ]]; then
+                    profile="$1"
+                else
+                    echo "Unexpected argument: $1"
+                    exit 1
+                fi
+                ;;
+        esac
+
+        shift
+    done
 
     [[ -n "${image}" ]] || {
         echo "Missing image name"
@@ -869,33 +903,11 @@ prune)
 
     profile="$(resolve_profile_hash "${image}" "${profile}")"
 
-    apply=false
-
-    shift
-
-    shift
-
-    if [[ $# -gt 0 ]]; then
-        shift
-    fi
-
-    while (($#)); do
-        case "$1" in
-            --apply)
-                apply=true
-                ;;
-            *)
-                echo "Unknown prune option: $1"
-                exit 1
-                ;;
-        esac
-        shift
-    done
-
     prune_artifacts \
         "${image}" \
         "${profile}" \
         "${apply}"
+
     ;;
 rm)
 
