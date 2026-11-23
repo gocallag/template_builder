@@ -30,7 +30,6 @@ VALID_PHASES=(
     base
     patch
     harden
-
 )
 
 validate_phase() {
