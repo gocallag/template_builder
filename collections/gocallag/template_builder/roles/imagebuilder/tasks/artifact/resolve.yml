@@ -28,6 +28,9 @@
   loop_control:
     loop_var: imagebuilder_candidate_phase
 
-- name: Artifact | Resolve | Show selected artifact
+- name: Artifact | Resolve | Selected artifact
   ansible.builtin.debug:
-    var: imagebuilder_resolved_artifact
+    msg:
+      event: artifact_selected
+      phase: "{{ imagebuilder_resolved_artifact.phase }}"
+      generation: "{{ imagebuilder_resolved_artifact.generation }}"

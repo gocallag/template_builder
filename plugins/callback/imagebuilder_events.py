@@ -225,7 +225,7 @@ class CallbackModule(CallbackBase):
         if self._is_role_wrapper(task):
             return
 
-        self._emit({
+        payload = {
             "type": "task_ok",
             "task": task.get_name(),
             "task_uuid": task._uuid,
@@ -237,7 +237,12 @@ class CallbackModule(CallbackBase):
             "duration_ms": self._duration_ms(
                 task._uuid
             ),
-        })
+        }
+
+        if "msg" in result._result:
+            payload["msg"] = result._result["msg"]
+
+        self._emit(payload)
 
     def v2_runner_on_failed(
         self,

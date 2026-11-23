@@ -81,6 +81,28 @@ EOF
 runtime() {
     "${CONTAINER_RUNTIME}" "$@"
 }
+display_domain_event() {
+
+    local event="$1"
+    local title="$2"
+
+    local timestamp
+
+    timestamp="$(jq -r '.timestamp // "-"' <<< "${event}")"
+
+    if [[ "${task_header_shown}" != "true" ]]; then
+        printf '%-12s %-32s %-6s %-12s %s\n' \
+            "JOBID" "STARTED" "RESULT" "ELAPSED" "TASK"
+        task_header_shown=true
+    fi
+
+    printf '%-12s %-32s %-6s %-12s %s\n' \
+        "${job_id}" \
+        "${timestamp}" \
+        "*" \
+        "-" \
+        "${title}"
+}
 
 display_task_event() {
     local event="$1"
@@ -91,6 +113,53 @@ display_task_event() {
     local duration_ms
     local elapsed="-"
     local status
+    msg_type="$(
+    jq -r '
+      .msg
+      | select(type == "object")
+      | .event // empty
+    ' <<< "${event}"
+)"
+
+    case "${msg_type}" in
+
+        artifact_selected)
+                phase="$(jq -r '.msg.phase // "-"' <<< "${event}")"
+                generation="$(jq -r '.msg.generation // "-"' <<< "${event}")"
+                display_domain_event \
+                    "${event}" \
+                    "ARTIFACT selected ${phase}/${generation}"
+                return
+            ;;
+
+
+        artifact_restored)
+
+            phase="$(jq -r '.msg.phase' <<< "${event}")"
+            generation="$(jq -r '.msg.generation' <<< "${event}")"
+
+            printf '%-12s %-32s %s\n' \
+                "${job_id}" \
+                "RESTORE" \
+                "${phase}/${generation}"
+
+            return
+            ;;
+
+        artifact_stored)
+
+            phase="$(jq -r '.msg.phase' <<< "${event}")"
+            generation="$(jq -r '.msg.generation' <<< "${event}")"
+
+            printf '%-12s %-32s %s\n' \
+                "${job_id}" \
+                "STORE" \
+                "${phase}/${generation}"
+
+            return
+            ;;
+
+    esac
 
     event_type="$(jq -r '.type // empty' <<< "${event}")"
 
