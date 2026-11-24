@@ -122,6 +122,13 @@ display_task_event() {
 
     case "${msg_type}" in
 
+        gen_message)
+                gmesg="$(jq -r '.msg.general // "-"' <<< "${event}")"
+                display_domain_event \
+                    "${event}" \
+                    "${gmesg}"
+                return
+            ;;
         artifact_selected)
                 phase="$(jq -r '.msg.phase // "-"' <<< "${event}")"
                 generation="$(jq -r '.msg.generation // "-"' <<< "${event}")"

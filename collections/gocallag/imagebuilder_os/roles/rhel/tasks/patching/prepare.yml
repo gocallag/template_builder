@@ -32,4 +32,11 @@
     password: "{{ imagebuilder_config.credentials.rhsm.password }}"
   no_log: true
   become: true
+  register: imagebuilder_rhsm_status
   delegate_to: bob_build
+
+- name: Patching | prepare | RHSM status
+  ansible.builtin.debug:
+    msg:
+      event: gen_message
+      general: "RHSM status {{ imagebuilder_rhsm_status }}"
