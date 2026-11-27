@@ -9,7 +9,7 @@ else
     images=(
         ol-8.10
         ol-9.8
-        ol-10.1
+        ol-10.3
     )
 fi
 
