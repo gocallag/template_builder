@@ -125,6 +125,7 @@
 
     - name: Main | Define remote paths
       ansible.builtin.set_fact:
+        imagebuilder_proxmox_build_timestamp: "{{ lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ') }}"
         imagebuilder_proxmox_remote_dir: >-
           /mnt/pve/{{ imagebuilder_proxmox.storage }}/import
 
@@ -187,6 +188,7 @@
         description: |
           Imagebuilder template
           Build ID: {{ imagebuilder_artifact.id }}
+          Build timestamp (UTC): {{ imagebuilder_proxmox_build_timestamp }}
       delegate_to: localhost
       register: imagebuilder_proxmox_vm
 
